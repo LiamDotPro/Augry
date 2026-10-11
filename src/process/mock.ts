@@ -17,7 +17,7 @@ const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
 function version(process: Process, message: string, at: number, note?: string): ProcessVersion {
-  return { version: process.version, message, by: "Liam", at, hash: hashOf(process), process, note };
+  return { version: process.version, message, by: "You", at, hash: hashOf(process), process, note };
 }
 
 export function seedRecords(now: number): ProcessRecord[] {

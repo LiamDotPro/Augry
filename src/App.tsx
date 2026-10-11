@@ -75,8 +75,10 @@ function Shell() {
           {state.account ? (
             <ProcessView
               onOpenPane={(n) => {
+                // Run rows number panes across every page, not within the current one.
+                const id = state.order[n - 1];
                 actions.setTab("terminals");
-                actions.focusIndex(n - 1);
+                if (id) actions.focusTerminal(id);
               }}
             />
           ) : (
@@ -143,7 +145,8 @@ function useGlobalHotkeys(): void {
       if (action.type === "toggle-review" && scheme === "mac" && isTextField(event.target)) return;
       // ⌘S saves in the review editor and the note editor; only a terminal's
       // selection is ours to save.
-      if (action.type === "save-note" && isTextField(event.target)) return;
+      // Elsewhere the same key (⌘S on macOS) saves whatever that tab has open.
+      if (action.type === "save-note" && (isTextField(event.target) || state.activeTab !== "terminals")) return;
       // In the review panel plain Alt+↑ / Alt+↓ step through changed files.
       if (
         action.type === "move-focus" &&

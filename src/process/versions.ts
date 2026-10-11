@@ -161,7 +161,7 @@ export function saveVersion(
   const entry: ProcessVersion = {
     version,
     message: message.trim() || "Saved",
-    by: options.by ?? "Liam",
+    by: options.by ?? "You",
     at: now,
     hash: hashOf(process),
     process,

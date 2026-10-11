@@ -47,10 +47,12 @@ export function FirstRunSetup() {
 
   const browserPending = pending === "github" || pending === "google";
 
-  // Enter continues, the way the button says; text fields keep their Enter.
+  // Enter continues, the way the button says.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Enter" || step >= 2 || (event.target as HTMLElement | null)?.closest("input")) return;
+      // A focused control keeps its own Enter: Back goes back, Change opens the picker.
+      const target = event.target as HTMLElement | null;
+      if (event.key !== "Enter" || step >= 2 || target?.closest("input, button, select, textarea, a")) return;
       event.preventDefault();
       setStep((current) => current + 1);
     };

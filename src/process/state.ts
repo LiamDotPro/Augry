@@ -11,7 +11,7 @@ import { blankProcess, TEMPLATES } from "./examples";
 import { cloneProcess, hashOf } from "./json";
 import { seedRecords, seedRuns, newestFile } from "./mock";
 import { uniqueId } from "./model";
-import { advanceRun, approveRun, sendBackRun, startRun, stopRun } from "./runs";
+import { advanceRun, approveRun, decideNoRun, sendBackRun, skipRun, startRun, stopRun } from "./runs";
 import type { Connection, Process, ProcessRecord, Run } from "./types";
 import { latest, restoreVersion, saveVersion, withDraft, working } from "./versions";
 
@@ -70,6 +70,8 @@ export type Action =
   | { type: "tick"; now: number }
   | { type: "approve"; runId: string; stepId: string; now: number }
   | { type: "send-back"; runId: string; stepId: string; now: number }
+  | { type: "skip"; runId: string; stepId: string; now: number }
+  | { type: "decide-no"; runId: string; stepId: string; now: number }
   | { type: "stop"; runId: string; now: number }
   | { type: "edit"; processId: string; process: Process }
   | { type: "select"; processId: string; selection: Selection }
@@ -164,6 +166,7 @@ function beginRun(state: ProcessState, processId: string, now: number, trigger?:
   const number = Math.max(0, ...state.runs.filter((r) => r.processId === processId).map((r) => r.number)) + 1;
   const fallback = defaultTrigger(current.process, now);
   const run = startRun(current.process, {
+    processId,
     number,
     version: current.version,
     trigger: trigger ?? fallback.trigger,
@@ -179,7 +182,7 @@ function addRecord(state: ProcessState, process: Process, message: string, now: 
   const record: ProcessRecord = {
     id,
     draft: null,
-    versions: [{ version: 1, message, by: "Liam", at: now, hash: hashOf(content), process: content }],
+    versions: [{ version: 1, message, by: "You", at: now, hash: hashOf(content), process: content }],
   };
   return { state: { ...state, records: [...state.records, record] }, id };
 }
@@ -222,15 +225,19 @@ export function reducer(state: ProcessState, action: Action): ProcessState {
 
     case "approve":
     case "send-back":
+    case "skip":
+    case "decide-no":
     case "stop": {
       const run = state.runs.find((r) => r.id === action.runId);
       if (!run) return state;
       const next =
-        action.type === "approve"
-          ? approveRun(run, action.stepId, action.now)
-          : action.type === "send-back"
-            ? sendBackRun(run, action.stepId, action.now)
-            : stopRun(run, action.now);
+        action.type === "stop"
+          ? stopRun(run, action.now)
+          : { approve: approveRun, "send-back": sendBackRun, skip: skipRun, "decide-no": decideNoRun }[action.type](
+              run,
+              action.stepId,
+              action.now,
+            );
       return next === run ? state : replaceRun(state, next);
     }
 
@@ -304,12 +311,19 @@ export function reducer(state: ProcessState, action: Action): ProcessState {
       return addRecord(state, copy, `Copied from ${source.name}`, action.now).state;
     }
 
-    case "delete":
+    case "delete": {
+      // Its runs go too, so a later process that gets the same id starts clean.
+      const { [action.processId]: _editor, ...editor } = state.editor;
+      const { [action.processId]: _versions, ...versions } = state.versions;
       return {
         ...state,
         records: state.records.filter((r) => r.id !== action.processId),
+        runs: state.runs.filter((r) => r.processId !== action.processId),
+        editor,
+        versions,
         route: { view: "home" },
       };
+    }
 
     case "file-arrived": {
       const record = recordOf(state, action.processId);

@@ -85,8 +85,13 @@ export function tokenize(line: string): Token[] {
  */
 export function stepLineRange(lines: readonly string[], id: string): [number, number] | null {
   const needle = `"id": ${JSON.stringify(id)}`;
-  const i = lines.findIndex((l) => l.includes(needle));
-  if (i < 0) return null;
+  // Rows and stages come before the steps and can share a step's id, so only
+  // look inside the steps list.
+  const steps = lines.findIndex((l) => /^\s*"steps": \[/.test(l));
+  if (steps < 0) return null;
+  const found = lines.slice(steps + 1).findIndex((l) => l.includes(needle));
+  if (found < 0) return null;
+  const i = steps + 1 + found;
   const line = lines[i]!;
   if (line.trimStart().startsWith("{")) return [i, i];
   const open = i - 1;
@@ -190,6 +195,16 @@ export function validateProcess(value: unknown): Problem[] {
     if (isRepeat(s.no)) refs.push(s.no.repeatFrom);
     for (const r of refs) {
       if (!ids.has(r)) out.push({ message: `Step "${s.id}" points at "${r}", which is not a step`, near: quoted(s.id) });
+    }
+  }
+  for (const key of ["ends", "loops"] as const) {
+    const items = value[key];
+    if (items === undefined) continue;
+    if (!Array.isArray(items) || !items.every(isObj)) return [...out, { message: `${key} must be a list of objects`, near: `"${key}"` }];
+  }
+  for (const l of p.loops ?? []) {
+    if (l.steps !== undefined && !Array.isArray(l.steps)) {
+      return [...out, { message: `Loop "${String(l.id)}" needs steps as a list`, near: '"loops"' }];
     }
   }
   for (const e of p.ends ?? []) {

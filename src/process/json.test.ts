@@ -85,3 +85,21 @@ describe("hashOf", () => {
     expect(hashOf({ ...FEATURE_DELIVERY, name: "Other" })).not.toBe(a);
   });
 });
+
+describe("hardening", () => {
+  it("reports ends and loops of the wrong shape instead of throwing", () => {
+    for (const ends of [{}, 5, [null]]) {
+      const problems = validateProcess({ ...FEATURE_DELIVERY, ends });
+      expect(problems.some((p) => p.message.includes("ends must be a list"))).toBe(true);
+    }
+    const loops = validateProcess({ ...BUG_FIX, loops: [{ id: "x", steps: "fix" }] });
+    expect(loops.some((p) => p.message.includes("needs steps as a list"))).toBe(true);
+  });
+
+  it("finds a step even when a stage or row shares its id", () => {
+    const process = { ...FEATURE_DELIVERY, stages: [...FEATURE_DELIVERY.stages, { id: "approve", name: "Approve" }] };
+    const lines = formatProcess(process).split("\n");
+    const range = stepLineRange(lines, "approve")!;
+    expect(lines.slice(range[0], range[1] + 1).join("\n")).toContain('"name": "Approve plan"');
+  });
+});

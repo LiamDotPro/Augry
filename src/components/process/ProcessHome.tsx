@@ -295,7 +295,7 @@ function RunsColumn() {
                 <button
                   type="button"
                   className="process-btn process-btn--small process-btn--soft"
-                  onClick={() => dispatch({ type: "send-back", runId: run.id, stepId: step, now: Date.now() })}
+                  onClick={() => dispatch({ type: actions.backAction, runId: run.id, stepId: step, now: Date.now() })}
                 >
                   {actions.back}
                 </button>

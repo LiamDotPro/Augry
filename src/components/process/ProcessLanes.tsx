@@ -279,7 +279,7 @@ function WaitingCard({ run, stepId, x, y }: { run: Run; stepId: string; x: numbe
         <button type="button" className="process-btn process-btn--small process-btn--soft" onClick={() => dispatch({ type: "approve", runId: run.id, stepId, now: Date.now() })}>
           {actions.approve}
         </button>
-        <button type="button" className="process-btn process-btn--small process-btn--soft" onClick={() => dispatch({ type: "send-back", runId: run.id, stepId, now: Date.now() })}>
+        <button type="button" className="process-btn process-btn--small process-btn--soft" onClick={() => dispatch({ type: actions.backAction, runId: run.id, stepId, now: Date.now() })}>
           {actions.back}
         </button>
       </div>

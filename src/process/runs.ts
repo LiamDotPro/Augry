@@ -14,10 +14,11 @@ import type { Process, Run, RunStatus, StepRun, Tone } from "./types";
 /** How many items a for-each loop pretends to have. */
 export const EACH_TOTAL = 3;
 
+/** Steps on "you" wait for you, decisions included when you are the one who decides. */
 const isYou = (process: Process, stepId: string) => {
   const step = process.steps.find((s) => s.id === stepId);
   const surface = process.surfaces.find((s) => s.id === step?.on);
-  return surface?.kind === "you" && !step?.decide;
+  return surface?.kind === "you" && (!step?.decide || step.decide === "ask");
 };
 
 /** A clock time like 10:31. */
@@ -59,6 +60,8 @@ export function agoWords(ts: number, now: number): string {
 // Starting -----------------------------------------------------------------------
 
 export interface RunStart {
+  /** The record the run belongs to; the pinned JSON's own `id` can be edited to anything. */
+  processId: string;
   number: number;
   version: number;
   /** "issue #142", "webhook", "folder". */
@@ -84,9 +87,9 @@ export function startRun(process: Process, start: RunStart): Run {
   for (const s of pinned.steps) steps[s.id] = { state: "pending", note: "" };
   const graph = buildGraph(pinned);
   const run: Run = {
-    id: `${pinned.id}#${start.number}`,
+    id: `${start.processId}#${start.number}`,
     number: start.number,
-    processId: pinned.id,
+    processId: start.processId,
     version: start.version,
     hash: hashOf(pinned),
     process: pinned,
@@ -241,8 +244,58 @@ export function advanceRun(previous: Run, now: number): Run {
 export function approveRun(previous: Run, stepId: string, now: number): Run {
   if (previous.steps[stepId]?.state !== "waiting") return previous;
   const run = copy(previous);
-  run.steps[stepId] = { state: "done", note: clock(now) };
+  const graph = buildGraph(run.process);
+  const step = graph.byId[stepId];
+  if (step?.decide) {
+    // Your decision said yes: the no branch is not taken.
+    run.steps[stepId] = { state: "done", note: "yes" };
+    if (Array.isArray(step.no)) skipBranch(run, step.no);
+  } else {
+    run.steps[stepId] = { state: "done", note: clock(now) };
+  }
+  startReady(run, graph);
+  return settle(run, now);
+}
+
+/** You skipped a question: the run goes on without an answer. */
+export function skipRun(previous: Run, stepId: string, now: number): Run {
+  if (previous.steps[stepId]?.state !== "waiting") return previous;
+  const run = copy(previous);
+  run.steps[stepId] = { state: "done", note: "skipped" };
   startReady(run, buildGraph(run.process));
+  return settle(run, now);
+}
+
+/**
+ * Your decision said no: a repeat goes round again until its limit, and a
+ * branching no skips the steps it did not lead to.
+ */
+export function decideNoRun(previous: Run, stepId: string, now: number): Run {
+  if (previous.steps[stepId]?.state !== "waiting") return previous;
+  const run = copy(previous);
+  const graph = buildGraph(run.process);
+  const step = graph.byId[stepId];
+  if (!step?.decide) return previous;
+  const no = step.no;
+  if (isRepeat(no)) {
+    const tries = (run.tries[stepId] ?? 0) + 1;
+    const loop = graph.loops.find((l) => l.kind === "repeat" && l.id === stepId);
+    if (!loop || tries >= no.max) {
+      const stopped = stopRun(run, now);
+      stopped.result = `Stopped after ${no.max} tries`;
+      return stopped;
+    }
+    run.tries[stepId] = tries;
+    rewind(run, loop.steps);
+    begin(run, graph, no.repeatFrom);
+    run.loops[stepId] = `try ${tries + 1} of ${no.max}`;
+    return settle(run, now);
+  }
+  run.steps[stepId] = { state: "done", note: "no" };
+  const taken = Array.isArray(no) ? no : [];
+  const others = graph.steps.filter((s) => graph.preds[s.id]!.includes(stepId) && !taken.includes(s.id)).map((s) => s.id);
+  skipBranch(run, others);
+  startReady(run, graph);
   return settle(run, now);
 }
 
@@ -333,11 +386,17 @@ export function runHeadline(run: Run): string {
 }
 
 /** The waiting step's buttons: the first opens what you need to look at. */
-export function waitActions(run: Run, stepId: string): { primary: string; approve: string; back: string } {
+export type WaitBack = "send-back" | "skip" | "decide-no";
+
+export function waitActions(
+  run: Run,
+  stepId: string,
+): { primary: string; approve: string; back: string; backAction: WaitBack } {
   const step = run.process.steps.find((s) => s.id === stepId);
-  if (step?.ask) return { primary: "Open pane", approve: "Answered", back: "Skip" };
-  if (step?.approve) return { primary: `Open ${step.approve}`, approve: "Approve", back: "Send back" };
-  return { primary: "Open review", approve: "Approve", back: "Send back" };
+  if (step?.decide) return { primary: "Open run", approve: "Yes", back: "No", backAction: "decide-no" };
+  if (step?.ask) return { primary: "Open pane", approve: "Answered", back: "Skip", backAction: "skip" };
+  if (step?.approve) return { primary: `Open ${step.approve}`, approve: "Approve", back: "Send back", backAction: "send-back" };
+  return { primary: "Open review", approve: "Approve", back: "Send back", backAction: "send-back" };
 }
 
 /** What the waiting card says when the run did not come with a summary. */
