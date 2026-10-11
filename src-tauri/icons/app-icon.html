@@ -1,10 +1,11 @@
 <!doctype html>
 <!--
-  Terminal Grid master icon ("Trio"). A 1024x1024 artboard with transparent
-  corners: three glass panes stacked in true 3D, violet at the back, cyan in
-  the middle, clear glass with a white rim at the front, over a cyan floor glow.
-  The panes are CSS 3D transforms, which SVG can't express, so the master is
-  HTML and gets rendered to a 2048px PNG (app-icon.png). See README.md.
+  Augry master icon (App Shell.dc.html board 04, Components.dc.html
+  use="appicon"). A 1024x1024 artboard: three glass panes, violet at the back,
+  cyan in the middle and clear glass in front, skewed on a plain dark tile.
+  Nothing else: no glow, floor or reflection. Add ?small for the flat version
+  used at 48px and below, where the glass turns to solid colours so the mark
+  stays clear. See README.md for rendering.
 -->
 <html>
 <head>
@@ -12,70 +13,35 @@
 <style>
   html, body { margin: 0; background: transparent; }
   * { box-sizing: border-box; }
-  .art { position: relative; width: 1024px; height: 1024px; }
+  .art { position: relative; width: 1024px; height: 1024px; overflow: hidden; }
   .tile {
-    position: absolute; left: 64px; top: 64px; width: 896px; height: 896px;
-    border-radius: 208px; overflow: hidden; background: #06070d;
-    box-shadow: 0 18px 34px rgba(0,0,0,.4);
+    position: absolute; inset: 0; border-radius: 230px; overflow: hidden;
+    background: linear-gradient(180deg, #16133a, #06050f);
+    box-shadow: inset 0 0 0 3px rgba(255,255,255,.07), inset 0 6px 0 rgba(255,255,255,.08);
   }
-  .fill { position: absolute; inset: 0; }
-  .bg {
-    background:
-      radial-gradient(720px 420px at 50% 100%, rgba(141,220,255,.28), transparent 70%),
-      radial-gradient(500px 400px at 20% 0%, rgba(139,108,255,.18), transparent 70%),
-      linear-gradient(180deg, #0d1022, #030409);
-  }
-  .floor {
-    position: absolute; left: 110px; top: 650px; width: 680px; height: 190px; border-radius: 50%;
-    background: radial-gradient(ellipse, rgba(141,220,255,.65), transparent 70%);
-    filter: blur(28px);
-  }
-  .stage { position: absolute; inset: 0; display: grid; place-items: center; }
-  .stack { grid-area: 1/1; position: relative; width: 350px; height: 530px; }
-  .pane {
-    position: absolute; inset: 0; border-radius: 50px;
-    backface-visibility: hidden; outline: 1px solid transparent;
-    --tilt: translate(-62px,26px) perspective(1500px) rotateY(-38deg) rotateX(7deg);
-  }
-  .back {
-    transform: var(--tilt) translate3d(0,-40px,-360px);
-    background: linear-gradient(160deg, rgba(139,108,255,.66), rgba(139,108,255,.12));
-    border: 4px solid rgba(206,190,255,.72);
-    box-shadow: 0 0 120px rgba(139,108,255,.55), inset 0 6px 0 rgba(255,255,255,.3);
-  }
-  .mid {
-    transform: var(--tilt) translate3d(0,-20px,-180px);
-    background: linear-gradient(160deg, rgba(63,200,255,.58), rgba(63,200,255,.1));
-    border: 4px solid rgba(150,230,255,.78);
-    box-shadow: 0 0 120px rgba(63,200,255,.5), inset 0 6px 0 rgba(255,255,255,.32);
-  }
-  .front {
-    overflow: hidden;
-    transform: var(--tilt);
-    background: linear-gradient(155deg, rgba(255,255,255,.36) 0%, rgba(255,255,255,.09) 36%, rgba(255,255,255,.03) 62%, rgba(141,220,255,.22) 100%);
-    border: 4px solid rgba(255,255,255,.62);
-    box-shadow:
-      inset 9px 0 0 rgba(235,250,255,.95), inset 0 8px 0 rgba(255,255,255,.45),
-      0 0 0 2px rgba(141,220,255,.6), 0 0 150px rgba(141,220,255,.55);
-  }
-  .streak {
-    background: linear-gradient(116deg, transparent 20%, rgba(255,255,255,.3) 29%, rgba(255,255,255,.06) 39%, transparent 47%);
-  }
+  .pane { position: absolute; transform: skewY(-10deg); }
+
+  .full .pane { width: 300px; height: 440px; border-radius: 46px; border: 5px solid; }
+  .full .back { left: 452px; top: 268px; background: linear-gradient(160deg, rgba(139,108,255,.92), rgba(139,108,255,.4)); border-color: rgba(206,190,255,.85); }
+  .full .mid { left: 362px; top: 302px; background: linear-gradient(160deg, rgba(63,200,255,.86), rgba(63,200,255,.32)); border-color: rgba(150,230,255,.9); }
+  .full .front { left: 272px; top: 336px; background: linear-gradient(155deg, rgba(255,255,255,.55), rgba(255,255,255,.14) 45%, rgba(141,220,255,.32)); border-color: rgba(255,255,255,.85); box-shadow: inset 10px 0 0 rgba(240,252,255,.95); }
+
+  .small .pane { width: 320px; height: 470px; border-radius: 56px; }
+  .small .back { left: 452px; top: 250px; background: #8b6cff; }
+  .small .mid { left: 352px; top: 290px; background: #3fc8ff; }
+  .small .front { left: 252px; top: 330px; background: #f2fbff; }
 </style>
 </head>
 <body>
 <div class="art">
-  <div class="tile">
-    <div class="fill bg"></div>
-    <div class="floor"></div>
-    <div class="stage">
-      <div class="stack">
-        <div class="pane back"></div>
-        <div class="pane mid"></div>
-        <div class="pane front"><div class="fill streak"></div></div>
-      </div>
-    </div>
+  <div class="tile" id="tile">
+    <div class="pane back"></div>
+    <div class="pane mid"></div>
+    <div class="pane front"></div>
   </div>
 </div>
+<script>
+  document.getElementById("tile").classList.add(location.search.includes("small") ? "small" : "full");
+</script>
 </body>
 </html>

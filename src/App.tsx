@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Chrome } from "./components/Chrome";
 import { EmptyState } from "./components/EmptyState";
 import { HotkeyPopover } from "./components/HotkeyPopover";
+import { FirstRunSetup } from "./components/FirstRunSetup";
 import { NotesView } from "./components/notes/NotesView";
+import { ProcessSignedOut } from "./components/ProcessSignedOut";
+import { ProcessView } from "./components/process/ProcessView";
 import { PaneGrid } from "./components/PaneGrid";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { Splash } from "./components/Splash";
@@ -52,18 +55,38 @@ function Shell() {
   // handoff lets the chrome in ("reveal").
   const [splash, setSplash] = useState<"hold" | "reveal" | null>("hold");
 
-  const isTerminals = state.activeTab === "terminals";
+  const tab = state.activeTab;
+  // Setup runs once, after the splash has handed over to the app.
+  const showSetup = state.ready && !state.setupDone && splash === null;
 
   // macOS draws a native edge round the window; elsewhere the app draws one.
   return (
-    <div className={cx("app", frame === "windowed" && !IS_MAC && "app--windowed")} data-splash={splash ?? undefined}>
+    <div
+      className={cx("app", frame === "windowed" && !IS_MAC && "app--windowed")}
+      data-splash={splash ?? undefined}
+      data-setup={showSetup || undefined}
+    >
       <Chrome frame={frame} />
 
+      {/* Every tab stays mounted, so switching never reloads, closes or
+          scrolls anything: each one is where it was left (App Shell board 02). */}
       <div className="app__body">
-        <div className={cx("view", isTerminals && "view--active")} aria-hidden={!isTerminals}>
+        <div className={cx("view", tab === "process" && "view--active")} aria-hidden={tab !== "process"}>
+          {state.account ? (
+            <ProcessView
+              onOpenPane={(n) => {
+                actions.setTab("terminals");
+                actions.focusIndex(n - 1);
+              }}
+            />
+          ) : (
+            <ProcessSignedOut />
+          )}
+        </div>
+        <div className={cx("view", tab === "terminals" && "view--active")} aria-hidden={tab !== "terminals"}>
           {state.order.length === 0 ? <EmptyState /> : <PaneGrid />}
         </div>
-        <div className={cx("view", !isTerminals && "view--active")} aria-hidden={isTerminals}>
+        <div className={cx("view", tab === "notes" && "view--active")} aria-hidden={tab !== "notes"}>
           <NotesView />
         </div>
       </div>
@@ -77,6 +100,7 @@ function Shell() {
         />
       )}
 
+      {showSetup && <FirstRunSetup />}
       {state.hotkeysOpen && <HotkeyPopover />}
       {state.settingsOpen && <SettingsDialog />}
 
@@ -107,8 +131,8 @@ function useGlobalHotkeys(): void {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // The settings sheet owns the keyboard while it is open.
-      if (state.settingsOpen) return;
+      // The settings sheet and first-time setup own the keyboard while open.
+      if (state.settingsOpen || !state.setupDone) return;
 
       const scheme = hotkeyScheme(state.config.hotkeyModifier);
       const action = matchHotkey(event, scheme);
@@ -189,7 +213,7 @@ function useGlobalHotkeys(): void {
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [actions, state.activeTab, state.config.hotkeyModifier, state.focusedId, state.settingsOpen]);
+  }, [actions, state.activeTab, state.config.hotkeyModifier, state.focusedId, state.settingsOpen, state.setupDone]);
 }
 
 /** Holding the chord modifier reveals the hotkey popover, as screen 1d notes. */

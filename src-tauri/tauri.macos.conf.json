@@ -4,7 +4,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Terminal Grid",
+        "title": "Augry",
         "fullscreen": true,
         "width": 1280,
         "height": 800,

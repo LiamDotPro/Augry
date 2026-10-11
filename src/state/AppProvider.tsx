@@ -18,7 +18,9 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { call, decodeB64, on } from "../ipc/client";
 import { EVENTS } from "../ipc/types";
 import type {
+  Account,
   AgentEvent,
+  AppTab,
   ChangedFile,
   Config,
   CwdEvent,
@@ -63,8 +65,16 @@ const SUBMIT_DELAY_MS = 150;
 const NOTE_TOAST_MS = 6000;
 
 export interface AppActions {
-  setTab(tab: "terminals" | "notes"): void;
+  setTab(tab: AppTab): void;
   toggleTab(): void;
+  /** First-time setup finished or skipped. */
+  finishSetup(): void;
+  /**
+   * Signs in. There is no account service yet, so this resolves the account
+   * locally (mocked) and keeps it in the session.
+   */
+  signIn(provider: Account["provider"], email?: string): void;
+  signOut(): void;
   setPage(page: number): void;
   stepPage(delta: -1 | 1): void;
   setLayoutMode(mode: LayoutMode): void;
@@ -622,6 +632,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setLayoutMode: (mode) => dispatch({ type: "layout/set", mode }),
       cycleLayoutMode: () => dispatch({ type: "layout/cycle" }),
       toggleTab: () => dispatch({ type: "tab/toggle" }),
+      finishSetup: () => dispatch({ type: "setup/done" }),
+      signIn: (provider, email) => dispatch({ type: "account/set", account: mockAccount(provider, email) }),
+      signOut: () => dispatch({ type: "account/set", account: null }),
       setPage: (page) => dispatch({ type: "page/set", page }),
       stepPage: (delta) => dispatch({ type: "page/step", delta }),
       setHotkeysOpen: (open) => dispatch({ type: "ui/hotkeys", open }),
@@ -1057,4 +1070,14 @@ function flattenPaths(nodes: { relPath: string; children: unknown }[]): string[]
   };
   walk(nodes);
   return out;
+}
+
+/**
+ * Stand-in for the account service: GitHub and Google would come back from
+ * the browser hand-off, email from the one-time code.
+ */
+function mockAccount(provider: Account["provider"], email?: string): Account {
+  const address = email?.trim() || "you@example.com";
+  const name = address.split("@")[0] || "You";
+  return { name: name.charAt(0).toUpperCase() + name.slice(1), email: address, provider };
 }

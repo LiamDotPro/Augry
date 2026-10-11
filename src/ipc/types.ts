@@ -153,9 +153,23 @@ export interface SavedTerminal {
   notes?: NoteLink[];
 }
 
+/** The top bar's tabs, in the order they sit there. */
+export type AppTab = "process" | "terminals" | "notes";
+
+/**
+ * Who is signed in. An account is optional: only the Process tab needs one.
+ * Sign-in has no backend yet, so the shell mocks it and keeps this in the
+ * session.
+ */
+export interface Account {
+  name: string;
+  email: string;
+  provider: "github" | "google" | "email";
+}
+
 export interface Session {
   version: 1;
-  activeTab: "terminals" | "notes";
+  activeTab: AppTab;
   focusedId: TerminalId | null;
   page: number;
   /** How panes stack; absent in sessions written before the option existed. */
@@ -173,6 +187,10 @@ export interface Session {
      */
     copied?: Record<string, NoteLink>;
   };
+  /** First-time setup finished or skipped; absent in sessions written before it. */
+  setupDone?: boolean;
+  /** Absent or null when signed out. */
+  account?: Account | null;
 }
 
 // Errors ------------------------------------------------------------------

@@ -9,7 +9,7 @@ export interface CommentRef {
   text: string;
 }
 
-const HEADER = "Review comments from Terminal Grid";
+const HEADER = "Review comments from Augry";
 
 function sortComments<T extends CommentRef>(comments: readonly T[]): T[] {
   return [...comments].sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line);

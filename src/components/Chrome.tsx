@@ -1,6 +1,7 @@
 import { LAYOUT_MODES, pageSlice, type LayoutMode } from "../ipc/layout";
 import { cx } from "../lib/cx";
 import { focusPaneLabel, IS_MAC, shortcutLabel } from "../lib/hotkeys";
+import type { AppTab } from "../ipc/types";
 import type { WindowFrame } from "../lib/windowFrame";
 import { useAppActions, useAppState, useHotkeyScheme } from "../state/AppProvider";
 import { totalPages } from "../state/reducer";
@@ -12,44 +13,32 @@ const LAYOUT_LABELS: Record<LayoutMode, string> = {
 };
 
 /**
- * The title bar version of the app icon (src-tauri/icons/app-icon.html), drawn
- * from its flat small-size variant: three skewed panes, violet at the back,
- * cyan in the middle, a dark pane with a white rim in front. Coordinates are
- * the icon's 1024 artboard, scaled down to 18px.
+ * The title bar version of the app icon (Components.dc.html use="topbar"):
+ * three small overlapping panes, violet at the back, cyan in the middle and
+ * clear glass in front, stepping down to the left. Flat colours, no glow.
  */
 function BrandMark() {
   return (
     <svg
       className="chrome__mark"
-      width="18"
-      height="18"
-      viewBox="0 0 18 18"
+      width="15"
+      height="15"
+      viewBox="0 0 15 15"
       aria-hidden="true"
       focusable="false"
     >
-      <defs>
-        <linearGradient id="brand-front" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#2c3d62" />
-          <stop offset="1" stopColor="#141a30" />
-        </linearGradient>
-      </defs>
-      <g transform="translate(9 9) scale(0.0225) translate(-12 -50) skewY(-9) translate(-448 -448)">
-        <rect x="430" y="150" width="330" height="520" rx="72" fill="#7a5cf0" />
-        <rect x="310" y="220" width="340" height="540" rx="72" fill="#2fb8ea" />
-        <rect
-          x="192"
-          y="322"
-          width="316"
-          height="496"
-          rx="48"
-          fill="url(#brand-front)"
-          stroke="#eefaff"
-          strokeWidth="64"
-        />
-      </g>
+      <rect x="7" y="0" width="7" height="11" rx="2" fill="#8b6cff" />
+      <rect x="3.5" y="2" width="7" height="11" rx="2" fill="#3fc8ff" />
+      <rect x="0" y="4" width="7" height="11" rx="2" fill="#eaf8ff" />
     </svg>
   );
 }
+
+const TABS: { tab: AppTab; label: string }[] = [
+  { tab: "process", label: "Process" },
+  { tab: "terminals", label: "Terminals" },
+  { tab: "notes", label: "Notes" },
+];
 
 /** Tiny pictograms of the three stacking modes. */
 function LayoutGlyph({ mode }: { mode: LayoutMode }) {
@@ -134,29 +123,23 @@ export function Chrome({ frame }: { frame: WindowFrame }) {
     <header className={cx("chrome", trafficLights && "chrome--traffic-lights")} data-tauri-drag-region={dragRegion}>
       <div className="chrome__brand" data-tauri-drag-region={dragRegion}>
         <BrandMark />
-        {inFocus ? <FocusPills /> : <span className="chrome__title">Terminal Grid</span>}
+        {inFocus ? <FocusPills /> : <span className="chrome__title">Augry</span>}
       </div>
 
       <div className="chrome__center" data-tauri-drag-region={dragRegion}>
         <div className="tabs" role="tablist" aria-label="Sections">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={isTerminals}
-            className={cx("tabs__item", isTerminals && "tabs__item--active")}
-            onClick={() => actions.setTab("terminals")}
-          >
-            Terminals
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!isTerminals}
-            className={cx("tabs__item", !isTerminals && "tabs__item--active")}
-            onClick={() => actions.setTab("notes")}
-          >
-            Notes
-          </button>
+          {TABS.map(({ tab, label }) => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={state.activeTab === tab}
+              className={cx("tabs__item", state.activeTab === tab && "tabs__item--active")}
+              onClick={() => actions.setTab(tab)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 

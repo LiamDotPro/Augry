@@ -11,7 +11,7 @@ describe("reviewMessage", () => {
   it("groups comments by file in line order and ends with the note", () => {
     expect(reviewMessage(comments, "  Also add a test for the last-page case. ")).toBe(
       [
-        "Review comments from Terminal Grid (3). Please address them:",
+        "Review comments from Augry (3). Please address them:",
         "",
         "src/components/PaneGrid.tsx:24",
         "  Stop at the last page instead of wrapping",

@@ -509,7 +509,7 @@ function Wordmark({ st }: { st: Stage }) {
         transform: `translateX(${lerp(-50, 0, q)}%) scale(${scale})`,
       }}
     >
-      Terminal Grid
+      Augry
     </div>
   );
 }

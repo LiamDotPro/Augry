@@ -13,6 +13,8 @@
 @import "./styles/overlays.css";
 @import "./styles/review.css";
 @import "./styles/splash.css";
+@import "./styles/account.css";
+@import "./styles/process.css";
 
 *,
 *::before,

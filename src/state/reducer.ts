@@ -15,7 +15,9 @@ import {
 } from "../ipc/layout";
 import type { Direction, LayoutMode } from "../ipc/layout";
 import type {
+  Account,
   AgentEvent,
+  AppTab,
   Config,
   GitInfo,
   NoteLink,
@@ -109,7 +111,11 @@ export interface AppState {
   config: Config;
   /** Agent CLIs on PATH; each idle pane offers a button to start one. */
   installedAgents: string[];
-  activeTab: "terminals" | "notes";
+  activeTab: AppTab;
+  /** First-time setup is over (finished or skipped); until then it runs after the splash. */
+  setupDone: boolean;
+  /** Signed in or not. Only the Process tab needs an account. */
+  account: Account | null;
   order: TerminalId[];
   terminals: Record<TerminalId, TerminalState>;
   focusedId: TerminalId | null;
@@ -141,6 +147,8 @@ export const initialState: AppState = {
   config: DEFAULT_CONFIG,
   installedAgents: [],
   activeTab: "terminals",
+  setupDone: true,
+  account: null,
   order: [],
   terminals: {},
   focusedId: null,
@@ -176,8 +184,11 @@ export type Action =
   | { type: "booted" }
   | { type: "config/set"; config: Config }
   | { type: "agents/installed"; agents: string[] }
-  | { type: "tab/set"; tab: "terminals" | "notes" }
+  | { type: "tab/set"; tab: AppTab }
+  /** Steps to the next tab in the bar's order, wrapping round. */
   | { type: "tab/toggle" }
+  | { type: "setup/done" }
+  | { type: "account/set"; account: Account | null }
   | { type: "page/set"; page: number }
   | { type: "page/step"; delta: -1 | 1 }
   | { type: "layout/set"; mode: LayoutMode }
@@ -251,7 +262,10 @@ export function reducer(state: AppState, action: Action): AppState {
         ready: true,
         restoringPanes: action.config.restoreSessionOnLaunch ? (session?.terminals.length ?? 0) : 0,
         config: action.config,
-        activeTab: session?.activeTab ?? state.activeTab,
+        activeTab: isAppTab(session?.activeTab) ? session.activeTab : state.activeTab,
+        // A session from before setup existed means the app was already in use.
+        setupDone: session ? (session.setupDone ?? true) : false,
+        account: session?.account ?? null,
         layoutMode: isLayoutMode(session?.layoutMode) ? session.layoutMode : state.layoutMode,
         notes: {
           ...state.notes,
@@ -279,9 +293,15 @@ export function reducer(state: AppState, action: Action): AppState {
     case "tab/toggle":
       return {
         ...state,
-        activeTab: state.activeTab === "terminals" ? "notes" : "terminals",
+        activeTab: APP_TABS[(APP_TABS.indexOf(state.activeTab) + 1) % APP_TABS.length],
         hotkeysOpen: false,
       };
+
+    case "setup/done":
+      return { ...state, setupDone: true };
+
+    case "account/set":
+      return { ...state, account: action.account };
 
     case "page/set":
       return { ...state, page: clampPage(action.page, state.order.length) };
@@ -764,6 +784,13 @@ function neighbourId(state: AppState, dir: Direction): TerminalId | null {
   return target === null ? null : (onPage[target] ?? null);
 }
 
+/** The top bar's tabs, left to right. */
+export const APP_TABS: readonly AppTab[] = ["process", "terminals", "notes"];
+
+function isAppTab(value: unknown): value is AppTab {
+  return APP_TABS.includes(value as AppTab);
+}
+
 // Selectors ---------------------------------------------------------------
 
 export function visibleIds(state: AppState): TerminalId[] {
@@ -778,6 +805,8 @@ export function toSession(state: AppState): Session {
   return {
     version: 1,
     activeTab: state.activeTab,
+    setupDone: state.setupDone,
+    account: state.account,
     focusedId: state.focusedId,
     page: state.page,
     layoutMode: state.layoutMode,

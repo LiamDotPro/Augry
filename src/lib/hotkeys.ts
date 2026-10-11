@@ -13,7 +13,7 @@
  * layouts, and on macOS Option turns letters into symbols, so `key` is
  * unreliable for letters, digits and brackets.
  */
-import type { HotkeyModifier } from "../ipc/types";
+import type { AppTab, HotkeyModifier } from "../ipc/types";
 import type { Direction } from "../ipc/layout";
 
 export type HotkeyAction =
@@ -26,7 +26,7 @@ export type HotkeyAction =
   | { type: "focus-index"; index: number }
   | { type: "page"; delta: -1 | 1 }
   | { type: "toggle-tab" }
-  | { type: "set-tab"; tab: "terminals" | "notes" }
+  | { type: "set-tab"; tab: AppTab }
   | { type: "open-settings" }
   | { type: "cycle-layout" }
   | { type: "notes-toggle"; panel: "tree" | "preview" }
@@ -322,7 +322,7 @@ export function hotkeyHints(scheme: HotkeyScheme): HotkeyHint[] {
     { label: "Previous / next page", key: key("page") },
     { label: "Focus + review", key: key("toggle-review") },
     { label: "Save selection to note", key: key("save-note") },
-    { label: "Notes / Terminals", key: key("toggle-tab") },
+    { label: "Next tab: Process, Terminals, Notes", key: key("toggle-tab") },
     { label: "Notes: hide / show list, preview", key: key("notes-panels") },
     { label: "Settings", key: key("settings") },
     { label: "Full screen", key: key("fullscreen") },

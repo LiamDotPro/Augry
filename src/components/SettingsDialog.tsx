@@ -4,11 +4,12 @@ import { cx } from "../lib/cx";
 import { useAppearance } from "../lib/appearance";
 import { IS_MAC } from "../lib/hotkeys";
 import { useAppActions, useAppState } from "../state/AppProvider";
+import { AccountAvatar, PROVIDER_LABELS, ProviderIcon } from "./Account";
 
 /** The backend's fallback order differs by platform (src-tauri/src/pty/shell.rs). */
 const IS_WINDOWS = typeof navigator !== "undefined" && /Win/.test(navigator.platform || navigator.userAgent);
 
-const SHELLS = IS_WINDOWS
+export const SHELLS = IS_WINDOWS
   ? [
       { value: "", label: "Auto (pwsh, then Windows PowerShell)" },
       { value: "pwsh.exe", label: "pwsh.exe" },
@@ -22,7 +23,7 @@ const SHELLS = IS_WINDOWS
       { value: "fish", label: "fish" },
     ];
 
-const FONTS = ["JetBrains Mono", "Cascadia Mono", "Consolas", "Fira Code", "Menlo"];
+export const FONTS = ["JetBrains Mono", "Cascadia Mono", "Consolas", "Fira Code", "Menlo"];
 
 const THEMES: { value: ThemePreference; label: string }[] = [
   { value: "system", label: "System" },
@@ -148,6 +149,45 @@ export function SettingsDialog() {
         </div>
 
         <div className="sheet__body">
+          <div className="row">
+            <div className="row__label">
+              Account
+              <div className="row__hint">Only the Process tab needs one</div>
+            </div>
+            {state.account ? (
+              <div className="account-row">
+                <AccountAvatar account={state.account} />
+                <div className="account-row__who">
+                  <div className="account-row__name">
+                    {state.account.name}
+                    <span title={`Signed in with ${PROVIDER_LABELS[state.account.provider]}`}>
+                      <ProviderIcon provider={state.account.provider} size={13} />
+                    </span>
+                  </div>
+                  <div className="account-row__detail">{state.account.email}</div>
+                </div>
+                <button type="button" className="btn btn--outline account-row__sign-out" onClick={actions.signOut}>
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <div className="account-row">
+                <div className="account-row__status">Not signed in · Terminals and Notes work fully</div>
+                <button
+                  type="button"
+                  className="btn btn--outline"
+                  onClick={() => {
+                    // The Process tab is where signing in happens.
+                    actions.setSettingsOpen(false);
+                    actions.setTab("process");
+                  }}
+                >
+                  Sign in…
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="row">
             <label className="row__label" htmlFor="settings-shell">
               Shell
@@ -388,6 +428,11 @@ export function SettingsDialog() {
         </div>
 
         <div className="sheet__foot">
+          {state.account && (
+            <span className="sheet__foot-note">
+              Signing out stops new runs and pauses watched folders. Terminals and Notes are not affected.
+            </span>
+          )}
           <button
             type="button"
             className="btn btn--outline"

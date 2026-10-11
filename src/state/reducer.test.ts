@@ -491,3 +491,46 @@ describe("session notes", () => {
     expect(state.noteToast).toBeNull();
   });
 });
+
+describe("tabs, setup and account", () => {
+  it("steps through Process, Terminals and Notes and wraps round", () => {
+    let state = reducer(initialState, { type: "tab/set", tab: "process" });
+    state = reducer(state, { type: "tab/toggle" });
+    expect(state.activeTab).toBe("terminals");
+    state = reducer(state, { type: "tab/toggle" });
+    expect(state.activeTab).toBe("notes");
+    state = reducer(state, { type: "tab/toggle" });
+    expect(state.activeTab).toBe("process");
+  });
+
+  it("runs setup on a first launch only", () => {
+    const fresh = reducer(initialState, { type: "ready", config: initialState.config, session: null });
+    expect(fresh.setupDone).toBe(false);
+
+    // A session from before setup existed is an app already in use.
+    const older = toSession(initialState);
+    delete older.setupDone;
+    expect(reducer(initialState, { type: "ready", config: initialState.config, session: older }).setupDone).toBe(true);
+
+    expect(reducer(fresh, { type: "setup/done" }).setupDone).toBe(true);
+  });
+
+  it("keeps the tab and the account across a restart", () => {
+    let state = reducer(initialState, { type: "tab/set", tab: "process" });
+    state = reducer(state, {
+      type: "account/set",
+      account: { name: "Liam", email: "liam@example.com", provider: "github" },
+    });
+    const restored = reducer(initialState, { type: "ready", config: state.config, session: toSession(state) });
+    expect(restored.activeTab).toBe("process");
+    expect(restored.account?.provider).toBe("github");
+
+    const signedOut = reducer(restored, { type: "account/set", account: null });
+    expect(toSession(signedOut).account).toBeNull();
+  });
+
+  it("ignores a tab it does not know", () => {
+    const session = { ...toSession(initialState), activeTab: "settings" as never };
+    expect(reducer(initialState, { type: "ready", config: initialState.config, session }).activeTab).toBe("terminals");
+  });
+});
