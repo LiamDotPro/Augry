@@ -2,7 +2,7 @@
 id: T14
 epic: 001-trigger-core
 title: Add Hub::apply (validate, group, start, restart, stop)
-status: todo
+status: done
 depends_on: [T13]
 size: M
 model: haiku
@@ -298,3 +298,5 @@ mod apply_tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

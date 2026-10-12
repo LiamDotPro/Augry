@@ -5,12 +5,13 @@
 pub mod cool_down;
 
 use cool_down::CoolDown;
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 use std::time::Duration;
-use trigger_core::{Availability, Event, KindInfo, Rule, RuleError, Source};
+use trigger_core::{Availability, Event, Handle, KindInfo, Rule, RuleError, RuleId, Source};
 
 #[cfg(test)]
 mod tests;
@@ -29,6 +30,9 @@ const POLL: Duration = Duration::from_millis(50);
 /// Tauri state.
 pub struct Hub {
     sources: Vec<Box<dyn Source>>,
+    /// What each source is running right now, by source id. Dropping an entry
+    /// drops its `Handle`, which stops the source.
+    running: Mutex<BTreeMap<&'static str, Running>>,
     /// Sources get clones of this as their sink, and `publish` sends into it.
     tx: Sender<Event>,
     subscribers: Arc<Mutex<Vec<Sender<Fired>>>>,
@@ -71,6 +75,27 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// A started source: the rules it was started with (sorted by id) and its handle.
+struct Running {
+    rules: Vec<Rule>,
+    _handle: Handle,
+}
+
+/// Why a source that is not `Available` cannot run, or `None` if it can.
+fn unavailable_reason(availability: &Availability) -> Option<String> {
+    match availability {
+        Availability::Available => None,
+        Availability::Unsupported { reason } => Some(reason.clone()),
+        Availability::NeedsPermission { how, .. } => Some(format!("needs permission {how}")),
+    }
+}
+
+fn mark(states: &mut BTreeMap<RuleId, RuleState>, rules: &[Rule], state: RuleState) {
+    for rule in rules {
+        states.insert(rule.id.clone(), state.clone());
+    }
+}
+
 impl Hub {
     pub fn new(sources: Vec<Box<dyn Source>>) -> Hub {
         let (tx, rx) = channel();
@@ -88,6 +113,7 @@ impl Hub {
         };
         Hub {
             sources,
+            running: Mutex::new(BTreeMap::new()),
             tx,
             subscribers,
             cool_down,
@@ -129,6 +155,76 @@ impl Hub {
             Some(index) => self.sources[index].check(rule),
             None => Err(RuleError::UnknownKind(rule.kind.clone())),
         }
+    }
+
+    /// Starts, restarts or stops sources so that exactly these rules are live.
+    /// Returns the state of every rule that was passed in.
+    ///
+    /// - A rule no source owns, or that its source's `check` rejects, is
+    ///   `Rejected` and goes no further.
+    /// - A source that is not `Available` is not started; its rules are
+    ///   `SourceFailed`.
+    /// - A source whose rules are exactly what it already runs is left alone.
+    /// - A source with no rules is stopped. Otherwise the old run is stopped
+    ///   and the source is started with the new rules.
+    /// - A `start` error fails only that source's rules.
+    pub fn apply(&self, rules: Vec<Rule>) -> BTreeMap<RuleId, RuleState> {
+        let mut states = BTreeMap::new();
+        let mut groups: BTreeMap<usize, Vec<Rule>> = BTreeMap::new();
+        for rule in rules {
+            let Some(index) = self.source_index(&rule.kind) else {
+                let reason = format!("no source for kind {}", rule.kind);
+                states.insert(rule.id.clone(), RuleState::Rejected { reason });
+                continue;
+            };
+            match self.sources[index].check(&rule) {
+                Ok(()) => groups.entry(index).or_default().push(rule),
+                Err(e) => {
+                    let reason = e.to_string();
+                    states.insert(rule.id.clone(), RuleState::Rejected { reason });
+                }
+            }
+        }
+
+        let mut running = lock(&self.running);
+        for (index, source) in self.sources.iter().enumerate() {
+            let mut group = groups.remove(&index).unwrap_or_default();
+            group.sort_by(|a, b| a.id.cmp(&b.id));
+            let id = source.id();
+
+            if group.is_empty() {
+                running.remove(id);
+                continue;
+            }
+            if let Some(reason) = unavailable_reason(&source.availability()) {
+                running.remove(id);
+                mark(&mut states, &group, RuleState::SourceFailed { reason });
+                continue;
+            }
+            if running.get(id).is_some_and(|r| r.rules == group) {
+                mark(&mut states, &group, RuleState::Active);
+                continue;
+            }
+            // Stop the old run before starting the new one.
+            running.remove(id);
+            match source.start(group.clone(), self.tx.clone()) {
+                Ok(handle) => {
+                    mark(&mut states, &group, RuleState::Active);
+                    running.insert(
+                        id,
+                        Running {
+                            rules: group,
+                            _handle: handle,
+                        },
+                    );
+                }
+                Err(e) => {
+                    let reason = e.to_string();
+                    mark(&mut states, &group, RuleState::SourceFailed { reason });
+                }
+            }
+        }
+        states
     }
 
     /// Sends an event into the same channel the sources use, so it goes through

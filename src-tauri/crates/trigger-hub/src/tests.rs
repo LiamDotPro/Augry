@@ -233,3 +233,123 @@ mod check_tests {
         assert!(hub().check(&rule("r3", "fs.a.b", json!({}))).is_ok());
     }
 }
+
+mod apply_tests {
+    use crate::test_support::shared;
+    use crate::{Hub, RuleState};
+    use serde_json::json;
+    use trigger_core::testkit::{rule, FakeSource};
+    use trigger_core::{Availability, Permission};
+
+    fn ids(rules: &[trigger_core::Rule]) -> Vec<&str> {
+        rules.iter().map(|r| r.id.as_str()).collect()
+    }
+
+    #[test]
+    fn a_rule_no_source_owns_is_rejected() {
+        let (fake, started, _) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        let states = hub.apply(vec![
+            rule("r1", "other.x", json!({})),
+            rule("r2", "plain", json!({})),
+        ]);
+        assert_eq!(
+            states["r1"],
+            RuleState::Rejected {
+                reason: "no source for kind other.x".to_string()
+            }
+        );
+        assert_eq!(
+            states["r2"],
+            RuleState::Rejected {
+                reason: "no source for kind plain".to_string()
+            }
+        );
+        assert!(started.started.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_rule_the_source_rejects_is_rejected_and_the_rest_start() {
+        let (fake, started, _) = shared(FakeSource::new("fake", &[]), true);
+        let hub = Hub::new(vec![fake]);
+        let states = hub.apply(vec![
+            rule("bad1", "fake.x", json!({"bad": 1})),
+            rule("good", "fake.x", json!({})),
+        ]);
+        assert_eq!(
+            states["bad1"],
+            RuleState::Rejected {
+                reason: "field bad: not allowed".to_string()
+            }
+        );
+        assert_eq!(states["good"], RuleState::Active);
+        let calls = started.started.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(ids(&calls[0]), vec!["good"]);
+    }
+
+    #[test]
+    fn start_is_called_once_with_the_rules_sorted_by_id() {
+        let (fake, started, _) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        let states = hub.apply(vec![
+            rule("r2", "fake.x", json!({})),
+            rule("r1", "fake.y", json!({"a": 1})),
+        ]);
+        assert_eq!(states.len(), 2);
+        assert_eq!(states["r1"], RuleState::Active);
+        assert_eq!(states["r2"], RuleState::Active);
+        let calls = started.started.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(ids(&calls[0]), vec!["r1", "r2"]);
+        assert_eq!(calls[0][0].when["a"], json!(1));
+    }
+
+    #[test]
+    fn each_source_gets_only_its_own_rules() {
+        let (a, a_started, _) = shared(FakeSource::new("alpha", &[]), false);
+        let (b, b_started, _) = shared(FakeSource::new("beta", &[]), false);
+        let hub = Hub::new(vec![a, b]);
+        hub.apply(vec![
+            rule("r1", "alpha.x", json!({})),
+            rule("r2", "beta.x", json!({})),
+            rule("r3", "alpha.y", json!({})),
+        ]);
+        assert_eq!(ids(&a_started.started.lock().unwrap()[0]), vec!["r1", "r3"]);
+        assert_eq!(ids(&b_started.started.lock().unwrap()[0]), vec!["r2"]);
+    }
+
+    #[test]
+    fn an_unavailable_source_is_not_started() {
+        let mut unsupported = FakeSource::new("alpha", &[]);
+        unsupported.availability = Availability::Unsupported {
+            reason: "nope".to_string(),
+        };
+        let mut needs = FakeSource::new("beta", &[]);
+        needs.availability = Availability::NeedsPermission {
+            permission: Permission::Accessibility,
+            how: "Open System Settings".to_string(),
+        };
+        let (a, a_started, _) = shared(unsupported, false);
+        let (b, b_started, _) = shared(needs, false);
+        let hub = Hub::new(vec![a, b]);
+        let states = hub.apply(vec![
+            rule("r1", "alpha.x", json!({})),
+            rule("r2", "beta.x", json!({})),
+        ]);
+        assert_eq!(
+            states["r1"],
+            RuleState::SourceFailed {
+                reason: "nope".to_string()
+            }
+        );
+        assert_eq!(
+            states["r2"],
+            RuleState::SourceFailed {
+                reason: "needs permission Open System Settings".to_string()
+            }
+        );
+        assert!(a_started.started.lock().unwrap().is_empty());
+        assert!(b_started.started.lock().unwrap().is_empty());
+    }
+}
