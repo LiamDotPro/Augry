@@ -84,7 +84,7 @@ took ownership of it.
 - [ ] `cd src-tauri && cargo test -p trigger-hub` shows 6 `cool_down::tests`, 3 `catalogue_tests`, 7 `publish_tests`, 4 `check_tests`, 5 `apply_tests`, 8 `lifecycle_tests` and 5 `end_to_end_tests`, all ok
 - [ ] `cd src-tauri && cargo clippy -p trigger-core -p trigger-hub --all-targets -- -D warnings` exits 0
 - [ ] `cd src-tauri && cargo fmt -p trigger-hub --check` exits 0
-- [ ] `node plans/_tools/check-crates.mjs` exits 0 and prints `2 crate(s), 0 error(s), 0 warning(s)`
+- [ ] `node plans/_tools/check-crates.mjs` exits 0, its summary says `0 error(s)`, and any `warn` line is only a size warning for a `tests.rs` file (the architect accepts test files over 400 lines; under 800 is fine)
 - [ ] `git status --porcelain` lists only `src-tauri/crates/trigger-hub/README.md`
 
 ## Out of scope
@@ -97,7 +97,7 @@ took ownership of it.
 
 - If a count in the second check differs, an earlier card is wrong or missing. Set status blocked and list the counts you saw.
 - If fmt or clippy fails, set status blocked and quote the first error. Do not fix code in this card.
-- If `check-crates.mjs` prints a different crate count, `trigger-fs` may already exist from slice C; the expected error and warning counts are still 0. Set status blocked only if either is not 0.
+- If `check-crates.mjs` prints a different crate count, `trigger-fs` may already exist from slice C; the expected error count is still 0 and the only warnings allowed are `tests.rs` size warnings. Set status blocked otherwise.
 - Anything else: set status blocked and stop.
 
 ## Log
