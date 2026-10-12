@@ -15,10 +15,11 @@ serde_json = { workspace = true }
 globset = { workspace = true }
 croner = { workspace = true }
 chrono = { workspace = true }
+chrono-tz = { workspace = true }
+calcard = { workspace = true }
+ureq = { workspace = true }
+iana-time-zone = { workspace = true }
 
 # Platform only dependencies go in blocks like this one, so the crate still
 # builds everywhere.
 # [target.'cfg(target_os = "macos")'.dependencies]
-
-[dev-dependencies]
-chrono-tz = { workspace = true }

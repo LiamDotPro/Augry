@@ -2,7 +2,7 @@
 id: T10
 epic: 007-trigger-clock
 title: Add the calendar and HTTP dependencies
-status: todo
+status: done
 depends_on: [T09]
 size: S
 model: haiku
@@ -80,3 +80,5 @@ iana-time-zone = { workspace = true }
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (ureq resolved to 3.4.2, ureq card check "ureq v3.4" matches by prefix; check-crates exit 0 with the expected template warning)
+- 2026-10-12 checker: pass
