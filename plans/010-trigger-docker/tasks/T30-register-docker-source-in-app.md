@@ -2,7 +2,7 @@
 id: T30
 epic: 010-trigger-docker
 title: Register trigger-docker in the app behind a feature
-status: todo
+status: done
 depends_on: [T27]
 size: S
 model: haiku
@@ -109,3 +109,5 @@ If clippy or rustc warns that `source_ids` is unused when the feature is off, th
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy baseline 7, after 7. Card line refs drifted (sources() is at 31-41, mod tests at 245), content matched, so no change needed.
+- 2026-10-12 checker: pass

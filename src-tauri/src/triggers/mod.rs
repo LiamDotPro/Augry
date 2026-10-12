@@ -37,6 +37,8 @@ fn sources() -> Vec<Box<dyn Source>> {
     let mut list: Vec<Box<dyn Source>> = Vec::new();
     #[cfg(feature = "trigger-fs")]
     list.push(Box::new(trigger_fs::FsSource));
+    #[cfg(feature = "trigger-docker")]
+    list.push(Box::new(trigger_docker::DockerSource));
     list
 }
 
@@ -356,6 +358,22 @@ mod tests {
         assert!(service.has_definition("tidy"));
         assert!(!service.has_definition("nope"));
         cleanup(&dir);
+    }
+
+    fn source_ids() -> Vec<&'static str> {
+        sources().iter().map(|source| source.id()).collect()
+    }
+
+    #[cfg(feature = "trigger-docker")]
+    #[test]
+    fn the_catalogue_lists_the_docker_source() {
+        assert!(source_ids().contains(&"docker"));
+    }
+
+    #[cfg(not(feature = "trigger-docker"))]
+    #[test]
+    fn the_catalogue_has_no_docker_source_without_the_feature() {
+        assert!(!source_ids().contains(&"docker"));
     }
 
     #[test]
