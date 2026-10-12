@@ -2,7 +2,7 @@
 id: T15
 epic: 002-trigger-internal
 title: Add the command clock and the tap that makes signals
-status: todo
+status: done
 depends_on: [T14, T09]
 size: M
 model: haiku
@@ -317,3 +317,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7 warnings, after 7; tap tests 8 passed; workspace tests pass; fmt and no-default-features check pass)
+- 2026-10-12 checker: pass

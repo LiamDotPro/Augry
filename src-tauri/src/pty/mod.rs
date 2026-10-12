@@ -3,6 +3,7 @@
 pub mod marks;
 pub mod reader;
 pub mod shell;
+pub mod tap;
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
