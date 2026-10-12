@@ -1,10 +1,10 @@
-//! Tests against the real OS. Not run by `cargo test`; run them on a machine
-//! of each supported platform with:
+//! Tests against the real GitHub, through the user's own `gh` login. Not run by
+//! `cargo test`; run them on a machine where `gh auth login` was done with:
 //!
 //!     cargo test -p trigger-github -- --ignored
 //!
-//! Each test arms a rule, causes the real thing to happen, and waits for the
-//! event with `RecordingSink::wait_for`. Keep them few and generous with time.
+//! Each test arms a rule, waits for the event with `RecordingSink::wait_for`,
+//! and reads GitHub only. Keep them few and generous with time.
 
 use std::time::Duration;
 
@@ -20,14 +20,13 @@ fn fires_for_the_real_thing() {
         .start(
             vec![rule(
                 "p/t",
-                "github.example",
-                serde_json::json!({ "example": "x" }),
+                "github.issue-assigned",
+                serde_json::json!({ "repo": "cli/cli" }),
             )],
             sink.tx.clone(),
         )
         .expect("start");
-    // Cause the real thing here.
     assert!(sink
-        .wait_for("github.example", Duration::from_secs(5))
+        .wait_for("github.issue-assigned", Duration::from_secs(5))
         .is_some());
 }

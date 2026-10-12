@@ -14,7 +14,14 @@ the markers; `tests/readme.rs` fails while this table is stale.
 <!-- kinds -->
 | Kind | Title | Platforms | Permission | When | Payload |
 | --- | --- | --- | --- | --- | --- |
-| github.example | Example | macOS, Windows, Linux | none | example* | example |
+| github.issue-assigned | Issue assigned | macOS, Windows, Linux | none | repo*, interval_s | number, title, url, author, assignees |
+| github.review-requested | Review requested | macOS, Windows, Linux | none | repo*, interval_s | number, title, url, author, head, base |
+| github.ci-failed | CI failed | macOS, Windows, Linux | none | repo*, branch, interval_s | id, name, branch, sha, conclusion, url, event, actor, updated_at |
+| github.ci-passed | CI passed | macOS, Windows, Linux | none | repo*, branch, interval_s | id, name, branch, sha, conclusion, url, event, actor, updated_at |
+| github.pr-commented | Pull request commented | macOS, Windows, Linux | none | repo*, interval_s | id, url, author, body, created_at |
+| github.pr-merged | Pull request merged | macOS, Windows, Linux | none | repo*, branch, interval_s | number, title, url, author, merged_at, base |
+| github.release-published | Release published | macOS, Windows, Linux | none | repo*, interval_s | tag, name, prerelease, url, published_at, author |
+| github.dependency-pr-opened | Dependency update opened | macOS, Windows, Linux | none | repo*, author, interval_s | number, title, url, author, base |
 <!-- /kinds -->
 
 ## Rule fields

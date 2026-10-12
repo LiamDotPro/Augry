@@ -2,7 +2,7 @@
 id: T02
 epic: 011-trigger-github
 title: Add the eight GitHub kinds and stub the rest around them
-status: todo
+status: done
 depends_on: [T01]
 size: M
 model: haiku
@@ -480,3 +480,5 @@ The README keeps all its other text for now: T07 writes the Rule fields, Payload
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (lib --lib 3 tests, all 3 tests + readme + 1 ignored, example grep 8, clippy 0, fmt check 0, check-crates 0 with expected template warnings, git status limited to files:)
+- 2026-10-12 checker: pass
