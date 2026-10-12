@@ -1,1 +1,519 @@
 /* Sign in (sign-in, sign-in-code, sign-in-expired), the top bar account chip and its menu (team-switch), the Settings account rows and signed-in devices, first-time setup step 3. Shared pieces are in cloud.css. */
+
+/* Sign in dialog -------------------------------------------------------- */
+
+.sign-in-dialog__tile--expired {
+  background: rgb(var(--warn-rgb) / 0.14);
+  color: var(--cloud-warn-text);
+}
+
+/* What stays local, what a team adds. */
+.sign-in-dialog__compare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgb(var(--ink-rgb) / 0.1);
+}
+
+.sign-in-dialog__column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-left: 1px solid rgb(var(--ink-rgb) / 0.1);
+}
+
+.sign-in-dialog__column--local {
+  border-left: 0;
+  background: rgb(var(--ink-rgb) / 0.03);
+}
+
+.sign-in-dialog__column-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgb(var(--text-rgb) / 0.88);
+}
+
+.sign-in-dialog__perk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: rgb(var(--text-rgb) / 0.86);
+}
+
+.sign-in-dialog__mark {
+  width: 18px;
+  flex: none;
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.sign-in-dialog__mark--ok {
+  color: var(--ok);
+}
+
+.sign-in-dialog__code-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+  border-radius: 14px;
+  background: rgb(var(--ink-rgb) / 0.03);
+  border: 1px solid rgb(var(--ink-rgb) / 0.08);
+}
+
+.sign-in-dialog__code-card--expired {
+  padding: 20px;
+}
+
+.sign-in-dialog__code-line {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sign-in-dialog__copy {
+  height: 30px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+  border: 1px solid rgb(var(--ink-rgb) / 0.16);
+  font-size: 12px;
+  color: var(--text-85);
+}
+
+.sign-in-dialog__copy:hover {
+  background: var(--fill-hover);
+  color: var(--text-strong);
+}
+
+/* Open GitHub again: a plain button, not the cyan primary. */
+.sign-in-dialog__again {
+  padding: 0 16px;
+  gap: 8px;
+  background: rgb(var(--ink-rgb) / 0.06);
+  border-color: rgb(var(--ink-rgb) / 0.16);
+  color: var(--text);
+}
+
+/* Fetching a code: the button stays put and goes quiet. */
+.sign-in-dialog__busy,
+.sign-in-dialog__busy:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* GitHub's device code, in the dialog and in setup. */
+.sign-in-code {
+  font-family: var(--font-mono);
+  font-size: 40px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--text-strong);
+  user-select: text;
+}
+
+.sign-in-code--expired {
+  font-size: 32px;
+  color: rgb(var(--text-rgb) / 0.35);
+  text-decoration: line-through;
+}
+
+.sign-in-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--cloud-cyan-text);
+}
+
+.sign-in-status__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.15);
+  animation: sign-in-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sign-in-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Top bar account chip -------------------------------------------------- */
+
+.account-chip {
+  position: relative;
+}
+
+/* Setup keeps only the window controls in the bar. */
+.app[data-setup] .account-chip {
+  visibility: hidden;
+}
+
+.account-chip__button {
+  height: 28px;
+  padding: 0 9px 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: rgb(var(--text-rgb) / 0.6);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.account-chip__button:hover {
+  background: rgb(var(--ink-rgb) / 0.08);
+  color: var(--text-strong);
+}
+
+.account-chip__button--open,
+.account-chip__button--open:hover {
+  background: rgb(var(--ink-rgb) / 0.1);
+  color: var(--text-strong);
+}
+
+.account-chip__faces {
+  display: flex;
+  align-items: center;
+}
+
+/* The team's tile sits behind the avatar, overlapping it by 4px. */
+.account-chip__faces > .cloud-team-tile {
+  margin-right: -4px;
+}
+
+.account-chip__avatar {
+  position: relative;
+  display: flex;
+}
+
+.account-chip__avatar .cloud-avatar {
+  box-shadow: 0 0 0 2px var(--cloud-avatar-ring);
+}
+
+.account-chip__offline-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cloud-avatar-ring);
+  border: 1.5px solid rgb(var(--text-rgb) / 0.55);
+}
+
+.account-chip__label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-chip__offline {
+  color: var(--text-45);
+}
+
+/* Account menu (team-switch) --------------------------------------------- */
+
+/* Right-aligned to the chip, its top on the bar's bottom edge (44px). */
+.account-menu {
+  position: absolute;
+  top: calc(100% + (var(--chrome-h) - 28px) / 2);
+  right: 0;
+  z-index: 50;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--cloud-dialog-bg);
+  border: 1px solid rgb(var(--ink-rgb) / 0.14);
+  backdrop-filter: blur(30px);
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / calc(0.5 * var(--shadow-k))),
+    inset 0 1px 0 rgb(var(--ink-rgb) / 0.1);
+  color: var(--text);
+}
+
+.account-menu__label {
+  padding: 8px 10px 4px;
+  font-size: 11px;
+  color: var(--text-50);
+}
+
+.account-menu__space {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  text-align: left;
+}
+
+.account-menu__space--selected {
+  background: rgb(var(--ink-rgb) / 0.07);
+}
+
+.account-menu__space:hover,
+.account-menu__space:focus-visible {
+  background: rgb(var(--ink-rgb) / 0.08);
+}
+
+.account-menu__space .cloud-avatar {
+  font-size: 12px;
+}
+
+.account-menu__space .cloud-team-tile {
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.account-menu__space-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-menu__space-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.account-menu__space-detail {
+  font-size: 11.5px;
+  color: var(--text-55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-menu__check {
+  display: flex;
+  color: var(--accent);
+}
+
+.account-menu__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: rgb(var(--ink-rgb) / 0.08);
+}
+
+.account-menu__item {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+  font-size: 12.5px;
+  text-align: left;
+  color: rgb(var(--text-rgb) / 0.8);
+}
+
+.account-menu__item:hover,
+.account-menu__item:focus-visible {
+  background: rgb(var(--ink-rgb) / 0.08);
+  color: var(--text-strong);
+}
+
+/* Settings › account rows (settings-account) ----------------------------- */
+
+.account-row__status--strong {
+  color: var(--text-70);
+}
+
+.account-row__status--team {
+  color: rgb(var(--text-rgb) / 0.8);
+}
+
+.account-row__role {
+  color: var(--text-50);
+}
+
+.account-row__notice {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--cloud-warn-text);
+}
+
+.account-row__team-tile {
+  display: flex;
+}
+
+.account-row__team-tile .cloud-team-tile {
+  border-radius: 6px;
+  font-size: 9px;
+}
+
+/* The line above the footer. */
+.settings-note {
+  flex: none;
+  padding: 0 22px 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-50);
+}
+
+.settings-note--devices {
+  padding: 10px 22px 16px;
+}
+
+/* Settings › Signed-in devices (settings-devices) ------------------------ */
+
+.settings-devices__head {
+  gap: 8px;
+}
+
+.settings-devices__back {
+  font-size: 14px;
+  color: rgb(var(--text-rgb) / 0.6);
+}
+
+.settings-devices__back:hover {
+  color: var(--text-strong);
+}
+
+.settings-devices__list {
+  padding: 4px 22px 6px;
+}
+
+.settings-device {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hair-soft);
+}
+
+.settings-device__tile {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--fill-2);
+  color: rgb(var(--text-rgb) / 0.8);
+}
+
+.settings-device__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-device__name {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-device__pill {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: rgb(var(--accent-rgb) / 0.14);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cloud-cyan-text);
+}
+
+.settings-device__usage {
+  font-size: 11.5px;
+  color: var(--text-55);
+}
+
+.settings-devices__error {
+  padding-top: 10px;
+}
+
+.settings-devices__foot {
+  justify-content: space-between;
+}
+
+/* .btn--outline is defined after this file (index.css), so this needs the extra class. */
+.btn.settings-devices__sign-out {
+  color: var(--cloud-error-text);
+}
+
+/* First-time setup, step 3 (setup-account, setup-browser) ---------------- */
+
+.setup__group--sign-in {
+  gap: 12px;
+}
+
+.setup__note--sign-in {
+  color: rgb(var(--text-rgb) / 0.6);
+}
+
+.sign-in__button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.setup-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 26px;
+  border-radius: 16px;
+  background: rgb(var(--ink-rgb) / 0.03);
+  border: 1px solid var(--hair);
+}
+
+.setup-code__mark {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: var(--fill-3);
+  color: var(--text-strong);
+}
+
+.setup-code__label {
+  font-size: 13px;
+  color: rgb(var(--text-rgb) / 0.6);
+}
+
+.setup-code__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.setup-code__button {
+  padding: 0 16px;
+  gap: 8px;
+  background: rgb(var(--ink-rgb) / 0.06);
+  border-color: rgb(var(--ink-rgb) / 0.16);
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sign-in-status__dot {
+    animation: none;
+  }
+}

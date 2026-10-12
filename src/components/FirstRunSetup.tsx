@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { HotkeyModifier } from "../ipc/types";
 import { cx } from "../lib/cx";
 import { IS_MAC, modifierLabel } from "../lib/hotkeys";
 import { useAppActions, useAppState } from "../state/AppProvider";
-import { useCloud } from "../cloud/CloudProvider";
+import { useDeviceSignIn } from "../cloud/useDeviceSignIn";
 import { GitHubMark, StrokeIcon } from "./Account";
 import { AgentIcon } from "./AgentIcon";
 import { FONTS, SHELLS } from "./SettingsDialog";
@@ -25,6 +25,10 @@ const SETUP_FONTS = FONTS.slice(0, 3);
  * animation: the shell and agents on this computer, where notes go and the
  * terminal font, then an optional account. Defaults are already picked, every
  * choice can be changed later in Settings, and it ends on the Terminals tab.
+ *
+ * Step 3 signs in right here rather than in the sign-in dialog: Continue with
+ * GitHub shows GitHub's code in the card (setup-browser), and approving it
+ * finishes setup by itself.
  */
 export function FirstRunSetup() {
   const state = useAppState();
@@ -37,7 +41,12 @@ export function FirstRunSetup() {
   const [notesRoot, setNotesRoot] = useState(state.config.notesRoot ?? state.notes.root);
   const [fontFamily, setFontFamily] = useState(state.config.fontFamily ?? FONTS[0]);
   const [fontSize, setFontSize] = useState(state.config.fontSize);
-  const cloud = useCloud();
+  const signIn = useDeviceSignIn();
+  // The code as last shown, kept while signing in completes or a new one loads.
+  const [shownCode, setShownCode] = useState<string | null>(null);
+  const [expiredCode, setExpiredCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const finished = useRef(false);
 
   const finish = useCallback(async () => {
     await actions.saveConfig({ shell: shell || null, hotkeyModifier: modifier, agentPatterns: patterns, fontFamily, fontSize });
@@ -46,8 +55,42 @@ export function FirstRunSetup() {
     actions.finishSetup();
   }, [actions, shell, modifier, patterns, fontFamily, fontSize, notesRoot, state.config.notesRoot, state.notes.root]);
 
-  // TODO(account): setup-account and setup-browser (show the code here with useDeviceSignIn).
-  const browserPending = false;
+  const signStep = signIn.state.step;
+  useEffect(() => {
+    const current = signIn.state;
+    if (current.step === "waiting") {
+      setShownCode(current.userCode);
+      setExpiredCode(null);
+    } else if (current.step === "expired") {
+      setExpiredCode(current.userCode);
+    } else if (current.step === "error" || current.step === "idle") {
+      setExpiredCode(null);
+    }
+  }, [signIn.state]);
+
+  // Approved on GitHub: the account is set up, so is everything else.
+  useEffect(() => {
+    if (signStep !== "done" || finished.current) return;
+    finished.current = true;
+    void finish();
+  }, [signStep, finish]);
+
+  /** setup-account, setup-browser, or the code ran out. */
+  const accountView =
+    signStep === "waiting" || (signStep === "done" && shownCode)
+      ? "browser"
+      : signStep === "expired" || (signStep === "starting" && expiredCode)
+        ? "expired"
+        : "account";
+  const browserPending = accountView !== "account";
+  const starting = signStep === "starting";
+
+  const copyCode = (code: string) => {
+    void navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    });
+  };
 
   // Enter continues, the way the button says.
   useEffect(() => {
@@ -283,7 +326,7 @@ export function FirstRunSetup() {
             </>
           )}
 
-          {step === 2 && (
+          {step === 2 && accountView === "account" && (
             <>
               <Heading title="Sign in to share with a team">
                 An account is optional. Everything works without one and stays on this computer. Sign in only if you
@@ -302,18 +345,80 @@ export function FirstRunSetup() {
                   <Perk>Version history the whole team can see</Perk>
                   <Perk>Templates added to the team</Perk>
                 </div>
-                <div className="setup__group">
+                <div className="setup__group setup__group--sign-in">
                   <button
                     type="button"
-                    className="sign-in__button sign-in__button--primary"
-                    onClick={() => cloud.openDialog({ kind: "sign-in" })}
+                    className={cx("sign-in__button", "sign-in__button--primary", starting && "sign-in__button--busy")}
+                    aria-busy={starting || undefined}
+                    disabled={starting}
+                    onClick={() => void signIn.start()}
                   >
-                    <GitHubMark />
+                    <GitHubMark size={18} />
                     <span className="sign-in__label">Continue with GitHub</span>
+                    <span className="sign-in__chevron" aria-hidden="true">
+                      ›
+                    </span>
                   </button>
-                  <div className="setup__note">
+                  <div className="setup__note setup__note--sign-in">
                     GitHub opens in your browser and shows a short code to enter. Augry never sees your password.
                   </div>
+                  {signIn.state.step === "error" && (
+                    <div className="cloud-field__error" role="alert">
+                      {signIn.state.message}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === 2 && accountView === "browser" && (
+            <>
+              <Heading title="Enter this code on GitHub">
+                We opened github.com/login/device in your browser. Enter the code and approve Augry, and setup carries
+                on by itself.
+              </Heading>
+              <div className="setup-code">
+                <span className="setup-code__mark">
+                  <GitHubMark size={22} />
+                </span>
+                <div className="setup-code__label">Your code</div>
+                <div className="sign-in-code">{shownCode}</div>
+                <div className="sign-in-status" role="status">
+                  <span className="sign-in-status__dot" aria-hidden="true" />
+                  Waiting for you to approve · works for 15 minutes
+                </div>
+                <div className="setup-code__actions">
+                  <button type="button" className="cloud-btn setup-code__button" onClick={signIn.reopen}>
+                    Open browser again
+                  </button>
+                  <button
+                    type="button"
+                    className="cloud-btn setup-code__button"
+                    onClick={() => shownCode && copyCode(shownCode)}
+                  >
+                    {copied ? "Copied" : "Copy code"}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {step === 2 && accountView === "expired" && (
+            <>
+              <Heading title="That code expired">Codes work for 15 minutes. Get a new one and enter it on GitHub.</Heading>
+              <div className="setup-code">
+                <span className="sign-in-code sign-in-code--expired">{expiredCode}</span>
+                <div className="setup-code__actions">
+                  <button
+                    type="button"
+                    className={cx("cloud-btn", "cloud-btn--primary", starting && "sign-in-dialog__busy")}
+                    aria-busy={starting || undefined}
+                    disabled={starting}
+                    onClick={() => void signIn.start()}
+                  >
+                    Get a new code
+                  </button>
                 </div>
               </div>
             </>
@@ -325,7 +430,11 @@ export function FirstRunSetup() {
             <button
               type="button"
               className="btn btn--quiet setup__back"
-              onClick={() => setStep(step - 1)}
+              onClick={() => {
+                // From the code, Back drops it and returns to the sign in choice.
+                signIn.cancel();
+                if (!(step === 2 && browserPending)) setStep(step - 1);
+              }}
             >
               Back
             </button>

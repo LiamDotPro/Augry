@@ -5,7 +5,7 @@ import { useAppearance } from "../lib/appearance";
 import { IS_MAC } from "../lib/hotkeys";
 import { useAppActions, useAppState } from "../state/AppProvider";
 import { useCloud } from "../cloud/CloudProvider";
-import { Avatar, GitHubMark } from "./Account";
+import { AccountRows, DevicesView } from "./cloud/SettingsAccount";
 
 /** The backend's fallback order differs by platform (src-tauri/src/pty/shell.rs). */
 const IS_WINDOWS = typeof navigator !== "undefined" && /Win/.test(navigator.platform || navigator.userAgent);
@@ -56,6 +56,10 @@ type Draft = Pick<
  * Settings sheet from screen 1f. Edits a draft and only commits through
  * `config_set` on Save, so Cancel really is a cancel. Theme and layout preview
  * live from the draft; on close the app reapplies the saved config.
+ *
+ * The account rows come first (settings-account); Devices opens the
+ * signed-in devices list in place of the body (settings-devices), keeping
+ * the draft as it was.
  */
 export function SettingsDialog() {
   const state = useAppState();
@@ -68,26 +72,36 @@ export function SettingsDialog() {
   // closed the open note.
   const [initialNotesRoot] = useState(draft.notesRoot);
   const [pattern, setPattern] = useState("");
+  const [view, setView] = useState<"main" | "devices">("main");
   const sheet = useRef<HTMLFormElement>(null);
   useAppearance(draft.theme, draft.compactLayout, {
     focus: draft.focusColor,
     finished: draft.finishedColor,
   });
 
+  // A cloud dialog opened from here (sign in, team settings) sits on top and
+  // takes its own Escape; the devices list goes back to Settings first.
+  const escape = useRef({ dialogOpen: false, view });
+  escape.current = { dialogOpen: cloud.dialog !== null, view };
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        actions.setSettingsOpen(false);
-      }
+      if (event.key !== "Escape" || escape.current.dialogOpen) return;
+      event.stopPropagation();
+      if (escape.current.view === "devices") setView("main");
+      else actions.setSettingsOpen(false);
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [actions]);
 
   useEffect(() => {
-    sheet.current?.querySelector<HTMLElement>("select, input, button")?.focus();
-  }, []);
+    if (view === "main") sheet.current?.querySelector<HTMLElement>("select, input, button")?.focus();
+  }, [view]);
+
+  // Signed out from the devices list (or by the server): back to Settings.
+  useEffect(() => {
+    if (!cloud.user) setView("main");
+  }, [cloud.user]);
 
   const patch = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
@@ -138,309 +152,284 @@ export function SettingsDialog() {
         onMouseDown={(event) => event.stopPropagation()}
         onSubmit={(event) => void onSubmit(event)}
       >
-        <div className="sheet__head">
-          <h2 className="sheet__title">Settings</h2>
-          <button
-            type="button"
-            className="sheet__close"
-            aria-label="Close settings"
-            onClick={() => actions.setSettingsOpen(false)}
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="sheet__body">
-          {/* TODO(account): Notes sync, Devices and Teams rows; the devices panel (shell-07-settings-*). */}
-          <div className="row">
-            <div className="row__label">
-              Account
-              <div className="row__hint">Only needed for teams</div>
+        {view === "devices" ? (
+          <DevicesView onBack={() => setView("main")} onClose={() => actions.setSettingsOpen(false)} />
+        ) : (
+          <>
+            <div className="sheet__head">
+              <h2 className="sheet__title">Settings</h2>
+              <button
+                type="button"
+                className="sheet__close"
+                aria-label="Close settings"
+                onClick={() => actions.setSettingsOpen(false)}
+              >
+                ×
+              </button>
             </div>
-            {cloud.user ? (
-              <div className="account-row">
-                <Avatar name={cloud.user.name || cloud.user.login} size={30} />
-                <div className="account-row__who">
-                  <div className="account-row__name">
-                    {cloud.user.name || cloud.user.login}
-                    <span title="Signed in with GitHub">
-                      <GitHubMark size={13} />
+
+            <div className="sheet__body">
+              <AccountRows onManageDevices={() => setView("devices")} />
+
+              <div className="row">
+                <label className="row__label" htmlFor="settings-shell">
+                  Shell
+                </label>
+                <div className="field">
+                  <select
+                    id="settings-shell"
+                    value={draft.shell ?? ""}
+                    onChange={(event) => patch("shell", event.target.value || null)}
+                  >
+                    {SHELLS.map((shell) => (
+                      <option key={shell.value} value={shell.value}>
+                        {shell.label}
+                      </option>
+                    ))}
+                    {/* A shell set in config.json, or on another platform, still shows. */}
+                    {draft.shell && !SHELLS.some((shell) => shell.value === draft.shell) && (
+                      <option value={draft.shell}>{draft.shell}</option>
+                    )}
+                  </select>
+                  <span className="field__chevron" aria-hidden="true">
+                    ▾
+                  </span>
+                </div>
+              </div>
+
+              <div className="row row--top">
+                <div className="row__label">
+                  Agent name patterns
+                  <div className="row__hint">Process names that mark a pane as an agent</div>
+                </div>
+                <div className="tokens">
+                  {draft.agentPatterns.map((value) => (
+                    <span className="token" key={value}>
+                      {value}
+                      <button
+                        type="button"
+                        className="token__remove"
+                        aria-label={`Remove ${value}`}
+                        onClick={() =>
+                          patch(
+                            "agentPatterns",
+                            draft.agentPatterns.filter((item) => item !== value),
+                          )
+                        }
+                      >
+                        ×
+                      </button>
                     </span>
-                  </div>
-                  <div className="account-row__detail">
-                    @{cloud.user.login} · {cloud.user.email}
+                  ))}
+                  <input
+                    className="tokens__input"
+                    value={pattern}
+                    placeholder="add pattern…"
+                    aria-label="Add an agent name pattern"
+                    onChange={(event) => setPattern(event.target.value)}
+                    onKeyDown={onPatternKeyDown}
+                    onBlur={commitPattern}
+                  />
+                </div>
+              </div>
+
+              {IS_MAC ? (
+                <div className="row">
+                  <div className="row__label">Hotkeys</div>
+                  <div className="row__note">
+                    Command (⌘), the macOS layout: ⌘N, ⌘W, ⌘1…9 and so on. Hold ⌘ to see them all.
                   </div>
                 </div>
-                <button type="button" className="btn btn--outline account-row__sign-out" onClick={() => void cloud.signOut()}>
-                  Sign out
-                </button>
+              ) : (
+                <div className="row">
+                  <div className="row__label" id="settings-modifier">
+                    Hotkey modifier
+                  </div>
+                  <div className="segmented" role="radiogroup" aria-labelledby="settings-modifier">
+                    {(["ctrl+alt", "ctrl+shift"] as HotkeyModifier[]).map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={draft.hotkeyModifier === value}
+                        className={cx(
+                          "segmented__item",
+                          draft.hotkeyModifier === value && "segmented__item--active",
+                        )}
+                        onClick={() => patch("hotkeyModifier", value)}
+                      >
+                        {value === "ctrl+alt" ? "Ctrl+Alt" : "Ctrl+Shift"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="row">
+                <div className="row__label" id="settings-theme">
+                  Theme
+                  <div className="row__hint">
+                    System follows your OS; Black is total darkness
+                    {IS_MAC && "; Glass shows your desktop through the window (Dark in full screen)"}
+                  </div>
+                </div>
+                <div className="segmented" role="radiogroup" aria-labelledby="settings-theme">
+                  {THEMES.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={draft.theme === value}
+                      className={cx("segmented__item", draft.theme === value && "segmented__item--active")}
+                      onClick={() => patch("theme", value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <div className="account-row">
-                <div className="account-row__status">Not signed in · everything works on this computer</div>
-                <button type="button" className="btn btn--outline" onClick={() => cloud.openDialog({ kind: "sign-in" })}>
-                  Sign in…
-                </button>
+
+              <div className="row">
+                <div className="row__label" id="settings-compact">
+                  Compact layout
+                  <div className="row__hint">Square panes, no borders, minimal gaps</div>
+                </div>
+                <div className="segmented" role="radiogroup" aria-labelledby="settings-compact">
+                  {[false, true].map((value) => (
+                    <button
+                      key={String(value)}
+                      type="button"
+                      role="radio"
+                      aria-checked={draft.compactLayout === value}
+                      className={cx(
+                        "segmented__item",
+                        draft.compactLayout === value && "segmented__item--active",
+                      )}
+                      onClick={() => patch("compactLayout", value)}
+                    >
+                      {value ? "On" : "Off"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="row__label">
+                  Colours
+                  <div className="row__hint">Reset follows the theme</div>
+                </div>
+                <div className="color-picks">
+                  <ColorPick
+                    label="Focus ring"
+                    token="--focus-rgb"
+                    value={draft.focusColor}
+                    onChange={(value) => patch("focusColor", value)}
+                  />
+                  <ColorPick
+                    label="Agent finished"
+                    token="--finished-rgb"
+                    value={draft.finishedColor}
+                    onChange={(value) => patch("finishedColor", value)}
+                  />
+                </div>
+              </div>
+
+              <div className="row">
+                <label className="row__label" htmlFor="settings-font">
+                  Font
+                </label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 84px", gap: 8 }}>
+                  <div className="field">
+                    <select
+                      id="settings-font"
+                      value={draft.fontFamily ?? FONTS[0]}
+                      onChange={(event) => patch("fontFamily", event.target.value)}
+                    >
+                      {FONTS.map((font) => (
+                        <option key={font} value={font}>
+                          {font}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="field__chevron" aria-hidden="true">
+                      ▾
+                    </span>
+                  </div>
+                  <div className="field stepper">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={MIN_FONT_SIZE}
+                      max={MAX_FONT_SIZE}
+                      aria-label="Font size"
+                      value={draft.fontSize}
+                      onChange={(event) =>
+                        patch("fontSize", clampFontSize(Number(event.target.value) || draft.fontSize))
+                      }
+                    />
+                    <span className="stepper__arrows">
+                      <button
+                        type="button"
+                        aria-label="Increase font size"
+                        onClick={() => patch("fontSize", clampFontSize(draft.fontSize + 1))}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Decrease font size"
+                        onClick={() => patch("fontSize", clampFontSize(draft.fontSize - 1))}
+                      >
+                        ▼
+                      </button>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="row">
+                <div className="row__label">Notes folder</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+                  <div className="field">
+                    <span className="ellipsis" title={draft.notesRoot ?? ""}>
+                      {draft.notesRoot ?? "Not set"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn--outline"
+                    onClick={() => {
+                      void actions.chooseNotesRoot().then((root) => {
+                        if (root) patch("notesRoot", root);
+                      });
+                    }}
+                  >
+                    Browse…
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {cloud.user && (
+              <div className="settings-note">
+                Signing out keeps everything on this computer. Team processes are hidden until you sign in again.
               </div>
             )}
-          </div>
 
-          <div className="row">
-            <label className="row__label" htmlFor="settings-shell">
-              Shell
-            </label>
-            <div className="field">
-              <select
-                id="settings-shell"
-                value={draft.shell ?? ""}
-                onChange={(event) => patch("shell", event.target.value || null)}
-              >
-                {SHELLS.map((shell) => (
-                  <option key={shell.value} value={shell.value}>
-                    {shell.label}
-                  </option>
-                ))}
-                {/* A shell set in config.json, or on another platform, still shows. */}
-                {draft.shell && !SHELLS.some((shell) => shell.value === draft.shell) && (
-                  <option value={draft.shell}>{draft.shell}</option>
-                )}
-              </select>
-              <span className="field__chevron" aria-hidden="true">
-                ▾
-              </span>
-            </div>
-          </div>
-
-          <div className="row row--top">
-            <div className="row__label">
-              Agent name patterns
-              <div className="row__hint">Process names that mark a pane as an agent</div>
-            </div>
-            <div className="tokens">
-              {draft.agentPatterns.map((value) => (
-                <span className="token" key={value}>
-                  {value}
-                  <button
-                    type="button"
-                    className="token__remove"
-                    aria-label={`Remove ${value}`}
-                    onClick={() =>
-                      patch(
-                        "agentPatterns",
-                        draft.agentPatterns.filter((item) => item !== value),
-                      )
-                    }
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-              <input
-                className="tokens__input"
-                value={pattern}
-                placeholder="add pattern…"
-                aria-label="Add an agent name pattern"
-                onChange={(event) => setPattern(event.target.value)}
-                onKeyDown={onPatternKeyDown}
-                onBlur={commitPattern}
-              />
-            </div>
-          </div>
-
-          {IS_MAC ? (
-            <div className="row">
-              <div className="row__label">Hotkeys</div>
-              <div className="row__note">
-                Command (⌘), the macOS layout: ⌘N, ⌘W, ⌘1…9 and so on. Hold ⌘ to see them all.
-              </div>
-            </div>
-          ) : (
-            <div className="row">
-              <div className="row__label" id="settings-modifier">
-                Hotkey modifier
-              </div>
-              <div className="segmented" role="radiogroup" aria-labelledby="settings-modifier">
-                {(["ctrl+alt", "ctrl+shift"] as HotkeyModifier[]).map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    role="radio"
-                    aria-checked={draft.hotkeyModifier === value}
-                    className={cx(
-                      "segmented__item",
-                      draft.hotkeyModifier === value && "segmented__item--active",
-                    )}
-                    onClick={() => patch("hotkeyModifier", value)}
-                  >
-                    {value === "ctrl+alt" ? "Ctrl+Alt" : "Ctrl+Shift"}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="row">
-            <div className="row__label" id="settings-theme">
-              Theme
-              <div className="row__hint">
-                System follows your OS; Black is total darkness
-                {IS_MAC && "; Glass shows your desktop through the window (Dark in full screen)"}
-              </div>
-            </div>
-            <div className="segmented" role="radiogroup" aria-labelledby="settings-theme">
-              {THEMES.map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.theme === value}
-                  className={cx("segmented__item", draft.theme === value && "segmented__item--active")}
-                  onClick={() => patch("theme", value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="row__label" id="settings-compact">
-              Compact layout
-              <div className="row__hint">Square panes, no borders, minimal gaps</div>
-            </div>
-            <div className="segmented" role="radiogroup" aria-labelledby="settings-compact">
-              {[false, true].map((value) => (
-                <button
-                  key={String(value)}
-                  type="button"
-                  role="radio"
-                  aria-checked={draft.compactLayout === value}
-                  className={cx(
-                    "segmented__item",
-                    draft.compactLayout === value && "segmented__item--active",
-                  )}
-                  onClick={() => patch("compactLayout", value)}
-                >
-                  {value ? "On" : "Off"}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="row__label">
-              Colours
-              <div className="row__hint">Reset follows the theme</div>
-            </div>
-            <div className="color-picks">
-              <ColorPick
-                label="Focus ring"
-                token="--focus-rgb"
-                value={draft.focusColor}
-                onChange={(value) => patch("focusColor", value)}
-              />
-              <ColorPick
-                label="Agent finished"
-                token="--finished-rgb"
-                value={draft.finishedColor}
-                onChange={(value) => patch("finishedColor", value)}
-              />
-            </div>
-          </div>
-
-          <div className="row">
-            <label className="row__label" htmlFor="settings-font">
-              Font
-            </label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 84px", gap: 8 }}>
-              <div className="field">
-                <select
-                  id="settings-font"
-                  value={draft.fontFamily ?? FONTS[0]}
-                  onChange={(event) => patch("fontFamily", event.target.value)}
-                >
-                  {FONTS.map((font) => (
-                    <option key={font} value={font}>
-                      {font}
-                    </option>
-                  ))}
-                </select>
-                <span className="field__chevron" aria-hidden="true">
-                  ▾
-                </span>
-              </div>
-              <div className="field stepper">
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={MIN_FONT_SIZE}
-                  max={MAX_FONT_SIZE}
-                  aria-label="Font size"
-                  value={draft.fontSize}
-                  onChange={(event) =>
-                    patch("fontSize", clampFontSize(Number(event.target.value) || draft.fontSize))
-                  }
-                />
-                <span className="stepper__arrows">
-                  <button
-                    type="button"
-                    aria-label="Increase font size"
-                    onClick={() => patch("fontSize", clampFontSize(draft.fontSize + 1))}
-                  >
-                    ▲
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Decrease font size"
-                    onClick={() => patch("fontSize", clampFontSize(draft.fontSize - 1))}
-                  >
-                    ▼
-                  </button>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="row__label">Notes folder</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
-              <div className="field">
-                <span className="ellipsis" title={draft.notesRoot ?? ""}>
-                  {draft.notesRoot ?? "Not set"}
-                </span>
-              </div>
+            <div className="sheet__foot">
               <button
                 type="button"
                 className="btn btn--outline"
-                onClick={() => {
-                  void actions.chooseNotesRoot().then((root) => {
-                    if (root) patch("notesRoot", root);
-                  });
-                }}
+                onClick={() => actions.setSettingsOpen(false)}
               >
-                Browse…
+                Cancel
+              </button>
+              <button type="submit" className="btn btn--primary">
+                Save
               </button>
             </div>
-          </div>
-        </div>
-
-        <div className="sheet__foot">
-          {cloud.user && (
-            <span className="sheet__foot-note">
-              Signing out keeps everything on this computer. Team processes are hidden until you sign in again.
-            </span>
-          )}
-          <button
-            type="button"
-            className="btn btn--outline"
-            onClick={() => actions.setSettingsOpen(false)}
-          >
-            Cancel
-          </button>
-          <button type="submit" className="btn btn--primary">
-            Save
-          </button>
-        </div>
+          </>
+        )}
       </form>
     </div>
   );

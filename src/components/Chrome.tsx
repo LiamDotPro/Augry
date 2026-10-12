@@ -5,6 +5,7 @@ import type { AppTab } from "../ipc/types";
 import type { WindowFrame } from "../lib/windowFrame";
 import { useAppActions, useAppState, useHotkeyScheme } from "../state/AppProvider";
 import { totalPages } from "../state/reducer";
+import { AccountChip } from "./cloud/AccountChip";
 
 const LAYOUT_LABELS: Record<LayoutMode, string> = {
   grid: "Grid: stack both ways",
@@ -95,9 +96,10 @@ function MaximizeGlyph({ restore = false }: { restore?: boolean }) {
 }
 
 /**
- * The window bar: brand, tab switcher, pager, pane/hotkey/settings actions and
- * the window controls. It is also the drag region, so the app can run without
- * native decorations the way the design draws it.
+ * The window bar: brand, tab switcher, pager, pane/hotkey/settings actions,
+ * the account chip (signed in only) and the window controls. It is also the
+ * drag region, so the app can run without native decorations the way the
+ * design draws it.
  *
  * On macOS the window keeps its native frame with the title bar overlaid
  * (tauri.macos.conf.json), so the traffic lights sit in this bar the way they
@@ -227,6 +229,8 @@ export function Chrome({ frame }: { frame: WindowFrame }) {
         >
           Settings
         </button>
+
+        <AccountChip />
 
         {!trafficLights && <span className="chrome__divider" aria-hidden="true" />}
 
