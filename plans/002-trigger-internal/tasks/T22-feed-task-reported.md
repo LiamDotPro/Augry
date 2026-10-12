@@ -2,7 +2,7 @@
 id: T22
 epic: 002-trigger-internal
 title: Publish tg.task-reported from the task tracker
-status: todo
+status: done
 depends_on: [T20]
 size: S
 model: haiku
@@ -109,3 +109,5 @@ and replace it with the following. How it works: `reported` is a copy of the tas
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7, after 7; agent::task 6 passed; workspace tests ok; fmt ok; no-default-features check ok)
+- 2026-10-12 checker: pass
