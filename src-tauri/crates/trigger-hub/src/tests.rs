@@ -494,3 +494,87 @@ mod lifecycle_tests {
         assert_eq!(stops.load(Ordering::SeqCst), 1);
     }
 }
+
+mod end_to_end_tests {
+    use crate::test_support::shared;
+    use crate::Hub;
+    use serde_json::json;
+    use std::collections::BTreeMap;
+    use std::time::{Duration, UNIX_EPOCH};
+    use trigger_core::testkit::{rule, FakeSource};
+    use trigger_core::Event;
+
+    const WAIT: Duration = Duration::from_secs(5);
+
+    fn event(rule: &str, secs: u64) -> Event {
+        Event {
+            rule: rule.to_string(),
+            kind: "fake.x".to_string(),
+            at: UNIX_EPOCH + Duration::from_secs(secs),
+            payload: BTreeMap::new(),
+        }
+    }
+
+    #[test]
+    fn hub_is_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<Hub>();
+    }
+
+    #[test]
+    fn an_event_from_a_started_source_reaches_a_subscriber() {
+        let (fake, fake_ref, _) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        let rx = hub.subscribe();
+        hub.apply(vec![rule("r1", "fake.x", json!({}))]);
+        fake_ref.fire(event("r1", 100));
+        let fired = rx.recv_timeout(WAIT).unwrap();
+        assert_eq!(fired.event.rule, "r1");
+        assert_eq!(fired.event.kind, "fake.x");
+        assert_eq!(fired.coalesced, 0);
+    }
+
+    #[test]
+    fn events_from_a_source_are_cooled_down_and_counted() {
+        let (fake, fake_ref, _) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        let rx = hub.subscribe();
+        hub.apply(vec![rule("r1", "fake.x", json!({}))]);
+        fake_ref.fire(event("r1", 100));
+        fake_ref.fire(event("r1", 100));
+        fake_ref.fire(event("r1", 101));
+        fake_ref.fire(event("r1", 105));
+        assert_eq!(rx.recv_timeout(WAIT).unwrap().coalesced, 0);
+        let later = rx.recv_timeout(WAIT).unwrap();
+        assert_eq!(later.event.at, UNIX_EPOCH + Duration::from_secs(105));
+        assert_eq!(later.coalesced, 2);
+    }
+
+    #[test]
+    fn a_restarted_source_still_reaches_subscribers() {
+        let (fake, fake_ref, _) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        let rx = hub.subscribe();
+        hub.apply(vec![rule("r1", "fake.x", json!({}))]);
+        hub.apply(vec![
+            rule("r1", "fake.x", json!({})),
+            rule("r2", "fake.x", json!({})),
+        ]);
+        // `fire` uses the sink from the latest start.
+        fake_ref.fire(event("r2", 100));
+        assert_eq!(rx.recv_timeout(WAIT).unwrap().event.rule, "r2");
+    }
+
+    #[test]
+    fn source_events_and_published_events_share_one_cool_down() {
+        let (fake, fake_ref, _) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        let rx = hub.subscribe();
+        hub.apply(vec![rule("r1", "fake.x", json!({}))]);
+        fake_ref.fire(event("r1", 100));
+        hub.publish(event("r1", 101));
+        hub.publish(event("r1", 110));
+        assert_eq!(rx.recv_timeout(WAIT).unwrap().coalesced, 0);
+        assert_eq!(rx.recv_timeout(WAIT).unwrap().coalesced, 1);
+    }
+}
