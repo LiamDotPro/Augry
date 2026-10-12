@@ -6,6 +6,7 @@
 #![allow(dead_code)]
 
 pub mod backoff;
+pub mod cli;
 pub mod comments;
 pub mod diff;
 pub mod json;

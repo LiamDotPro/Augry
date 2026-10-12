@@ -2,7 +2,7 @@
 id: T20
 epic: 011-trigger-github
 title: Add the Gh trait and the pure gh helpers
-status: todo
+status: done
 depends_on: [T19]
 size: M
 model: haiku
@@ -312,3 +312,5 @@ pub mod cli;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
