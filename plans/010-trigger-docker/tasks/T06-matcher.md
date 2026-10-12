@@ -2,7 +2,7 @@
 id: T06
 epic: 010-trigger-docker
 title: Add logic::matches for the four when fields
-status: todo
+status: done
 depends_on: [T05]
 size: M
 model: haiku
@@ -279,3 +279,5 @@ fn health_kinds_are_told_apart() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

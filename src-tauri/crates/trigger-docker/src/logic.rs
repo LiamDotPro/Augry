@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use serde_json::Map;
 use trigger_core::{RuleId, Value};
 
-use crate::rule::Parsed;
+use crate::rule::{EngineChoice, Parsed};
 
 /// A rule this crate is watching for.
 #[derive(Debug, Clone)]
@@ -239,7 +239,69 @@ pub fn parse_line(line: &str) -> Option<EngineEvent> {
     })
 }
 
+/// The forms of an image reference a rule's `image` glob is tried against: as
+/// printed, without a leading `docker.io/library/`, and each of those with
+/// `:latest` added or removed. So `alpine` matches `docker.io/library/alpine`
+/// and `alpine:latest` matches `alpine`.
+fn image_candidates(image: &str) -> Vec<String> {
+    let stripped = image.strip_prefix("docker.io/library/").unwrap_or(image);
+    let mut out = Vec::new();
+    for base in [image, stripped] {
+        out.push(base.to_string());
+        if let Some(without) = base.strip_suffix(":latest") {
+            out.push(without.to_string());
+        } else {
+            let last_segment = base.rsplit('/').next().unwrap_or(base);
+            if !last_segment.contains(':') && !last_segment.contains('@') {
+                out.push(format!("{base}:latest"));
+            }
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Whether the rule fires for the event: the kind, the engine, and every `when`
+/// field the rule set. For `image-built` the event's name is the image
+/// reference, so `name` and `image` globs both test that.
+pub fn matches(armed: &Armed, event: &EngineEvent) -> bool {
+    if armed.kind != event.kind.id() {
+        return false;
+    }
+    let when = &armed.when;
+    let engine_ok = match when.when.engine {
+        EngineChoice::Auto => true,
+        EngineChoice::Docker => event.engine == Engine::Docker,
+        EngineChoice::Podman => event.engine == Engine::Podman,
+    };
+    if !engine_ok {
+        return false;
+    }
+    if let Some(name) = &when.name {
+        if !name.is_match(&event.name) {
+            return false;
+        }
+    }
+    if let Some(image) = &when.image {
+        if !image_candidates(&event.image)
+            .iter()
+            .any(|candidate| image.is_match(candidate))
+        {
+            return false;
+        }
+    }
+    if let Some((key, value)) = &when.label {
+        if event.labels.get(key) != Some(value) {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod fixtures;
+#[cfg(test)]
+mod match_tests;
 #[cfg(test)]
 mod tests;
