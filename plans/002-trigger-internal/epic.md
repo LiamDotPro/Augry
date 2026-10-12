@@ -70,6 +70,12 @@ because they tie processes to what the user is already doing in the grid.
      the card's acceptance greps the script.
    - **Repeated commands**: compare `$HISTCMD` instead of the command text in
      `shell-integration.sh`, so running `make` twice reports twice.
+     Ruling (slice B): bash reads the number `history 1` prints, because
+     `$HISTCMD` inside `PROMPT_COMMAND` is always 1 on macOS bash 3.2; zsh
+     keeps `$HISTCMD`. The first prompt only records the number. Wrapper
+     files are compiled in with `include_str!` and written by
+     `install_scripts`, since Tauri's `resources/*` glob skips folders;
+     `Shell` gains an `env` field for `ZDOTDIR` and friends; `sh` starts bare.
    The scripts stay installed by `install_scripts`; the wrapper files are
    installed beside them the same way.
 8. **Marks are parsed in Rust**: a pure scanner `src-tauri/src/pty/marks.rs`
