@@ -2,7 +2,7 @@
 id: T11
 epic: 003-trigger-git
 title: Add a temporary repository helper for git tests
-status: todo
+status: done
 depends_on: [T10]
 size: M
 model: haiku
@@ -233,3 +233,5 @@ Note on `check-crates.mjs`: it prints warnings, not errors, about template text.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (51 lib tests, 4 testutil_tests, git 2.50.1 present so no skips; clippy, fmt --check and check-crates 0 errors)
+- 2026-10-12 checker: pass

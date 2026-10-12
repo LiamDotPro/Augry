@@ -166,3 +166,6 @@ pub fn value(cwd: &Path, args: &[&str]) -> Option<String> {
 mod tests;
 #[cfg(test)]
 mod testutil;
+
+#[cfg(test)]
+mod testutil_tests;
