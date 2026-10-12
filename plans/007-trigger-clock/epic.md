@@ -107,9 +107,9 @@ src-tauri/crates/trigger-clock/
 
 | Id | Question | Why it matters | Answer (filled after research) |
 |---|---|---|---|
-| R01 | Current, maintained cron parsing crate with local time zone support and its version | Decision 1 || croner 4.0.1, five fields via the builder, chrono 0.4.45 already in the lock. Decision 6, 8. |
-| R02 | Current ICS parsing crate that handles recurring events, and its version | Decision 1 || calcard 0.3.14 with two traps and workarounds; ureq 3.4. Decision 6, 9. |
-| R03 | Does a thread sleeping across a system sleep wake with the right elapsed time on each OS, or must the crate re-check the wall clock on a short tick | Decision 4 || Waits do not count sleep on any OS: 30 s tick, 90 s jump. Decision 7. |
+| R01 | Current, maintained cron parsing crate with local time zone support and its version | Decision 1 | croner 4.0.1, five fields via the builder, chrono 0.4.45 already in the lock. Decision 6, 8. |
+| R02 | Current ICS parsing crate that handles recurring events, and its version | Decision 1 | calcard 0.3.14 with two traps and workarounds; ureq 3.4. Decision 6, 9. |
+| R03 | Does a thread sleeping across a system sleep wake with the right elapsed time on each OS, or must the crate re-check the wall clock on a short tick | Decision 4 | Waits do not count sleep on any OS: 30 s tick, 90 s jump. Decision 7. |
 
 ## Risks
 
