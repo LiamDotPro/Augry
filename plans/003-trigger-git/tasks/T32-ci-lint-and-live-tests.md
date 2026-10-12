@@ -2,7 +2,7 @@
 id: T32
 epic: 003-trigger-git
 title: Lint trigger-git and run its live tests in CI
-status: todo
+status: done
 depends_on: [T31]
 size: S
 model: haiku
@@ -71,3 +71,5 @@ CI lints `trigger-git` with `-D warnings` like the other trigger crates, and run
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

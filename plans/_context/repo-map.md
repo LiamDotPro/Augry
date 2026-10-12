@@ -46,7 +46,7 @@ A Tauri 2 desktop app: a Rust core in `src-tauri/` and a React frontend in
 | `docs/technical-design.md` | The design of the core: modules, IPC contract (section 10), persistence (9), testing (14) |
 | `docs/process-triggers.md` | The trigger catalogue (Part 1) and the one crate per integration design (Part 2) that the trigger epics implement |
 | `design/` | Export of the Claude Design project. `CLAUDE.md` says how to port it |
-| `.github/workflows/ci.yml` | On every pull request and push to main, on macOS, Windows and Ubuntu: `npm test`, `npm run build`, `cargo fmt --check`, clippy with `-D warnings` on the three trigger crates, `cargo test --workspace`, `node plans/_tools/check-crates.mjs`, and the `trigger-fs` live tests |
+| `.github/workflows/ci.yml` | On every pull request and push to main, on macOS, Windows and Ubuntu: `npm test`, `npm run build`, `cargo fmt --check`, clippy with `-D warnings` on the trigger crates, `cargo test --workspace`, `node plans/_tools/check-crates.mjs`, and the live tests of `trigger-fs` and `trigger-git` |
 | `plans/`, `.claude/` | The planning pipeline. See `plans/README.md` |
 | `plans/_templates/trigger-crate/` | The template every trigger crate is made from: Cargo.toml, README with the eight sections, `src/lib.rs`, `rule.rs`, `logic.rs`, `os.rs`, `examples/readme.rs`, `tests/readme.rs`, `tests/live.rs` |
 
@@ -62,7 +62,7 @@ Run from the repo root unless stated.
 | Live file watching tests | `cd src-tauri && cargo test -p trigger-fs -- --ignored --test-threads=1` |
 | Live git tests | `cd src-tauri && cargo test -p trigger-git -- --ignored --test-threads=1` (needs `git` on the PATH; each test makes its own temporary repository) |
 | Rust formatting | `cd src-tauri && cargo fmt --check` |
-| Rust lints | `cd src-tauri && cargo clippy --all-targets -- -D warnings` (the app crate has a few existing warnings; new crates must be clean; CI lints only `-p trigger-core -p trigger-hub -p trigger-fs`) |
+| Rust lints | `cd src-tauri && cargo clippy --all-targets -- -D warnings` (the app crate has a few existing warnings; new crates must be clean; CI lints the trigger crates by name with `-p`) |
 | Run the app | `npm run tauri dev` |
 | Regenerate the cloud clients | `npm run api:generate` |
 | Cloud tests against a running API | `npm run test:cloud`; `cd src-tauri && AUGRY_API_URL=http://localhost:8080 cargo test cloud` |
