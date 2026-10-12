@@ -11,12 +11,15 @@ pub mod comments;
 pub mod diff;
 pub mod json;
 pub mod payload;
+pub mod poll;
 pub mod pulls;
 pub mod response;
 pub mod runs;
 pub mod simple;
 pub mod text;
 
+#[cfg(test)]
+pub(crate) mod fake_gh;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

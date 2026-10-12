@@ -2,7 +2,7 @@
 id: T24
 epic: 011-trigger-github
 title: Plan the poll jobs and add a fake gh for tests
-status: todo
+status: done
 depends_on: [T23]
 size: M
 model: haiku
@@ -503,3 +503,5 @@ mod tests;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
