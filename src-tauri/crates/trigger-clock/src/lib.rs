@@ -14,6 +14,7 @@ mod feed;
 mod logic;
 mod os;
 mod rule;
+mod threads;
 
 use trigger_core::{
     Availability, FieldInfo, Handle, KindInfo, Platforms, Rule, RuleError, Sink, Source,
@@ -168,11 +169,15 @@ impl Source for ClockSource {
     }
 
     fn start(&self, rules: Vec<Rule>, sink: Sink) -> Result<Handle, SourceError> {
+        let mut armed = Vec::new();
         for r in &rules {
-            rule::parse(r).map_err(|e| SourceError::Os(e.to_string()))?;
+            let parsed = rule::parse(r).map_err(|e| SourceError::Os(format!("{}: {e}", r.id)))?;
+            armed.push(logic::Armed {
+                id: r.id.clone(),
+                kind: r.kind.clone(),
+                parsed,
+            });
         }
-        // The thread is added by the glue card.
-        let _ = sink;
-        Err(SourceError::Unavailable("not implemented yet".into()))
+        threads::launch(armed, sink, threads::Parts::system())
     }
 }
