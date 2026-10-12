@@ -207,6 +207,38 @@ fn fire_due<Tz: TimeZone>(
     }
 }
 
+/// `clock.daily-first-use`: fires once per local date, after the clock has run
+/// normally for `cfg.normal_for`. A machine that slept all night therefore
+/// fires one `normal_for` after waking, not on the jump step itself.
+fn fire_daily<Tz: TimeZone>(
+    state: &mut State,
+    tz: &Tz,
+    now: SystemTime,
+    rules: &[Armed],
+    out: &mut Vec<Fire>,
+) {
+    let today = in_zone(tz, now).date_naive();
+    let calm = now.duration_since(state.normal_since).unwrap_or_default() >= state.cfg.normal_for;
+    if state.last_daily == Some(today) || !calm {
+        return;
+    }
+    let mut daily = rules
+        .iter()
+        .filter(|a| a.kind == "clock.daily-first-use")
+        .peekable();
+    if daily.peek().is_none() {
+        return;
+    }
+    state.last_daily = Some(today);
+    for armed in daily {
+        out.push(Fire {
+            rule: armed.id.clone(),
+            kind: armed.kind.clone(),
+            payload: BTreeMap::from([("date".to_string(), Value::from(today.to_string()))]),
+        });
+    }
+}
+
 /// The rules due at `now`. `tz` is the zone cron expressions and dates are
 /// read in: `&chrono::Local` in the app, a fixed zone in tests.
 pub fn step<Tz: TimeZone>(
@@ -229,6 +261,7 @@ pub fn step<Tz: TimeZone>(
         state.normal_since = now;
     }
     fire_due(state, tz, now, jumped, rules, &mut out);
+    fire_daily(state, tz, now, rules, &mut out);
     state.prev_wall = now;
     out
 }

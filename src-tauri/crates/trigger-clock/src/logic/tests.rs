@@ -259,3 +259,79 @@ fn a_backwards_jump_fires_nothing_and_plans_again() {
     assert_eq!(fired.len(), 1);
     assert_eq!(due_of(&fired[0]), millis(at(2026, 3, 6, 9, 30, 0)));
 }
+
+#[test]
+fn daily_first_use_fires_once_after_the_clock_has_run_normally_for_a_minute() {
+    let start = at(2026, 3, 6, 10, 0, 0);
+    let rules = [armed("d", "clock.daily-first-use", json!({}))];
+    let mut state = State::new(ClockConfig::default(), start);
+    assert!(run(&mut state, start + secs(30), &rules).is_empty());
+    let fired = run(&mut state, start + secs(60), &rules);
+    assert_eq!(fired.len(), 1);
+    assert_eq!(fired[0].kind, "clock.daily-first-use");
+    assert_eq!(fired[0].payload["date"], json!("2026-03-06"));
+    assert!(walk(&mut state, start + secs(60), start + secs(3600), &rules).is_empty());
+}
+
+#[test]
+fn daily_first_use_fires_the_next_day_after_midnight() {
+    let start = at(2026, 3, 6, 23, 58, 0);
+    let rules = [armed("d", "clock.daily-first-use", json!({}))];
+    let mut state = State::new(ClockConfig::default(), start);
+    let fired = walk(&mut state, start, at(2026, 3, 7, 0, 5, 0), &rules);
+    assert_eq!(fired.len(), 2);
+    assert_eq!(fired[0].payload["date"], json!("2026-03-06"));
+    assert_eq!(fired[1].payload["date"], json!("2026-03-07"));
+}
+
+#[test]
+fn daily_first_use_waits_a_minute_after_waking_from_a_night_asleep() {
+    let evening = at(2026, 3, 6, 23, 0, 0);
+    let rules = [armed("d", "clock.daily-first-use", json!({}))];
+    let mut state = State::new(ClockConfig::default(), evening);
+    walk(&mut state, evening, evening + secs(120), &rules);
+    // Wake at 07:00 the next morning: the jump step does not fire.
+    let wake = at(2026, 3, 7, 7, 0, 0);
+    assert!(run(&mut state, wake, &rules).is_empty());
+    assert!(run(&mut state, wake + secs(30), &rules).is_empty());
+    let fired = run(&mut state, wake + secs(60), &rules);
+    assert_eq!(fired.len(), 1);
+    assert_eq!(fired[0].payload["date"], json!("2026-03-07"));
+    assert!(run(&mut state, wake + secs(90), &rules).is_empty());
+}
+
+#[test]
+fn a_nap_during_the_day_does_not_fire_daily_first_use_again() {
+    let start = at(2026, 3, 6, 10, 0, 0);
+    let rules = [armed("d", "clock.daily-first-use", json!({}))];
+    let mut state = State::new(ClockConfig::default(), start);
+    assert_eq!(walk(&mut state, start, start + secs(120), &rules).len(), 1);
+    let woke = start + secs(120 + 3 * 3600);
+    assert!(run(&mut state, woke, &rules).is_empty());
+    assert!(walk(&mut state, woke, woke + secs(300), &rules).is_empty());
+}
+
+#[test]
+fn daily_first_use_does_nothing_without_a_daily_rule() {
+    let start = at(2026, 3, 6, 10, 0, 0);
+    let mut state = State::new(ClockConfig::default(), start);
+    assert!(walk(&mut state, start, start + secs(300), &[]).is_empty());
+    assert_eq!(state.last_daily, None);
+}
+
+#[test]
+fn a_short_config_runs_in_milliseconds() {
+    let cfg = ClockConfig {
+        tick: Duration::from_millis(20),
+        jump: Duration::from_millis(60),
+        normal_for: Duration::from_millis(40),
+    };
+    let start = at(2026, 3, 6, 10, 0, 0);
+    let rules = [armed("d", "clock.daily-first-use", json!({}))];
+    let mut state = State::new(cfg, start);
+    assert!(run(&mut state, start + Duration::from_millis(20), &rules).is_empty());
+    assert_eq!(
+        run(&mut state, start + Duration::from_millis(40), &rules).len(),
+        1
+    );
+}
