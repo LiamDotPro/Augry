@@ -25,7 +25,7 @@ A Tauri 2 desktop app: a Rust core in `src-tauri/` and a React frontend in
 | `src/cloud/` | `api.ts` (openapi-fetch client, React Query `$api`, `withSessionToken`), `schema.d.ts` (generated), `api.cloud.test.ts` (needs an API, skipped otherwise) |
 | `src/styles/tokens.css` | Design tokens lifted from Claude Design. Colours and sizes live here, never in components |
 | `src/styles/*.css` | One file per area: `chrome.css`, `pane.css`, `notes.css`, `overlays.css` (settings sheet, toast), `review.css` |
-| `src-tauri/Cargo.toml` | The app crate `terminal-grid` (lib `terminal_grid_lib`), also the root of a Cargo workspace whose members are `crates/*`. `[workspace.dependencies]` holds the shared versions. Feature `trigger-fs` (on by default) wires in the file source. Rust 2021, stable toolchain |
+| `src-tauri/Cargo.toml` | The app crate `terminal-grid` (lib `terminal_grid_lib`), also the root of a Cargo workspace whose members are `crates/*`. `[workspace.dependencies]` holds the shared versions. Features `trigger-fs` and `trigger-docker` (both on by default) wire in the file and container sources. Rust 2021, stable toolchain |
 | `src-tauri/src/lib.rs` | Builder, plugins, `AppState` (`pty`, `git`, `agent`, `notes`, `state`), the `generate_handler![...]` command list, `blocking()` |
 | `src-tauri/src/error.rs` | `AppError`: thiserror enum, serialised with `code` tag in PascalCase |
 | `src-tauri/src/pty/` | PTY sessions, shell integration, the reader thread. `create_terminal`, `write_terminal` |
@@ -37,6 +37,7 @@ A Tauri 2 desktop app: a Rust core in `src-tauri/` and a React frontend in
 | `src-tauri/crates/trigger-core/` | The contract (`Source`, `Rule`, `Event`, `KindInfo`, `kinds_markdown`) and `testkit` (`RecordingSink`, `FixedClock`, `FakeSource`) |
 | `src-tauri/crates/trigger-hub/` | `Hub`: catalogue, `check`, `apply`, `publish`, `subscribe`, the two second cool down, the `trigger-hub` thread |
 | `src-tauri/crates/trigger-fs/` | The reference source. Kinds `fs.file-saved`, `fs.file-created`, `fs.file-removed`, `fs.file-renamed`, `fs.download-finished`, over `notify` |
+| `src-tauri/crates/trigger-docker/` | Fires on container events from Docker and Podman by running `<engine> events` as a child and parsing its lines. Kinds `docker.container-started`, `docker.container-stopped`, `docker.container-healthy`, `docker.container-unhealthy`, `docker.image-built`. `logic.rs` (pure parser and matcher), `supervisor.rs` (restart with backoff, kill on stop), `os.rs` (finding the binary, the `version` check) |
 | `src-tauri/src/cloud/` | `generated.rs` (progenitor client from the API contract) and `mod.rs` (`client()`, `poll_github_token`, a test that needs `AUGRY_API_URL`) |
 | `src-tauri/tauri.conf.json` | Window, CSP (`connect-src` allows the API), bundle |
 | `src-tauri/capabilities/default.json` | Permissions for the webview: window, dialog, opener |
@@ -59,6 +60,7 @@ Run from the repo root unless stated.
 | Type check and build | `npm run build` |
 | Rust tests | `cd src-tauri && cargo test --workspace` |
 | Live file watching tests | `cd src-tauri && cargo test -p trigger-fs -- --ignored --test-threads=1` |
+| Live container tests | `cd src-tauri && cargo test -p trigger-docker -- --ignored --test-threads=1` (needs a running Docker; each test prints `skipping:` and passes without one) |
 | Rust formatting | `cd src-tauri && cargo fmt --check` |
 | Rust lints | `cd src-tauri && cargo clippy --all-targets -- -D warnings` (the app crate has a few existing warnings; new crates must be clean; CI lints only `-p trigger-core -p trigger-hub -p trigger-fs`) |
 | Run the app | `npm run tauri dev` |

@@ -74,5 +74,6 @@ process definition (local file, later synced)      ${variables} filled in
 |---|---|---|
 | 001-trigger-core | workspace, contract, hub, `trigger-fs`, app wiring, Settings switch | done |
 | 002-trigger-internal | triggers from inside the app | draft |
-| 003 to 015 | one crate per integration, all depending on 001 only | draft |
+| 010-trigger-docker | `trigger-docker`: container started, stopped, healthy, unhealthy and image built, from Docker and Podman | done |
+| 003 to 009, 011 to 015 | one crate per integration, all depending on 001 only | draft |
 | later | process editor, run engine, trigger picker UI, team sync of definitions | not planned |

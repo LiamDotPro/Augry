@@ -2,7 +2,7 @@
 id: T31
 epic: 010-trigger-docker
 title: Add trigger-docker to the repo map and mark 010 done
-status: todo
+status: done
 depends_on: [T30]
 size: S
 model: haiku
@@ -50,7 +50,7 @@ If the file already has a row starting `| 010`, set its Status cell to `done` in
 
 ## Acceptance
 
-- [ ] `grep -c "trigger-docker" plans/_context/repo-map.md` prints `4` or more
+- [ ] `grep -c "trigger-docker" plans/_context/repo-map.md` prints `3` (the Cargo.toml row, the crate row and the Commands row)
 - [ ] `grep -n "010-trigger-docker" plans/_context/architecture.md` prints one line ending in `| done |`
 - [ ] `grep -c "003 to 009, 011 to 015" plans/_context/architecture.md` prints `1`
 - [ ] `node plans/_tools/check-crates.mjs` exits 0
@@ -72,3 +72,6 @@ If the file already has a row starting `| 010`, set its Status cell to `done` in
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: blocked. Steps 1-4 applied as written (repo-map.md Cargo.toml row, trigger-docker crate row, live container test command row; architecture.md 010 row and 003 to 009, 011 to 015 row). Acceptance `grep -c "trigger-docker" plans/_context/repo-map.md` printed 3, card requires 4 or more. The three matching lines are the Cargo.toml row, the crate row and the Commands row; the steps add no fourth occurrence, and the card has no step that does. Not fixed: adding text outside the steps. Other checks pass: architecture grep prints the 010 row ending `| done |`, `003 to 009, 011 to 015` count is 1, check-crates exit 0 (2 size warnings in trigger-fs and trigger-hub, not these files), lint-cards exit 0, git status shows only the two _context files plus cards.
+- 2026-10-12 architect: the 4 was a miscount; the steps add 3 lines naming trigger-docker. Fixed the acceptance line; the build stands, sent to the checker.
+- 2026-10-12 checker: pass
