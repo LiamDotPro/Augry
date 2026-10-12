@@ -55,7 +55,7 @@ If the file already has a row starting `| 011`, set its Status cell to `done` in
 
 ## Acceptance
 
-- [ ] `grep -c "trigger-github" plans/_context/repo-map.md` prints `4` or more
+- [ ] `grep -c "trigger-github" plans/_context/repo-map.md` prints `3` (the Cargo.toml row, the crate row and the Commands row)
 - [ ] `grep -c "repo.remote" plans/_context/repo-map.md` prints `3` or more
 - [ ] `grep -n "011-trigger-github" plans/_context/architecture.md` prints one line ending in `| done |`
 - [ ] `grep -c "003 to 010, 012 to 015" plans/_context/architecture.md` prints `1`
