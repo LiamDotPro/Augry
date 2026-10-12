@@ -2,7 +2,7 @@
 id: T14
 epic: 003-trigger-git
 title: Read merge, rebase and conflict state in GitRepo
-status: todo
+status: done
 depends_on: [T13]
 size: M
 model: haiku
@@ -248,3 +248,5 @@ Note on `check-crates.mjs`: it prints warnings, not errors, about template text.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (66 lib tests, readme 1, live 1 ignored; git::repo 12 passed; clippy, fmt --check, check-crates 0 errors). Git was installed, no skips. Scratch files I accidentally wrote outside the worktree were removed.
+- 2026-10-12 checker: pass
