@@ -4502,6 +4502,7 @@ dependencies = [
  "trash",
  "trigger-core",
  "trigger-fs",
+ "trigger-git",
  "trigger-hub",
  "uuid",
  "window-vibrancy",

@@ -2,7 +2,7 @@
 id: T30
 epic: 003-trigger-git
 title: Register trigger-git in the app behind a feature
-status: todo
+status: done
 depends_on: [T29]
 size: S
 model: haiku
@@ -112,3 +112,5 @@ Do not add an allow for `source_ids`; the second test uses it when the feature i
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy warnings (grep -c warning): baseline 7, after 7. Feature-on and feature-off targeted tests both pass; `cargo test --workspace` passed; no-default-features check, trigger-git check, fmt --check, trigger-git clippy -D warnings and check-crates all exit 0. Cargo.lock gained `"trigger-git"` under terminal-grid as expected.
+- 2026-10-12 checker: pass
