@@ -2,7 +2,7 @@
 id: T30
 epic: 007-trigger-clock
 title: Register trigger-clock in the app behind a feature
-status: todo
+status: done
 depends_on: [T24]
 size: S
 model: haiku
@@ -110,3 +110,5 @@ If `source_ids` is reported unused, do not add an allow; the second test uses it
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy baseline 7 warnings, after 7 (not grown). Cargo.lock gained `"trigger-clock"` under terminal-grid (expected, under files:). Ran cargo fmt once; it changed no unrelated lines.
+- 2026-10-12 checker: pass
