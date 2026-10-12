@@ -97,8 +97,10 @@ because they tie processes to what the user is already doing in the grid.
     `regex` 1.13, `RegexBuilder` case insensitive, size limit 256 KiB,
     compiled once in `start`) for output-matched; `repo` (absolute path, after
     variables) optional on every pane, worktree and review kind; `glob`
-    (relative to the notes root) for note-saved; nothing for bell,
-    task-reported, focus-entered and app-started. Unknown fields are a
+    (relative to the notes root) for note-saved; nothing for bell and
+    app-started. Pane kinds (task-reported, focus-entered, command and output
+    kinds) match `repo` against the pane's cwd, so a rule fires for panes
+    inside that repository (architect ruling during T02). Unknown fields are a
     `RuleError`.
 12. **Feed points** are R01 implication 7's exact places, publishing after the
     work succeeds: `agent/mod.rs` after `emit_transition` (Finished only),
