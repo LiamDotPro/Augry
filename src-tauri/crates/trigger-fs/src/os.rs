@@ -3,17 +3,15 @@
 //! FSEvents, ReadDirectoryChangesW and inotify, so there is one file for all
 //! three platforms. Everything else is in `logic.rs`.
 
-// Removed in T27, when lib.rs uses everything in this file.
-#![allow(dead_code)]
-
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use globset::GlobSet;
 use notify::event::{EventKind, ModifyKind, RenameMode};
+use notify::{RecursiveMode, Watcher};
 use trigger_core::{Availability, SourceError};
 
 use crate::logic::{Armed, RawKind, Signal};
@@ -89,14 +87,49 @@ pub fn raw_kind(event: &notify::Event) -> RawKind {
     }
 }
 
-/// Starts reporting signals for the armed rules. Returns at once; the work
-/// happens on a named thread or an OS callback, and ends when `stop` is set.
+/// Starts reporting signals for the armed rules: one `notify` watcher over
+/// every distinct root, recursive. Returns at once. The watcher lives on a
+/// named thread until `stop` is set, then it is dropped, which stops it.
 pub fn listen(
-    _armed: &[Armed],
-    _stop: Arc<AtomicBool>,
-    _tx: Sender<Signal>,
+    armed: &[Armed],
+    stop: Arc<AtomicBool>,
+    tx: Sender<Signal>,
 ) -> Result<(), SourceError> {
-    Err(SourceError::Unavailable("not implemented yet".into()))
+    let mut roots: Vec<PathBuf> = armed.iter().map(|a| a.root.clone()).collect();
+    roots.sort();
+    roots.dedup();
+
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        // A watcher error carries no path to act on; the next event or the
+        // next rescan puts things right.
+        let Ok(event) = res else { return };
+        let kind = raw_kind(&event);
+        if kind == RawKind::Ignore {
+            return;
+        }
+        let _ = tx.send(Signal::Raw {
+            at: now_ms(),
+            kind,
+            paths: event.paths,
+        });
+    })
+    .map_err(|e| SourceError::Os(e.to_string()))?;
+    for root in &roots {
+        watcher
+            .watch(root, RecursiveMode::Recursive)
+            .map_err(|e| SourceError::Os(format!("cannot watch {}: {e}", root.display())))?;
+    }
+
+    std::thread::Builder::new()
+        .name("trigger-fs-watch".into())
+        .spawn(move || {
+            while !stop.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            drop(watcher);
+        })
+        .map_err(|e| SourceError::Os(e.to_string()))?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -201,5 +234,44 @@ mod tests {
     #[test]
     fn now_ms_is_a_plausible_unix_time() {
         assert!(now_ms() > 1_700_000_000_000);
+    }
+
+    /// Needs a real file system watcher. Run with:
+    /// `cargo test -p trigger-fs -- --ignored --test-threads=1`
+    #[test]
+    #[ignore]
+    fn listen_reports_a_created_file_and_stops() {
+        use std::sync::mpsc::channel;
+
+        let dir = TempDir::new();
+        let parsed = crate::rule::parse(&trigger_core::testkit::rule(
+            "p/t",
+            "fs.file-created",
+            serde_json::json!({ "path": dir.0 }),
+        ))
+        .unwrap();
+        let armed = Armed {
+            id: "p/t".into(),
+            kind: "fs.file-created".into(),
+            root: dir.0.clone(),
+            when: parsed.when,
+            glob: parsed.glob,
+            ignore: parsed.ignore,
+        };
+        let stop = Arc::new(AtomicBool::new(false));
+        let (tx, rx) = channel();
+        listen(&[armed], stop.clone(), tx).unwrap();
+        std::thread::sleep(Duration::from_millis(400));
+        let file = dir.0.join("hello.txt");
+        std::fs::write(&file, "hi").unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut seen = false;
+        while std::time::Instant::now() < deadline && !seen {
+            if let Ok(Signal::Raw { paths, .. }) = rx.recv_timeout(Duration::from_millis(100)) {
+                seen = paths.contains(&file);
+            }
+        }
+        stop.store(true, Ordering::Relaxed);
+        assert!(seen, "no raw event for the new file within 10 s");
     }
 }

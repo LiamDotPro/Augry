@@ -8,9 +8,6 @@
 //! the answer comes from a stat, compared with the set of files known to
 //! exist.
 
-// Removed in T27, when lib.rs reads everything in this file.
-#![allow(dead_code)]
-
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
