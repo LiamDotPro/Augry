@@ -79,6 +79,112 @@ pub fn review_staged(repo: &str, paths: usize) -> InternalSignal {
 mod tests {
     use super::*;
 
+    use crate::state::TriggersConfig;
+    use crate::triggers::variables::Context;
+    use crate::triggers::TriggerService;
+    use serde_json::json;
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+    use std::sync::mpsc::channel;
+    use std::time::Duration;
+
+    /// The nine kinds the app feeds from its own code (slice C).
+    const FED_KINDS: [&str; 9] = [
+        "tg.agent-finished",
+        "tg.task-reported",
+        "tg.pane-opened-in-repo",
+        "tg.worktree-created",
+        "tg.worktree-removed",
+        "tg.review-staged",
+        "tg.note-saved",
+        "tg.focus-entered",
+        "tg.app-started",
+    ];
+
+    fn every_fed_signal() -> Vec<InternalSignal> {
+        vec![
+            InternalSignal::AgentFinished {
+                pane: "p1".into(),
+                cwd: "/work/app".into(),
+                agent: "claude".into(),
+            },
+            task_reported("p1", "/work/app", Some("Fixing tests")).unwrap(),
+            InternalSignal::PaneOpened {
+                pane: "p1".into(),
+                cwd: "/work/app/src".into(),
+                repo_root: Some("/work/app".into()),
+            },
+            InternalSignal::WorktreeCreated {
+                repo: "/work/app".into(),
+                path: "/work/app-x".into(),
+                branch: Some("x".into()),
+            },
+            InternalSignal::WorktreeRemoved {
+                repo: "/work/app".into(),
+                path: "/work/app-x".into(),
+            },
+            review_staged("/work/app", 2),
+            note_saved(Path::new("/notes"), "work/plan.md"),
+            focus_entered(None, "p1", "/work/app").unwrap(),
+            InternalSignal::AppStarted,
+        ]
+    }
+
+    #[test]
+    fn every_fed_signal_fires_its_rule_with_the_documented_payload() {
+        let dir = std::env::temp_dir().join(format!("tg-feeds-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let triggers: Vec<_> = FED_KINDS
+            .iter()
+            .map(|kind| json!({ "id": kind.trim_start_matches("tg."), "kind": kind, "when": {} }))
+            .collect();
+        let definition = json!({ "schemaVersion": 1, "name": "Feeds", "triggers": triggers });
+        std::fs::write(dir.join("feeds.json"), definition.to_string()).unwrap();
+
+        let service = TriggerService::new(dir.clone());
+        let config = TriggersConfig {
+            enabled: true,
+            armed: vec!["feeds".into()],
+        };
+        let ctx = Context {
+            home: PathBuf::from("/home/me"),
+            downloads: None,
+            notes_root: PathBuf::from("/notes"),
+            repo_roots: Vec::new(),
+            screenshots: || None,
+        };
+        service.refresh(&config, &ctx);
+        let (tx, rx) = channel();
+        service.start_forwarding(move |payload| {
+            let _ = tx.send(payload);
+        });
+
+        for signal in every_fed_signal() {
+            service.publish_internal(signal);
+        }
+
+        let mut fired = BTreeMap::new();
+        for _ in 0..FED_KINDS.len() {
+            let got = rx
+                .recv_timeout(Duration::from_secs(5))
+                .expect("a fired trigger");
+            fired.insert(got.kind.clone(), got.payload);
+        }
+        for kind in FED_KINDS {
+            assert!(fired.contains_key(kind), "{kind} did not fire");
+        }
+        assert_eq!(fired["tg.agent-finished"]["agent"], json!("claude"));
+        assert_eq!(fired["tg.task-reported"]["pane"], json!("p1"));
+        assert_eq!(fired["tg.pane-opened-in-repo"]["repo"], json!("/work/app"));
+        assert_eq!(fired["tg.worktree-created"]["branch"], json!("x"));
+        assert_eq!(fired["tg.worktree-removed"]["path"], json!("/work/app-x"));
+        assert_eq!(fired["tg.review-staged"]["files"], json!(2));
+        assert_eq!(fired["tg.note-saved"]["relative"], json!("work/plan.md"));
+        assert_eq!(fired["tg.focus-entered"]["cwd"], json!("/work/app"));
+        assert!(fired["tg.app-started"].is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn a_task_report_fires_and_an_emptied_file_does_not() {
         assert_eq!(
