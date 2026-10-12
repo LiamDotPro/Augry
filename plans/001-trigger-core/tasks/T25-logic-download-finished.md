@@ -2,7 +2,7 @@
 id: T25
 epic: 001-trigger-core
 title: Add download finished to the logic
-status: todo
+status: done
 depends_on: [T24]
 size: S
 model: haiku
@@ -290,3 +290,5 @@ fn only_the_download_kind_fires_download_finished() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

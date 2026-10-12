@@ -374,3 +374,103 @@ fn renaming_to_an_ignored_name_is_only_a_removal() {
     fx.raw(1000, RawKind::Name, &["a.txt~"]);
     assert_eq!(fx.tick(1600), vec![Obs::Removed(fx.p("a.txt"))]);
 }
+
+#[test]
+fn chrome_download_is_created_and_download_finished() {
+    // x.zip.crdownload is written for a while, then renamed to x.zip.
+    let mut fx = Fx::new("fs.download-finished", json!({}), &[]);
+    fx.put("x.zip.crdownload");
+    fx.raw(1000, RawKind::Create, &["x.zip.crdownload"]);
+    fx.raw(3000, RawKind::Modify, &["x.zip.crdownload"]);
+    assert!(fx.tick(3600).is_empty(), "the partial file is ignored");
+    fx.raw(5000, RawKind::Modify, &["x.zip.crdownload"]);
+    fx.delete("x.zip.crdownload");
+    fx.put("x.zip");
+    fx.raw(6000, RawKind::Name, &["x.zip.crdownload"]);
+    fx.raw(6000, RawKind::Name, &["x.zip"]);
+    assert_eq!(
+        fx.tick(6600),
+        vec![
+            Obs::Created(fx.p("x.zip")),
+            Obs::DownloadFinished(fx.p("x.zip"))
+        ]
+    );
+    assert!(fx.tick(7000).is_empty());
+}
+
+#[test]
+fn a_finished_download_over_an_existing_file_is_saved_and_finished() {
+    let mut fx = Fx::new("fs.download-finished", json!({}), &["x.zip"]);
+    fx.put("x.zip.part");
+    fx.raw(1000, RawKind::Create, &["x.zip.part"]);
+    fx.delete("x.zip.part");
+    fx.raw(2000, RawKind::Name, &["x.zip.part"]);
+    fx.raw(2000, RawKind::Name, &["x.zip"]);
+    assert_eq!(
+        fx.tick(2600),
+        vec![
+            Obs::Saved(fx.p("x.zip")),
+            Obs::DownloadFinished(fx.p("x.zip"))
+        ]
+    );
+}
+
+#[test]
+fn partial_suffixes_match_in_any_case() {
+    let mut fx = Fx::new("fs.download-finished", json!({}), &[]);
+    fx.put("Photo.JPG.CRDOWNLOAD");
+    fx.raw(1000, RawKind::Create, &["Photo.JPG.CRDOWNLOAD"]);
+    fx.delete("Photo.JPG.CRDOWNLOAD");
+    fx.put("Photo.JPG");
+    fx.raw(2000, RawKind::Name, &["Photo.JPG"]);
+    let out = fx.tick(2600);
+    assert!(out.contains(&Obs::DownloadFinished(fx.p("Photo.JPG"))));
+}
+
+#[test]
+fn an_old_partial_does_not_make_a_download() {
+    let mut fx = Fx::new("fs.download-finished", json!({}), &[]);
+    fx.put("x.zip.crdownload");
+    fx.raw(1000, RawKind::Create, &["x.zip.crdownload"]);
+    fx.delete("x.zip.crdownload");
+    assert!(fx.tick(2000).is_empty());
+    fx.put("x.zip");
+    fx.raw(20_000, RawKind::Create, &["x.zip"]);
+    assert_eq!(fx.tick(20_600), vec![Obs::Created(fx.p("x.zip"))]);
+}
+
+#[test]
+fn a_partial_that_still_exists_is_not_finished() {
+    let mut fx = Fx::new("fs.download-finished", json!({}), &[]);
+    fx.put("x.zip.part");
+    fx.put("x.zip");
+    fx.raw(1000, RawKind::Create, &["x.zip.part"]);
+    fx.raw(1000, RawKind::Create, &["x.zip"]);
+    assert_eq!(fx.tick(1600), vec![Obs::Created(fx.p("x.zip"))]);
+}
+
+#[test]
+fn a_later_save_of_the_downloaded_file_is_not_a_second_download() {
+    let mut fx = Fx::new("fs.download-finished", json!({}), &[]);
+    fx.put("x.zip.part");
+    fx.raw(1000, RawKind::Create, &["x.zip.part"]);
+    fx.delete("x.zip.part");
+    fx.put("x.zip");
+    fx.raw(2000, RawKind::Name, &["x.zip"]);
+    assert_eq!(fx.tick(2600).len(), 2);
+    fx.raw(4000, RawKind::Modify, &["x.zip"]);
+    assert_eq!(fx.tick(4600), vec![Obs::Saved(fx.p("x.zip"))]);
+}
+
+#[test]
+fn only_the_download_kind_fires_download_finished() {
+    let mut fx = Fx::new("fs.file-created", json!({}), &[]);
+    fx.put("x.zip.part");
+    fx.raw(1000, RawKind::Create, &["x.zip.part"]);
+    fx.delete("x.zip.part");
+    fx.put("x.zip");
+    fx.raw(2000, RawKind::Name, &["x.zip"]);
+    let out = fx.step(Signal::Tick { now: 2600 });
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].0, "fs.file-created");
+}

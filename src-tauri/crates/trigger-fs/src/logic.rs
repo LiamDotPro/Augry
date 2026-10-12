@@ -123,6 +123,10 @@ pub type Payload = BTreeMap<String, Value>;
 
 const PARTIAL_SUFFIXES: [&str; 3] = [".crdownload", ".part", ".download"];
 
+/// How long after its last event a partial download file still counts as the
+/// start of a download.
+const DOWNLOAD_WINDOW_MS: u64 = 10_000;
+
 fn is_partial(path: &Path) -> bool {
     let name = path
         .file_name()
@@ -253,12 +257,44 @@ fn resolve(
 }
 
 fn settle(state: &mut State, armed: &Armed, now: u64, is_file: &dyn Fn(&Path) -> bool) -> Vec<Obs> {
+    state
+        .partials
+        .retain(|(_, at)| now.saturating_sub(*at) <= DOWNLOAD_WINDOW_MS);
     let mut resolved = resolve(state, armed, now, is_file);
     let mut obs = pair_renames(state, &mut resolved);
+    let finished = finished_downloads(state, &resolved, is_file);
     obs.extend(resolved.removed.into_iter().map(|r| Obs::Removed(r.path)));
     obs.extend(resolved.created.into_iter().map(|r| Obs::Created(r.path)));
     obs.extend(resolved.saved.into_iter().map(|r| Obs::Saved(r.path)));
+    obs.extend(finished);
     obs
+}
+
+/// A file that was just created or saved is a finished download when a
+/// partial file with its name plus `.crdownload`, `.part` or `.download` had
+/// events lately and is gone now. Each partial is used once.
+fn finished_downloads(
+    state: &mut State,
+    resolved: &Resolved,
+    is_file: &dyn Fn(&Path) -> bool,
+) -> Vec<Obs> {
+    let mut finished = Vec::new();
+    let mut used: Vec<PathBuf> = Vec::new();
+    for r in resolved.created.iter().chain(resolved.saved.iter()) {
+        let name = r.path.to_string_lossy().to_lowercase();
+        let partial = state.partials.iter().map(|(p, _)| p).find(|p| {
+            let p = p.to_string_lossy().to_lowercase();
+            PARTIAL_SUFFIXES.iter().any(|s| p == format!("{name}{s}"))
+        });
+        if let Some(partial) = partial {
+            if !is_file(partial) {
+                used.push(partial.clone());
+                finished.push(Obs::DownloadFinished(r.path.clone()));
+            }
+        }
+    }
+    state.partials.retain(|(p, _)| !used.contains(p));
+    finished
 }
 
 /// Takes renames out of `resolved`. First the `[from, to]` pairs the OS gave
