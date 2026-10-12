@@ -1,18 +1,12 @@
-/* Account and first-time setup (App Shell.dc.html boards 03, 06 and 07). */
+/* Settings' account row and first-time setup (App Shell.dc.html boards 06 and 07).
+   The sign in screens themselves are in cloud-account.css. */
 
 .account-icon {
   flex: none;
   display: block;
 }
 
-/* Sign-in buttons ------------------------------------------------------- */
-
-.sign-in {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-}
+/* Setup's Continue with GitHub button ---------------------------------- */
 
 .sign-in__button {
   height: 46px;
@@ -53,353 +47,6 @@
   color: var(--text-50);
 }
 
-/* Browser hand-off ------------------------------------------------------ */
-
-.browser-wait {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  padding: 26px;
-  border-radius: 16px;
-  background: rgb(var(--ink-rgb) / 0.03);
-  border: 1px solid var(--hair);
-  width: 100%;
-}
-
-.browser-wait__mark {
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 13px;
-  background: var(--fill-3);
-}
-
-.browser-wait__hint {
-  font-size: 13px;
-  color: var(--text-55);
-}
-
-.browser-wait__code {
-  font-family: var(--font-mono);
-  font-size: 40px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  color: var(--text-strong);
-}
-
-.browser-wait__status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--accent-bright);
-}
-
-.browser-wait__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.15);
-  animation: browser-wait-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes browser-wait-pulse {
-  50% {
-    opacity: 0.4;
-  }
-}
-
-.browser-wait__actions {
-  display: flex;
-  gap: 8px;
-}
-
-.browser-wait__actions .btn {
-  height: 38px;
-  font-size: 13px;
-  border-radius: 10px;
-}
-
-.browser-wait__actions .btn--quiet {
-  border-color: transparent;
-}
-
-/* Email code dialog ----------------------------------------------------- */
-
-/* Covers the whole window, top bar included, from whichever view opened it. */
-.scrim--dim {
-  position: fixed;
-  z-index: 60;
-  background: rgb(5 6 12 / calc(0.6 * var(--shadow-k) + 0.1));
-}
-
-.email-sign-in {
-  width: 540px;
-  display: flex;
-  flex-direction: column;
-  border-radius: 18px;
-  overflow: hidden;
-  background: var(--glass-sheet);
-  backdrop-filter: var(--glass-blur-strong);
-  border: 1px solid var(--edge-strong);
-  box-shadow: var(--shadow-sheet);
-}
-
-.email-sign-in__head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 20px 22px 6px;
-}
-
-.email-sign-in__icon {
-  width: 32px;
-  height: 32px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  background: rgb(var(--accent-rgb) / 0.12);
-  color: var(--accent);
-}
-
-.email-sign-in__title {
-  flex: 1;
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.email-sign-in__body {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  padding: 12px 22px 22px;
-}
-
-.email-sign-in__text {
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--text-70);
-}
-
-.email-sign-in__text strong {
-  color: var(--text-strong);
-  font-weight: 600;
-}
-
-.email-sign-in__email {
-  height: 42px;
-  padding: 0 14px;
-  border-radius: 11px;
-  background: rgb(0 0 0 / 0.28);
-  border: 1px solid rgb(var(--ink-rgb) / 0.14);
-  color: var(--text);
-  font: inherit;
-  font-size: 14px;
-  outline: none;
-}
-
-.email-sign-in__email:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.12);
-}
-
-.email-sign-in__links {
-  display: flex;
-  gap: 16px;
-}
-
-.email-sign-in__foot {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 22px;
-  border-top: 1px solid var(--hair);
-  background: rgb(0 0 0 / 0.12);
-}
-
-.email-sign-in__foot .btn {
-  height: 38px;
-  font-size: 13px;
-  border-radius: 10px;
-}
-
-.email-sign-in__foot .btn--quiet {
-  border-color: transparent;
-}
-
-.email-sign-in__foot .btn--primary {
-  background: rgb(var(--accent-rgb) / 0.2);
-  border-color: rgb(var(--accent-rgb) / 0.6);
-}
-
-.email-sign-in__foot .btn--primary:disabled {
-  background: rgb(var(--accent-rgb) / 0.1);
-  color: var(--text-50);
-  cursor: default;
-}
-
-.link-button {
-  padding: 0;
-  font-size: 12.5px;
-  color: var(--accent);
-}
-
-.link-button:hover {
-  text-decoration: underline;
-}
-
-.code-boxes {
-  position: relative;
-  display: flex;
-  gap: 10px;
-  cursor: text;
-}
-
-/* The real input sits over the boxes, invisible, so focus, paste and the
-   one-time-code autofill all work. */
-.code-boxes__input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  font-size: 1px;
-}
-
-.code-boxes__box {
-  width: 56px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  background: rgb(0 0 0 / 0.28);
-  border: 1px solid rgb(var(--ink-rgb) / 0.14);
-  font-family: var(--font-mono);
-  font-size: 26px;
-  font-weight: 600;
-}
-
-.code-boxes__input:focus ~ .code-boxes__box--current {
-  border: 1.5px solid var(--accent);
-  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.12);
-}
-
-.code-boxes__caret {
-  width: 2px;
-  height: 28px;
-  background: var(--accent);
-  opacity: 0;
-}
-
-.code-boxes__input:focus ~ .code-boxes__box .code-boxes__caret {
-  opacity: 1;
-}
-
-/* Process tab, signed out ----------------------------------------------- */
-
-.signed-out {
-  flex: 1;
-  min-height: 0;
-  margin: var(--grid-pad);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-pane);
-  overflow: auto;
-  background: var(--glass-panel);
-  border: 1px solid rgb(var(--ink-rgb) / 0.1);
-}
-
-.signed-out__card {
-  width: 640px;
-  max-width: calc(100% - 32px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  padding: 40px 44px;
-  border-radius: 22px;
-  text-align: center;
-  background: var(--glass-sheet);
-  backdrop-filter: var(--glass-blur-strong);
-  border: 1px solid var(--edge-strong);
-  box-shadow: var(--shadow-card);
-}
-
-.signed-out__badge {
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 16px;
-  background: rgb(var(--accent-rgb) / 0.12);
-  border: 1px solid rgb(var(--accent-rgb) / 0.3);
-  color: var(--accent);
-}
-
-.signed-out__intro {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.signed-out__title {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 600;
-}
-
-.signed-out__text {
-  max-width: 500px;
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--text-68);
-  text-wrap: pretty;
-}
-
-.signed-out__templates {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding-top: 4px;
-}
-
-.signed-out__templates-label {
-  font-size: 12px;
-  color: var(--text-55);
-}
-
-.signed-out__chips {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-}
-
-.signed-out__chip {
-  height: 26px;
-  padding: 0 10px;
-  display: flex;
-  align-items: center;
-  border-radius: 7px;
-  background: rgb(var(--ink-rgb) / 0.05);
-  border: 1px solid var(--fill-3);
-  font-size: 12px;
-  color: var(--text-78);
-  white-space: nowrap;
-}
-
 /* Settings › Account ---------------------------------------------------- */
 
 .account-row {
@@ -413,20 +60,6 @@
   flex: 1;
   font-size: 12.5px;
   color: var(--text-55);
-}
-
-.account-avatar {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #8b6cff, #3fc8ff);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
 }
 
 .account-row__who {
@@ -451,14 +84,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.sheet__foot-note {
-  flex: 1;
-  align-self: center;
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: var(--text-55);
 }
 
 /* First-time setup ------------------------------------------------------ */
@@ -809,7 +434,8 @@ button.setup-option--selected:hover {
   border-radius: 10px;
 }
 
-.setup__back {
+/* .btn--quiet comes later (index.css), hence the extra class. */
+.btn.setup__back {
   border-color: transparent;
 }
 
@@ -841,10 +467,4 @@ button.setup-option--selected:hover {
   font-size: 10.5px;
   font-weight: 400;
   color: var(--text-78);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .browser-wait__dot {
-    animation: none;
-  }
 }

@@ -147,6 +147,7 @@
   --cloud-error: #ff8a8a;
   --cloud-error-text: #ffb3b3;
   --cloud-ok-text: #a9ebc6;
+  --cloud-cyan-text: #bfeaff;
 }
 
 /* Light ----------------------------------------------------------------- */
@@ -162,6 +163,7 @@
   --cloud-error: #d64545;
   --cloud-error-text: #b42c2c;
   --cloud-ok-text: #1f7a4a;
+  --cloud-cyan-text: #075580;
   color-scheme: light;
   --ink-rgb: 24 30 52;
   --text-rgb: 28 33 48;

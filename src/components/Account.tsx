@@ -14,6 +14,9 @@ const STROKE = {
   lock: "M6.5 10.5h11v9.5h-11zM8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5",
   folder: "M3.5 7a1.5 1.5 0 0 1 1.5-1.5h4.2l2 2.2H19a1.5 1.5 0 0 1 1.5 1.5v8.8a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z",
   plug: "M9 3v5M15 3v5M6.5 8h11v3a5.5 5.5 0 0 1-11 0zM12 16.5V21",
+  monitor: "M4 5.5h16v10H4zM9 19.5h6M12 15.5v4",
+  clock: "M12 7v5.5l3 2M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17z",
+  check: "M5 12.5l4.5 4.5L19 7.5",
 } as const;
 
 export type StrokeIconName = keyof typeof STROKE;
@@ -26,14 +29,14 @@ export function GitHubMark({ size = 17 }: { size?: number }) {
   );
 }
 
-export function StrokeIcon({ name, size = 16 }: { name: StrokeIconName; size?: number }) {
+export function StrokeIcon({ name, size = 16, weight = 1.7 }: { name: StrokeIconName; size?: number; weight?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" className="account-icon">
       <path
         d={STROKE[name]}
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.7"
+        strokeWidth={weight}
         strokeLinecap="round"
         strokeLinejoin="round"
         vectorEffect="non-scaling-stroke"
