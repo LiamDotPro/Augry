@@ -2,7 +2,7 @@
 id: T22
 epic: 007-trigger-clock
 title: Add the live tests for interval and feed file events
-status: todo
+status: done
 depends_on: [T21]
 size: S
 model: haiku
@@ -183,3 +183,5 @@ fn an_event_that_just_ended_in_a_feed_file_fires() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
