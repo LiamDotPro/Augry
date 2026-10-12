@@ -24,8 +24,8 @@ export interface ProcessViewProps {
 /**
  * The Process tab (Process Tab.dc.html). It opens on the Processes home; a run
  * and the editor are separate views, and Connections and Versions open from
- * them. The shell mounts it only when an account is signed in and keeps it
- * mounted while other tabs show. All of the tab's place lives in the reducer
+ * them. The shell keeps it mounted while other tabs show;
+ * it needs no account. All of the tab's place lives in the reducer
  * here (plus scroll positions in a ref), so switching tabs never resets it.
  *
  * There is no backend for processes yet: the data is mocked in

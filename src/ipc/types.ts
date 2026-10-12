@@ -2,6 +2,8 @@
 // This is the one file the frontend imports from. Keep it in sync with docs/technical-design.md section 10.
 // Rust structs use serde(rename_all = "camelCase"); command arguments are camelCase on this side.
 
+import type { CloudSession } from "../cloud/types";
+
 export type TerminalId = string;
 
 export type ShellKind = "pwsh" | "windowsPowerShell" | "cmd" | "bash" | "zsh" | "other";
@@ -156,17 +158,6 @@ export interface SavedTerminal {
 /** The top bar's tabs, in the order they sit there. */
 export type AppTab = "process" | "terminals" | "notes";
 
-/**
- * Who is signed in. An account is optional: only the Process tab needs one.
- * Sign-in has no backend yet, so the shell mocks it and keeps this in the
- * session.
- */
-export interface Account {
-  name: string;
-  email: string;
-  provider: "github" | "google" | "email";
-}
-
 export interface Session {
   version: 1;
   activeTab: AppTab;
@@ -189,8 +180,11 @@ export interface Session {
   };
   /** First-time setup finished or skipped; absent in sessions written before it. */
   setupDone?: boolean;
-  /** Absent or null when signed out. */
-  account?: Account | null;
+  /**
+   * The cloud account as last seen on this device, and its choices. The
+   * session token is never here: it lives in the OS keychain.
+   */
+  cloud?: CloudSession;
 }
 
 // Errors ------------------------------------------------------------------
@@ -203,7 +197,9 @@ export type AppErrorCode =
   | "Conflict"
   | "InvalidName"
   | "GitTimeout"
-  | "GitNotInstalled";
+  | "GitNotInstalled"
+  /** The cloud API could not be reached. */
+  | "Offline";
 
 export interface AppError {
   code: AppErrorCode;
@@ -222,6 +218,8 @@ export const EVENTS = {
   stats: "terminal://stats",
   task: "terminal://task",
   notesChanged: "notes://changed",
+  /** augry:// links arrived; take them with cloud_take_deep_links. */
+  deepLink: "cloud://deep-link",
 } as const;
 
 export interface OutputEvent { id: TerminalId; dataB64: string }
@@ -324,6 +322,21 @@ export interface Commands {
 
   // window
   set_window_glass: { in: { enabled: boolean }; out: void };
+
+  // cloud (src-tauri/src/cloud). The token stays on the Rust side; use src/cloud/api.ts.
+  cloud_status: { in: Record<string, never>; out: { signedIn: boolean; baseUrl: string; deviceName: string } };
+  /** `path` is an API path like /v1/teams. Rejects with Offline when unreachable. */
+  cloud_request: {
+    in: { method: string; path: string; body: unknown };
+    out: { status: number; body: unknown };
+  };
+  cloud_device_start: { in: Record<string, never>; out: { status: number; body: unknown } };
+  /** On 200 the token is stored and left out of the body. */
+  cloud_device_poll: { in: { handle: string }; out: { status: number; body: unknown } };
+  cloud_sign_out: { in: Record<string, never>; out: void };
+  /** github.com and augry.app pages only. */
+  cloud_open_url: { in: { url: string }; out: void };
+  cloud_take_deep_links: { in: Record<string, never>; out: string[] };
 }
 
 export type CommandName = keyof Commands;

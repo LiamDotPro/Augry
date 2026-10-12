@@ -4,7 +4,8 @@ import { cx } from "../lib/cx";
 import { useAppearance } from "../lib/appearance";
 import { IS_MAC } from "../lib/hotkeys";
 import { useAppActions, useAppState } from "../state/AppProvider";
-import { AccountAvatar, PROVIDER_LABELS, ProviderIcon } from "./Account";
+import { useCloud } from "../cloud/CloudProvider";
+import { Avatar, GitHubMark } from "./Account";
 
 /** The backend's fallback order differs by platform (src-tauri/src/pty/shell.rs). */
 const IS_WINDOWS = typeof navigator !== "undefined" && /Win/.test(navigator.platform || navigator.userAgent);
@@ -59,6 +60,7 @@ type Draft = Pick<
 export function SettingsDialog() {
   const state = useAppState();
   const actions = useAppActions();
+  const cloud = useCloud();
   const [draft, setDraft] = useState<Draft>(() => toDraft(state.config, state.notes.root));
   // What the folder field started as. The configured path and the service's
   // canonical one differ in form on Windows (C:/x against \\?\C:\x), so
@@ -149,39 +151,34 @@ export function SettingsDialog() {
         </div>
 
         <div className="sheet__body">
+          {/* TODO(account): Notes sync, Devices and Teams rows; the devices panel (shell-07-settings-*). */}
           <div className="row">
             <div className="row__label">
               Account
-              <div className="row__hint">Only the Process tab needs one</div>
+              <div className="row__hint">Only needed for teams</div>
             </div>
-            {state.account ? (
+            {cloud.user ? (
               <div className="account-row">
-                <AccountAvatar account={state.account} />
+                <Avatar name={cloud.user.name || cloud.user.login} size={30} />
                 <div className="account-row__who">
                   <div className="account-row__name">
-                    {state.account.name}
-                    <span title={`Signed in with ${PROVIDER_LABELS[state.account.provider]}`}>
-                      <ProviderIcon provider={state.account.provider} size={13} />
+                    {cloud.user.name || cloud.user.login}
+                    <span title="Signed in with GitHub">
+                      <GitHubMark size={13} />
                     </span>
                   </div>
-                  <div className="account-row__detail">{state.account.email}</div>
+                  <div className="account-row__detail">
+                    @{cloud.user.login} · {cloud.user.email}
+                  </div>
                 </div>
-                <button type="button" className="btn btn--outline account-row__sign-out" onClick={actions.signOut}>
+                <button type="button" className="btn btn--outline account-row__sign-out" onClick={() => void cloud.signOut()}>
                   Sign out
                 </button>
               </div>
             ) : (
               <div className="account-row">
-                <div className="account-row__status">Not signed in · Terminals and Notes work fully</div>
-                <button
-                  type="button"
-                  className="btn btn--outline"
-                  onClick={() => {
-                    // The Process tab is where signing in happens.
-                    actions.setSettingsOpen(false);
-                    actions.setTab("process");
-                  }}
-                >
+                <div className="account-row__status">Not signed in · everything works on this computer</div>
+                <button type="button" className="btn btn--outline" onClick={() => cloud.openDialog({ kind: "sign-in" })}>
                   Sign in…
                 </button>
               </div>
@@ -428,9 +425,9 @@ export function SettingsDialog() {
         </div>
 
         <div className="sheet__foot">
-          {state.account && (
+          {cloud.user && (
             <span className="sheet__foot-note">
-              Signing out stops new runs and pauses watched folders. Terminals and Notes are not affected.
+              Signing out keeps everything on this computer. Team processes are hidden until you sign in again.
             </span>
           )}
           <button

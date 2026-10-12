@@ -25,6 +25,9 @@ pub enum AppError {
     GitTimeout { message: String },
     #[error("git is not installed or not on PATH")]
     GitNotInstalled { message: String },
+    /// The cloud API could not be reached (no network, DNS, timeout).
+    #[error("offline: {message}")]
+    Offline { message: String },
 }
 
 impl From<std::io::Error> for AppError {

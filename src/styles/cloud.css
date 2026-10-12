@@ -1,0 +1,336 @@
+/*
+ * Shared pieces of the cloud screens (App Shell boards 07 and 08, Process
+ * board 11, Notes board 02): the dialog frame, its buttons, fields, the team
+ * tile and the avatar. Screen-specific styles live next to them in
+ * cloud-account.css, cloud-teams.css, process-team.css and notes-sync.css.
+ */
+
+/* Dialog ---------------------------------------------------------------- */
+
+/* Over the whole window, top bar included, from whichever view opened it. */
+.cloud-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(4 5 10 / calc(0.35 * var(--shadow-k) + 0.1));
+}
+
+.cloud-dialog {
+  width: var(--cloud-dialog-width, 560px);
+  max-width: calc(100% - 48px);
+  max-height: calc(100% - 64px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--cloud-dialog-bg);
+  border: 1px solid rgb(var(--ink-rgb) / 0.14);
+  backdrop-filter: blur(30px);
+  box-shadow: var(--cloud-dialog-shadow);
+  color: var(--text);
+}
+
+.cloud-dialog__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 22px 6px;
+}
+
+.cloud-dialog__tile {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgb(var(--ink-rgb) / 0.1);
+  color: var(--text-strong);
+}
+
+.cloud-dialog__tile--warn {
+  background: rgb(var(--warn-rgb) / 0.16);
+  color: var(--warn);
+}
+
+.cloud-dialog__tile--danger {
+  background: rgb(255 138 138 / 0.14);
+  color: var(--cloud-error);
+}
+
+.cloud-dialog__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.cloud-dialog__close {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 16px;
+  color: var(--text-70);
+}
+
+.cloud-dialog__close:hover {
+  background: var(--fill-hover);
+  color: var(--text-strong);
+}
+
+.cloud-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 12px 22px 22px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.cloud-dialog__text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: rgb(var(--text-rgb) / 0.72);
+  text-wrap: pretty;
+}
+
+.cloud-dialog__text strong {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.cloud-dialog__small {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-60, rgb(var(--text-rgb) / 0.6));
+  text-wrap: pretty;
+}
+
+.cloud-dialog__foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 22px;
+  border-top: 1px solid rgb(var(--ink-rgb) / 0.08);
+  background: rgb(0 0 0 / 0.12);
+}
+
+.cloud-dialog__spacer {
+  flex: 1;
+}
+
+/* Buttons --------------------------------------------------------------- */
+
+.cloud-btn {
+  height: 38px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 10px;
+  border: 1px solid rgb(var(--ink-rgb) / 0.14);
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--text-85);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.cloud-btn:hover:not(:disabled) {
+  background: var(--fill-hover);
+  color: var(--text-strong);
+}
+
+.cloud-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Cancel and the like: text only. */
+.cloud-btn--quiet {
+  padding: 0 12px;
+  border-color: transparent;
+  color: var(--text-75);
+}
+
+.cloud-btn--primary {
+  padding: 0 18px;
+  background: var(--cloud-primary-bg);
+  border-color: var(--cloud-primary-border);
+  box-shadow: inset 0 1px 0 rgb(var(--ink-rgb) / 0.18);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.cloud-btn--primary:hover:not(:disabled) {
+  background: rgb(var(--accent-rgb) / 0.22);
+}
+
+.cloud-btn--danger {
+  color: var(--cloud-error-text);
+}
+
+.cloud-btn--small {
+  height: 30px;
+  padding: 0 11px;
+  gap: 7px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+
+/* Fields ---------------------------------------------------------------- */
+
+.cloud-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.cloud-field__label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgb(var(--text-rgb) / 0.88);
+}
+
+.cloud-field__input {
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 11px;
+  background: rgb(0 0 0 / 0.28);
+  border: 1px solid rgb(var(--ink-rgb) / 0.14);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.cloud-field__input--mono {
+  font-family: var(--font-mono);
+  font-size: 15px;
+}
+
+.cloud-field__input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--cloud-focus-ring);
+}
+
+.cloud-field__input--error,
+.cloud-field__input--error:focus {
+  border: 1.5px solid var(--cloud-error);
+  box-shadow: none;
+}
+
+.cloud-field__hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-55);
+}
+
+.cloud-field__error {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--cloud-error-text);
+}
+
+/* People and teams ------------------------------------------------------ */
+
+/** The user's initial on the avatar gradient. */
+.cloud-avatar {
+  width: var(--cloud-avatar-size, 20px);
+  height: var(--cloud-avatar-size, 20px);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--cloud-avatar-gradient);
+  font-size: calc(var(--cloud-avatar-size, 20px) * 0.5);
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+/** A team's initial on the violet tile. */
+.cloud-team-tile {
+  width: var(--cloud-tile-size, 18px);
+  height: var(--cloud-tile-size, 18px);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--cloud-tile-size, 18px) * 0.28);
+  background: var(--team-tile);
+  border: 1px solid var(--team-border);
+  font-size: calc(var(--cloud-tile-size, 18px) * 0.53);
+  font-weight: 700;
+  color: var(--team-initial);
+  line-height: 1;
+}
+
+/** Mono text: codes, paths, logins. */
+.cloud-mono {
+  font-family: var(--font-mono);
+}
+
+/* Banners --------------------------------------------------------------- */
+
+.cloud-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 11px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cloud-banner--warn {
+  background: var(--cloud-warn-banner);
+  border: 1px solid var(--cloud-warn-border);
+  color: var(--cloud-warn-text);
+}
+
+.cloud-banner--team {
+  background: var(--team-banner);
+  border: 1px solid var(--team-banner-border);
+  color: var(--text-85);
+}
+
+/* Dots ------------------------------------------------------------------ */
+
+.cloud-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.cloud-dot--ok {
+  background: var(--ok);
+}
+
+.cloud-dot--warn {
+  background: var(--warn);
+}
+
+.cloud-dot--team {
+  background: var(--team-dot);
+}
+
+/** Offline: an empty ring. */
+.cloud-dot--ring {
+  background: transparent;
+  border: 1.5px solid rgb(var(--text-rgb) / 0.55);
+}

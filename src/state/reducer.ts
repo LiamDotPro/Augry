@@ -15,7 +15,6 @@ import {
 } from "../ipc/layout";
 import type { Direction, LayoutMode } from "../ipc/layout";
 import type {
-  Account,
   AgentEvent,
   AppTab,
   Config,
@@ -26,6 +25,7 @@ import type {
   TerminalId,
   TerminalInfo,
 } from "../ipc/types";
+import { EMPTY_CLOUD_SESSION, type CloudSession } from "../cloud/types";
 import type { TerminalState } from "./model";
 
 export const DEFAULT_CONFIG: Config = {
@@ -114,8 +114,12 @@ export interface AppState {
   activeTab: AppTab;
   /** First-time setup is over (finished or skipped); until then it runs after the splash. */
   setupDone: boolean;
-  /** Signed in or not. Only the Process tab needs an account. */
-  account: Account | null;
+  /**
+   * The cloud account as last seen, the teams and this device's choices.
+   * Optional: everything works signed out. Kept in the session; the token is
+   * in the OS keychain. src/cloud/CloudProvider.tsx drives it.
+   */
+  cloud: CloudSession;
   order: TerminalId[];
   terminals: Record<TerminalId, TerminalState>;
   focusedId: TerminalId | null;
@@ -148,7 +152,7 @@ export const initialState: AppState = {
   installedAgents: [],
   activeTab: "terminals",
   setupDone: true,
-  account: null,
+  cloud: EMPTY_CLOUD_SESSION,
   order: [],
   terminals: {},
   focusedId: null,
@@ -188,7 +192,7 @@ export type Action =
   /** Steps to the next tab in the bar's order, wrapping round. */
   | { type: "tab/toggle" }
   | { type: "setup/done" }
-  | { type: "account/set"; account: Account | null }
+  | { type: "cloud/set"; patch: Partial<CloudSession> }
   | { type: "page/set"; page: number }
   | { type: "page/step"; delta: -1 | 1 }
   | { type: "layout/set"; mode: LayoutMode }
@@ -265,7 +269,7 @@ export function reducer(state: AppState, action: Action): AppState {
         activeTab: isAppTab(session?.activeTab) ? session.activeTab : state.activeTab,
         // A session from before setup existed means the app was already in use.
         setupDone: session ? (session.setupDone ?? true) : false,
-        account: session?.account ?? null,
+        cloud: { ...EMPTY_CLOUD_SESSION, ...session?.cloud },
         layoutMode: isLayoutMode(session?.layoutMode) ? session.layoutMode : state.layoutMode,
         notes: {
           ...state.notes,
@@ -300,8 +304,8 @@ export function reducer(state: AppState, action: Action): AppState {
     case "setup/done":
       return { ...state, setupDone: true };
 
-    case "account/set":
-      return { ...state, account: action.account };
+    case "cloud/set":
+      return { ...state, cloud: { ...state.cloud, ...action.patch } };
 
     case "page/set":
       return { ...state, page: clampPage(action.page, state.order.length) };
@@ -806,7 +810,7 @@ export function toSession(state: AppState): Session {
     version: 1,
     activeTab: state.activeTab,
     setupDone: state.setupDone,
-    account: state.account,
+    cloud: state.cloud,
     focusedId: state.focusedId,
     page: state.page,
     layoutMode: state.layoutMode,

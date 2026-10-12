@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import type { Account, HotkeyModifier } from "../ipc/types";
+import type { HotkeyModifier } from "../ipc/types";
 import { cx } from "../lib/cx";
 import { IS_MAC, modifierLabel } from "../lib/hotkeys";
 import { useAppActions, useAppState } from "../state/AppProvider";
-import { BrowserWait, EmailSignInDialog, SignInButtons, StrokeIcon } from "./Account";
+import { useCloud } from "../cloud/CloudProvider";
+import { GitHubMark, StrokeIcon } from "./Account";
 import { AgentIcon } from "./AgentIcon";
 import { FONTS, SHELLS } from "./SettingsDialog";
 
@@ -36,7 +37,7 @@ export function FirstRunSetup() {
   const [notesRoot, setNotesRoot] = useState(state.config.notesRoot ?? state.notes.root);
   const [fontFamily, setFontFamily] = useState(state.config.fontFamily ?? FONTS[0]);
   const [fontSize, setFontSize] = useState(state.config.fontSize);
-  const [pending, setPending] = useState<Account["provider"] | null>(null);
+  const cloud = useCloud();
 
   const finish = useCallback(async () => {
     await actions.saveConfig({ shell: shell || null, hotkeyModifier: modifier, agentPatterns: patterns, fontFamily, fontSize });
@@ -45,7 +46,8 @@ export function FirstRunSetup() {
     actions.finishSetup();
   }, [actions, shell, modifier, patterns, fontFamily, fontSize, notesRoot, state.config.notesRoot, state.notes.root]);
 
-  const browserPending = pending === "github" || pending === "google";
+  // TODO(account): setup-account and setup-browser (show the code here with useDeviceSignIn).
+  const browserPending = false;
 
   // Enter continues, the way the button says.
   useEffect(() => {
@@ -281,39 +283,39 @@ export function FirstRunSetup() {
             </>
           )}
 
-          {step === 2 && !browserPending && (
+          {step === 2 && (
             <>
-              <Heading title="Sign in to use Processes">
-                An account is optional. Terminals and Notes work fully without one. Processes need one, so you can skip
-                this and sign in later from the Process tab or Settings.
+              <Heading title="Sign in to share with a team">
+                An account is optional. Everything works without one and stays on this computer. Sign in only if you
+                want to create or join a team. You can do it later from Settings.
               </Heading>
               <div className="setup__columns">
                 <div className="setup__compare">
-                  <GroupTitle title="Works without an account" />
+                  <GroupTitle title="Works without an account, offline" />
                   <Perk ok>Terminals, the grid and every agent</Perk>
                   <Perk ok>Reviewing changes and requesting fixes</Perk>
                   <Perk ok>Notes, and saving agent output to them</Perk>
+                  <Perk ok>Your own processes, runs and connections</Perk>
                   <div className="setup__rule" />
-                  <GroupTitle title="Needs an account" />
-                  <Perk>Processes, runs and templates</Perk>
-                  <Perk>Connections to GitHub, Linear, Jira and databases</Perk>
-                  <Perk>Webhooks through the relay</Perk>
+                  <GroupTitle title="With an account and a team" />
+                  <Perk>Share processes with your team</Perk>
+                  <Perk>Version history the whole team can see</Perk>
+                  <Perk>Templates added to the team</Perk>
                 </div>
                 <div className="setup__group">
-                  <SignInButtons onPick={setPending} />
-                  <div className="setup__note">Signing in opens your browser. Augry never sees your password.</div>
+                  <button
+                    type="button"
+                    className="sign-in__button sign-in__button--primary"
+                    onClick={() => cloud.openDialog({ kind: "sign-in" })}
+                  >
+                    <GitHubMark />
+                    <span className="sign-in__label">Continue with GitHub</span>
+                  </button>
+                  <div className="setup__note">
+                    GitHub opens in your browser and shows a short code to enter. Augry never sees your password.
+                  </div>
                 </div>
               </div>
-            </>
-          )}
-
-          {step === 2 && browserPending && (
-            <>
-              <Heading title="Finish signing in your browser">
-                We opened {pending === "github" ? "GitHub" : "Google"} in your browser. Approve Augry there and you’ll
-                come straight back here.
-              </Heading>
-              <BrowserWait provider={pending} onSignedIn={() => void finish()} onCancel={() => setPending(null)} />
             </>
           )}
         </div>
@@ -323,7 +325,7 @@ export function FirstRunSetup() {
             <button
               type="button"
               className="btn btn--quiet setup__back"
-              onClick={() => (browserPending ? setPending(null) : setStep(step - 1))}
+              onClick={() => setStep(step - 1)}
             >
               Back
             </button>
@@ -345,7 +347,6 @@ export function FirstRunSetup() {
         </div>
       </div>
 
-      {pending === "email" && <EmailSignInDialog onClose={() => setPending(null)} onSignedIn={() => void finish()} />}
     </div>
   );
 }

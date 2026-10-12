@@ -492,7 +492,7 @@ describe("session notes", () => {
   });
 });
 
-describe("tabs, setup and account", () => {
+describe("tabs, setup and the cloud account", () => {
   it("steps through Process, Terminals and Notes and wraps round", () => {
     let state = reducer(initialState, { type: "tab/set", tab: "process" });
     state = reducer(state, { type: "tab/toggle" });
@@ -515,18 +515,30 @@ describe("tabs, setup and account", () => {
     expect(reducer(fresh, { type: "setup/done" }).setupDone).toBe(true);
   });
 
-  it("keeps the tab and the account across a restart", () => {
+  it("keeps the tab and the cloud account across a restart", () => {
     let state = reducer(initialState, { type: "tab/set", tab: "process" });
-    state = reducer(state, {
-      type: "account/set",
-      account: { name: "Liam", email: "liam@example.com", provider: "github" },
-    });
+    const user = {
+      id: "u1",
+      login: "liam",
+      name: "Liam",
+      avatarUrl: "",
+      email: "liam@example.com",
+      createdAt: "2026-10-11T09:00:00.000Z",
+    };
+    state = reducer(state, { type: "cloud/set", patch: { user, selectedSpace: "team-1" } });
     const restored = reducer(initialState, { type: "ready", config: state.config, session: toSession(state) });
     expect(restored.activeTab).toBe("process");
-    expect(restored.account?.provider).toBe("github");
+    expect(restored.cloud.user?.login).toBe("liam");
+    expect(restored.cloud.selectedSpace).toBe("team-1");
 
-    const signedOut = reducer(restored, { type: "account/set", account: null });
-    expect(toSession(signedOut).account).toBeNull();
+    const signedOut = reducer(restored, { type: "cloud/set", patch: { user: null, teams: [], selectedSpace: "personal" } });
+    expect(toSession(signedOut).cloud?.user).toBeNull();
+  });
+
+  it("starts signed out from a session written before the cloud", () => {
+    const older = { ...toSession(initialState), cloud: undefined };
+    const restored = reducer(initialState, { type: "ready", config: initialState.config, session: older });
+    expect(restored.cloud).toEqual({ user: null, teams: [], selectedSpace: "personal", notesSync: null });
   });
 
   it("ignores a tab it does not know", () => {

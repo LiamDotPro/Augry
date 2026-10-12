@@ -14,6 +14,11 @@
 @import "./styles/review.css";
 @import "./styles/splash.css";
 @import "./styles/account.css";
+@import "./styles/cloud.css";
+@import "./styles/cloud-account.css";
+@import "./styles/cloud-teams.css";
+@import "./styles/process-team.css";
+@import "./styles/notes-sync.css";
 @import "./styles/process.css";
 
 *,

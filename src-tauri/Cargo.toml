@@ -25,6 +25,25 @@ serde_json = "1"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 dirs = "7"
+# Augry cloud (src/cloud): the HTTP client, and the session token in the OS keychain.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+tauri-plugin-deep-link = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies.keyring]
+version = "3"
+features = ["apple-native"]
+
+[target.'cfg(windows)'.dependencies.keyring]
+version = "3"
+features = ["windows-native"]
+
+[target.'cfg(target_os = "linux")'.dependencies.keyring]
+version = "3"
+features = ["sync-secret-service", "crypto-rust"]
+
+# A second launch from an augry:// link hands the link to the running app.
+[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 
 # Native window glass for the Glass theme (src/glass.rs), and the full screen
 # traffic lights (src/traffic_lights.rs).

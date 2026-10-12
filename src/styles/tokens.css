@@ -125,12 +125,41 @@
   --grid-pad: 4px 12px 12px;
   --radius-pane: 14px;
   --radius-sheet: 20px;
+
+  /* Cloud: accounts, teams and sync (App Shell 07-08, Process 11, Notes 02) */
+  --cloud-dialog-bg: rgb(16 18 30 / 0.94);
+  --cloud-dialog-shadow: 0 30px 80px rgb(0 0 0 / calc(0.55 * var(--shadow-k))), inset 0 1px 0 rgb(var(--ink-rgb) / 0.1);
+  --cloud-primary-bg: rgb(var(--accent-rgb) / 0.14);
+  --cloud-primary-border: rgb(var(--accent-rgb) / 0.6);
+  --cloud-focus-ring: 0 0 0 3px rgb(var(--accent-rgb) / 0.12);
+  --cloud-avatar-gradient: linear-gradient(135deg, #8b6cff, #3fc8ff);
+  --cloud-avatar-ring: #0d1020;
+  --team-tile: rgb(139 108 255 / 0.22);
+  --team-border: rgb(139 108 255 / 0.45);
+  --team-initial: #d9d0ff;
+  --team-banner: rgb(139 108 255 / 0.08);
+  --team-banner-border: rgb(139 108 255 / 0.3);
+  --team-dot: #c8b6ff;
+  --cloud-warn-text: #f6d79a;
+  --cloud-warn-banner: rgb(240 182 74 / 0.1);
+  --cloud-warn-border: rgb(240 182 74 / 0.4);
+  --cloud-error: #ff8a8a;
+  --cloud-error-text: #ffb3b3;
+  --cloud-ok-text: #a9ebc6;
 }
 
 /* Light ----------------------------------------------------------------- */
 /* The same glass design on a pale wash: overlays turn to dark ink, accents
    are deepened so they keep their contrast on white. */
 :root[data-theme="light"] {
+  --cloud-dialog-bg: rgb(var(--glass-rgb) / 0.94);
+  --cloud-avatar-ring: #fff;
+  --team-initial: #5b43c9;
+  --team-dot: #7c62e6;
+  --cloud-warn-text: #8a5a00;
+  --cloud-error: #d64545;
+  --cloud-error-text: #b42c2c;
+  --cloud-ok-text: #1f7a4a;
   color-scheme: light;
   --ink-rgb: 24 30 52;
   --text-rgb: 28 33 48;

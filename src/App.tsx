@@ -4,7 +4,6 @@ import { EmptyState } from "./components/EmptyState";
 import { HotkeyPopover } from "./components/HotkeyPopover";
 import { FirstRunSetup } from "./components/FirstRunSetup";
 import { NotesView } from "./components/notes/NotesView";
-import { ProcessSignedOut } from "./components/ProcessSignedOut";
 import { ProcessView } from "./components/process/ProcessView";
 import { PaneGrid } from "./components/PaneGrid";
 import { SettingsDialog } from "./components/SettingsDialog";
@@ -13,6 +12,8 @@ import { useAppearance } from "./lib/appearance";
 import { cx } from "./lib/cx";
 import { hotkeyScheme, IS_MAC, isModifierHeld, matchHotkey } from "./lib/hotkeys";
 import { useWindowFrame } from "./lib/windowFrame";
+import { CloudDialogs } from "./components/cloud/CloudDialogs";
+import { CloudProvider } from "./cloud/CloudProvider";
 import { AppProvider, useAppActions, useAppState } from "./state/AppProvider";
 
 /** How long the chord modifier has to be held before the cheat sheet appears. */
@@ -32,7 +33,9 @@ const MODIFIER_CODES = new Set([
 export default function App() {
   return (
     <AppProvider>
-      <Shell />
+      <CloudProvider>
+        <Shell />
+      </CloudProvider>
     </AppProvider>
   );
 }
@@ -72,18 +75,15 @@ function Shell() {
           scrolls anything: each one is where it was left (App Shell board 02). */}
       <div className="app__body">
         <div className={cx("view", tab === "process" && "view--active")} aria-hidden={tab !== "process"}>
-          {state.account ? (
-            <ProcessView
-              onOpenPane={(n) => {
-                // Run rows number panes across every page, not within the current one.
-                const id = state.order[n - 1];
-                actions.setTab("terminals");
-                if (id) actions.focusTerminal(id);
-              }}
-            />
-          ) : (
-            <ProcessSignedOut />
-          )}
+          {/* Processes work with no account; a team only adds shared ones. */}
+          <ProcessView
+            onOpenPane={(n) => {
+              // Run rows number panes across every page, not within the current one.
+              const id = state.order[n - 1];
+              actions.setTab("terminals");
+              if (id) actions.focusTerminal(id);
+            }}
+          />
         </div>
         <div className={cx("view", tab === "terminals" && "view--active")} aria-hidden={tab !== "terminals"}>
           {state.order.length === 0 ? <EmptyState /> : <PaneGrid />}
@@ -105,6 +105,7 @@ function Shell() {
       {showSetup && <FirstRunSetup />}
       {state.hotkeysOpen && <HotkeyPopover />}
       {state.settingsOpen && <SettingsDialog />}
+      <CloudDialogs />
 
       {state.error && (
         <div className="toast" role="status">

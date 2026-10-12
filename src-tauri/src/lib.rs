@@ -1,6 +1,7 @@
 //! Terminal Grid core. Module layout follows docs/technical-design.md section 2.
 
 pub mod agent;
+pub mod cloud;
 pub mod error;
 pub mod git;
 mod glass;
@@ -43,6 +44,7 @@ pub struct AppState {
     pub agent: agent::AgentWatcher,
     pub notes: notes::NotesService,
     pub state: state::StateService,
+    pub cloud: cloud::CloudService,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -51,10 +53,17 @@ pub fn run() {
     // Windows and Linux keep a bare window; only macOS has an app menu bar.
     #[cfg(target_os = "macos")]
     let builder = builder.menu(menu::app_menu);
+    // Windows and Linux start a second process for an augry:// link; it hands
+    // the link over and quits. macOS delivers links to the running app.
+    #[cfg(any(windows, target_os = "linux"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+        cloud::deliver_deep_links(app, argv);
+    }));
 
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_deep_link::init())
         .setup(|app| {
             let handle = app.handle().clone();
             let config_dir = state::config_dir(&handle)?;
@@ -83,6 +92,7 @@ pub fn run() {
                 agent: agent::AgentWatcher::new(),
                 notes: notes::NotesService::new(notes_root),
                 state: state_service,
+                cloud: cloud::CloudService::new(),
             };
 
             // A missing or unwritable notes folder must not stop the app.
@@ -98,6 +108,7 @@ pub fn run() {
                 eprintln!("terminal-grid: notes watcher unavailable: {error}");
             }
             start_git_sweep(handle.clone());
+            watch_deep_links(&handle);
 
             #[cfg(target_os = "macos")]
             if let Some(window) = app.get_webview_window("main") {
@@ -156,9 +167,36 @@ pub fn run() {
             state::session_set,
             // window
             glass::set_window_glass,
+            // cloud
+            cloud::cloud_status,
+            cloud::cloud_request,
+            cloud::cloud_device_start,
+            cloud::cloud_device_poll,
+            cloud::cloud_sign_out,
+            cloud::cloud_open_url,
+            cloud::cloud_take_deep_links,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Terminal Grid");
+}
+
+/// augry://join/<code> links: the one the app was started with, and any that
+/// arrive while it runs.
+fn watch_deep_links(app: &AppHandle) {
+    use tauri_plugin_deep_link::DeepLinkExt;
+
+    // Dev builds and Linux aren't registered by an installer.
+    #[cfg(any(windows, target_os = "linux"))]
+    if let Err(error) = app.deep_link().register_all() {
+        eprintln!("terminal-grid: could not register augry:// links: {error}");
+    }
+    if let Ok(Some(urls)) = app.deep_link().get_current() {
+        cloud::deliver_deep_links(app, urls.iter().map(|u| u.to_string()).collect());
+    }
+    let handle = app.clone();
+    app.deep_link().on_open_url(move |event| {
+        cloud::deliver_deep_links(&handle, event.urls().iter().map(|u| u.to_string()).collect());
+    });
 }
 
 /// Re-reads git for every open session on a slow timer. The focused session is
