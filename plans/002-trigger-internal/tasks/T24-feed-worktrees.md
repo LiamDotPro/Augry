@@ -2,7 +2,7 @@
 id: T24
 epic: 002-trigger-internal
 title: Publish tg.worktree-created and tg.worktree-removed
-status: todo
+status: done
 depends_on: [T20]
 size: S
 model: haiku
@@ -190,3 +190,5 @@ and put these three tests directly above them:
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7, after 7)
+- 2026-10-12 checker: pass
