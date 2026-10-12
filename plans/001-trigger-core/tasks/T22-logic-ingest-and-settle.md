@@ -2,7 +2,7 @@
 id: T22
 epic: 001-trigger-core
 title: Add the settle state machine for created, saved, removed
-status: todo
+status: done
 depends_on: [T21]
 size: M
 model: haiku
@@ -501,3 +501,5 @@ fn a_rescan_forgets_pending_paths_and_asks_for_a_new_scan() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (logic 11/11, trigger-fs 19 lib, clippy, fmt, check-crates exit 0 with accepted warnings)
+- 2026-10-12 checker: pass
