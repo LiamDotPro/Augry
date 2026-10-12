@@ -162,6 +162,12 @@ pub fn value(cwd: &Path, args: &[&str]) -> Option<String> {
     (!text.is_empty()).then(|| text.to_string())
 }
 
+mod repo;
+
+// Removed when lib.rs uses GitRepo.
+#[allow(unused_imports)]
+pub use repo::GitRepo;
+
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

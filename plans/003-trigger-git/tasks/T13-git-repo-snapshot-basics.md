@@ -2,7 +2,7 @@
 id: T13
 epic: 003-trigger-git
 title: Add GitRepo and read HEAD, branch, commit and refs
-status: todo
+status: done
 depends_on: [T12]
 size: M
 model: haiku
@@ -275,3 +275,5 @@ Note on `check-crates.mjs`: it prints warnings, not errors, about template text.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (cargo test 61 + readme 1, git::repo 7, clippy, fmt, check-crates exit 0; check-crates warnings only)
+- 2026-10-12 checker: pass
