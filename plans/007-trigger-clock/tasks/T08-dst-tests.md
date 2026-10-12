@@ -2,7 +2,7 @@
 id: T08
 epic: 007-trigger-clock
 title: Pin the daylight saving behaviour with tests
-status: todo
+status: done
 depends_on: [T07]
 size: S
 model: haiku
@@ -196,3 +196,5 @@ fn step_fires_a_skipped_spring_time_at_three() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (38 lib tests incl. 7 in logic::dst_tests, readme 1 pass, live 1 ignored; clippy and fmt clean; check-crates 0 errors with the expected template warnings)
+- 2026-10-12 checker: pass

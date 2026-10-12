@@ -279,4 +279,6 @@ pub fn wait(state: &State, now: SystemTime) -> Duration {
 }
 
 #[cfg(test)]
+mod dst_tests;
+#[cfg(test)]
 mod tests;
