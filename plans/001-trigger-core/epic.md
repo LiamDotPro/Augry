@@ -1,7 +1,7 @@
 ---
 id: 001-trigger-core
 title: Trigger contract, hub, file watcher and app wiring
-status: building
+status: done
 depends_on: []
 ---
 
