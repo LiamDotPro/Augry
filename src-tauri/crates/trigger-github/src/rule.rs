@@ -6,10 +6,27 @@
 use serde::Deserialize;
 use trigger_core::{Rule, RuleError};
 
+/// Who counts as a dependency bot when `author` is not given.
+pub const DEFAULT_AUTHORS: &[&str] = &["dependabot[bot]", "renovate[bot]"];
+
+fn default_interval_s() -> u64 {
+    120
+}
+
+fn default_author() -> Vec<String> {
+    DEFAULT_AUTHORS.iter().map(|a| a.to_string()).collect()
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct When {
     pub repo: String,
+    #[serde(default)]
+    pub branch: Option<String>,
+    #[serde(default = "default_interval_s")]
+    pub interval_s: u64,
+    #[serde(default = "default_author")]
+    pub author: Vec<String>,
 }
 
 /// A parsed rule: the typed fields plus anything compiled from them.
@@ -38,6 +55,10 @@ mod tests {
     use serde_json::json;
     use trigger_core::testkit::rule;
 
+    fn parsed(when: serde_json::Value) -> Result<Parsed, RuleError> {
+        parse(&rule("p/t", "github.ci-failed", when))
+    }
+
     fn field_of(err: RuleError) -> String {
         match err {
             RuleError::Field { field, .. } => field,
@@ -46,9 +67,30 @@ mod tests {
     }
 
     #[test]
-    fn parses_the_repo() {
-        let r = rule("p/t", "github.issue-assigned", json!({ "repo": "cli/cli" }));
-        assert_eq!(parse(&r).unwrap().when.repo, "cli/cli");
+    fn defaults_are_filled_in() {
+        let when = parsed(json!({ "repo": "cli/cli" })).unwrap().when;
+        assert_eq!(when.repo, "cli/cli");
+        assert_eq!(when.branch, None);
+        assert_eq!(when.interval_s, 120);
+        assert_eq!(
+            when.author,
+            vec!["dependabot[bot]".to_string(), "renovate[bot]".to_string()]
+        );
+    }
+
+    #[test]
+    fn all_fields_are_read() {
+        let when = parsed(json!({
+            "repo": "cli/cli",
+            "branch": "release/*",
+            "interval_s": 300,
+            "author": ["octocat"]
+        }))
+        .unwrap()
+        .when;
+        assert_eq!(when.branch.as_deref(), Some("release/*"));
+        assert_eq!(when.interval_s, 300);
+        assert_eq!(when.author, vec!["octocat".to_string()]);
     }
 
     #[test]
@@ -60,16 +102,18 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unknown_fields_missing_repo_and_other_kinds() {
-        let typo = rule(
-            "p/t",
-            "github.ci-failed",
-            json!({ "repo": "a/b", "brach": "x" }),
-        );
-        assert_eq!(field_of(parse(&typo).unwrap_err()), "when");
-        let missing = rule("p/t", "github.ci-failed", json!({}));
-        assert_eq!(field_of(parse(&missing).unwrap_err()), "when");
-        let other = rule("p/t", "fs.file-saved", json!({ "repo": "a/b" }));
-        assert!(matches!(parse(&other), Err(RuleError::UnknownKind(_))));
+    fn rejects_unknown_fields_wrong_types_missing_repo_and_other_kinds() {
+        let typo = parsed(json!({ "repo": "a/b", "brach": "x" }));
+        assert_eq!(field_of(typo.unwrap_err()), "when");
+        let wrong_type = parsed(json!({ "repo": "a/b", "interval_s": "fast" }));
+        assert_eq!(field_of(wrong_type.unwrap_err()), "when");
+        let negative = parsed(json!({ "repo": "a/b", "interval_s": -5 }));
+        assert_eq!(field_of(negative.unwrap_err()), "when");
+        let single = parsed(json!({ "repo": "a/b", "author": "octocat" }));
+        assert_eq!(field_of(single.unwrap_err()), "when");
+        let missing = parsed(json!({}));
+        assert_eq!(field_of(missing.unwrap_err()), "when");
+        let other = parse(&rule("p/t", "fs.file-saved", json!({ "repo": "a/b" })));
+        assert!(matches!(other, Err(RuleError::UnknownKind(_))));
     }
 }

@@ -2,7 +2,7 @@
 id: T03
 epic: 011-trigger-github
 title: Read branch, interval_s and author in rule.rs
-status: todo
+status: done
 depends_on: [T02]
 size: S
 model: haiku
@@ -173,3 +173,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
