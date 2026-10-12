@@ -1,1 +1,206 @@
 /* Notes sync (Notes Tab board 02): notes-sync-setup, notes-synced, notes-sync-conflict, notes-offline. Shared pieces are in cloud.css. */
+
+/* notes-sync-setup ------------------------------------------------------ */
+
+.notes-sync-setup__body {
+  gap: 12px;
+  padding-top: 10px;
+}
+
+.notes-sync-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgb(var(--ink-rgb) / 0.03);
+  border: 1px solid rgb(var(--ink-rgb) / 0.1);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.notes-sync-option--on {
+  background: rgb(var(--accent-rgb) / 0.05);
+  border-color: rgb(var(--accent-rgb) / 0.35);
+}
+
+.notes-sync-option__icon {
+  flex: none;
+  display: flex;
+}
+
+/* The design's 28px avatar and tile carry a 12px initial. */
+.notes-sync-option__icon .cloud-avatar,
+.notes-sync-option__icon .cloud-team-tile {
+  font-size: 12px;
+}
+
+.notes-sync-option__icon .cloud-team-tile {
+  border-radius: 8px;
+}
+
+.notes-sync-option__copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notes-sync-option__title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.notes-sync-option__text {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-68);
+  text-wrap: pretty;
+}
+
+.notes-sync-option__path {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-55);
+  overflow-wrap: anywhere;
+}
+
+.notes-sync-switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  border-radius: 10px;
+  background: rgb(var(--ink-rgb) / 0.16);
+  transition: background-color 120ms ease;
+}
+
+.notes-sync-switch--on {
+  background: rgb(var(--accent-rgb) / 0.55);
+}
+
+.notes-sync-switch:focus-visible {
+  outline: none;
+  box-shadow: var(--cloud-focus-ring);
+}
+
+.notes-sync-switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 120ms ease;
+}
+
+.notes-sync-switch--on .notes-sync-switch__knob {
+  left: 16px;
+}
+
+.notes-sync-setup__small {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-55);
+  text-wrap: pretty;
+}
+
+/* notes-synced ---------------------------------------------------------- */
+
+/* The tree is wider while sync is on, for the row marks. */
+.notes--synced:not(.notes--no-tree) {
+  grid-template-columns: 320px minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.notes--synced.notes--no-preview:not(.notes--no-tree) {
+  grid-template-columns: 320px minmax(0, 1fr) var(--rail-w);
+}
+
+.tree__row--root {
+  color: var(--text-strong);
+}
+
+/** "only you", "team · 6", "waiting", "conflict", "not synced". */
+.tree__mark {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 400;
+  white-space: nowrap;
+  color: var(--text-45);
+}
+
+.tree__mark--muted {
+  color: var(--text-40);
+}
+
+.tree__mark--warn {
+  color: var(--cloud-warn-text);
+}
+
+/* Rename and Delete show on the selected row, or on hover in place of the mark. */
+.tree--synced .tree__row:not(:hover):not(:focus-within):not(.tree__row--selected) .tree__action {
+  display: none;
+}
+
+.tree--synced .tree__row:not(.tree__row--root):is(:hover, :focus-within) .tree__mark {
+  display: none;
+}
+
+.notes-sync-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--hair);
+}
+
+.notes-sync-foot__line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: rgb(var(--text-rgb) / 0.8);
+}
+
+.notes-sync-foot__text {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-50);
+  text-wrap: pretty;
+}
+
+.notes-sync-foot__dot--idle {
+  background: rgb(var(--text-rgb) / 0.35);
+}
+
+/* The team's name before a team note's path. */
+.notes-sync-path__team {
+  color: var(--team-initial);
+}
+
+.notes-sync-status--ok .editor__status-dot {
+  background: var(--ok);
+}
+
+.notes-sync-status--warn .editor__status-dot {
+  background: var(--warn);
+}
+
+/* notes-sync-conflict --------------------------------------------------- */
+
+.notes-sync-conflict .conflict__text {
+  line-height: 1.45;
+}
+
+.notes-sync-conflict__file {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.notes-sync-conflict button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
