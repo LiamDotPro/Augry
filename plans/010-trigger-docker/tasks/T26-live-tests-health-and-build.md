@@ -2,7 +2,7 @@
 id: T26
 epic: 010-trigger-docker
 title: Add live tests for health, image build and a silent engine
-status: todo
+status: done
 depends_on: [T25]
 size: M
 model: haiku
@@ -214,3 +214,5 @@ fn an_engine_that_does_not_answer_is_reported_by_start() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

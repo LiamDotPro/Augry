@@ -220,3 +220,155 @@ fn docker_stop_fires_stopped_once() {
     );
     assert!(again.is_none(), "stopped fired twice");
 }
+
+#[test]
+#[ignore]
+fn a_passing_health_check_fires_healthy() {
+    if !engine_ready() {
+        return;
+    }
+    let mut cleanup = Cleanup::default();
+    let name = unique("healthy");
+    cleanup.containers.push(name.clone());
+    let (sink, _handle) = arm(
+        vec![rule(
+            "live/healthy",
+            "docker.container-healthy",
+            json!({ "name": name }),
+        )],
+        &mut cleanup,
+    );
+
+    docker(&[
+        "run",
+        "-d",
+        "--name",
+        &name,
+        "--health-cmd",
+        "true",
+        "--health-interval",
+        "1s",
+        "--health-retries",
+        "1",
+        "alpine:3",
+        "sleep",
+        "300",
+    ])
+    .expect("docker run");
+
+    let healthy = wait_rule(&sink, "docker.container-healthy", "live/healthy");
+    assert_eq!(healthy.payload["health"], json!("healthy"));
+    assert_eq!(healthy.payload["name"], json!(name));
+}
+
+#[test]
+#[ignore]
+fn a_failing_health_check_fires_unhealthy() {
+    if !engine_ready() {
+        return;
+    }
+    let mut cleanup = Cleanup::default();
+    let name = unique("unhealthy");
+    cleanup.containers.push(name.clone());
+    let (sink, _handle) = arm(
+        vec![rule(
+            "live/unhealthy",
+            "docker.container-unhealthy",
+            json!({ "name": name }),
+        )],
+        &mut cleanup,
+    );
+
+    docker(&[
+        "run",
+        "-d",
+        "--name",
+        &name,
+        "--health-cmd",
+        "false",
+        "--health-interval",
+        "1s",
+        "--health-retries",
+        "1",
+        "alpine:3",
+        "sleep",
+        "300",
+    ])
+    .expect("docker run");
+
+    let unhealthy = wait_rule(&sink, "docker.container-unhealthy", "live/unhealthy");
+    assert_eq!(unhealthy.payload["health"], json!("unhealthy"));
+}
+
+#[test]
+#[ignore]
+fn a_docker_build_fires_image_built() {
+    if !engine_ready() {
+        return;
+    }
+    let mut cleanup = Cleanup::default();
+    let tag = format!("{}:1", unique("built"));
+    cleanup.images.push(tag.clone());
+    let (sink, _handle) = arm(
+        vec![rule(
+            "live/built",
+            "docker.image-built",
+            json!({ "name": tag }),
+        )],
+        &mut cleanup,
+    );
+
+    // The Dockerfile comes from stdin, so there is no build folder to clean up.
+    let mut build = Command::new("docker")
+        .args(["build", "-q", "-t", &tag, "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("docker build");
+    {
+        use std::io::Write;
+        let mut stdin = build.stdin.take().unwrap();
+        stdin
+            .write_all(b"FROM alpine:3\nLABEL tg.live=1\n")
+            .unwrap();
+    }
+    assert!(build.wait().unwrap().success(), "docker build failed");
+
+    let built = wait_rule(&sink, "docker.image-built", "live/built");
+    assert_eq!(built.payload["name"], json!(tag));
+    assert_eq!(built.payload["engine"], json!("docker"));
+    assert!(!built.payload.contains_key("container_id"));
+}
+
+#[test]
+#[ignore]
+fn an_engine_that_does_not_answer_is_reported_by_start() {
+    if docker(&["--version"]).is_none() {
+        eprintln!("skipping: the docker tool was not found");
+        return;
+    }
+    // Point the tool at a socket nobody listens on. This changes the whole
+    // process, which is why the live tests run with `--test-threads=1`.
+    let before = std::env::var_os("DOCKER_HOST");
+    std::env::set_var("DOCKER_HOST", "unix:///nonexistent/trigger-docker.sock");
+    let sink = RecordingSink::new();
+    let result = DockerSource.start(
+        vec![rule(
+            "live/any",
+            "docker.container-started",
+            json!({ "engine": "docker" }),
+        )],
+        sink.tx.clone(),
+    );
+    match before {
+        Some(value) => std::env::set_var("DOCKER_HOST", value),
+        None => std::env::remove_var("DOCKER_HOST"),
+    }
+    let message = result.err().expect("start should fail").to_string();
+    assert!(
+        message.starts_with("docker found at ")
+            && message.ends_with("but the engine did not answer"),
+        "unexpected message: {message}"
+    );
+}
