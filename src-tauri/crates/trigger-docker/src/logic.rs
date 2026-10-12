@@ -171,6 +171,7 @@ fn map_kind(raw: &Raw) -> Option<EventKind> {
     match (raw.kind_type.as_str(), raw.action.as_str()) {
         ("container", "start") => Some(EventKind::Started),
         ("container", "die") => Some(EventKind::Stopped),
+        ("image", "tag") if raw.engine == Engine::Docker => Some(EventKind::ImageBuilt),
         ("container", "health_status") => match raw.detail.as_str() {
             "healthy" => Some(EventKind::Healthy),
             "unhealthy" => Some(EventKind::Unhealthy),

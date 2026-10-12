@@ -146,3 +146,59 @@ fn a_line_with_a_trailing_newline_parses() {
     let line = format!("{DOCKER_START}\r\n");
     assert!(parse_line(&line).is_some());
 }
+
+#[test]
+fn docker_image_tag_means_built() {
+    let e = parse_line(DOCKER_IMAGE_TAG).unwrap();
+    assert_eq!(
+        e,
+        EngineEvent {
+            engine: Engine::Docker,
+            kind: EventKind::ImageBuilt,
+            id: "sha256:d760162063cb2959aa76446b17be2d95caa8289dd13aca56a65e12ec54eafa9f".into(),
+            name: "r01test:1".into(),
+            image: "r01test:1".into(),
+            labels: labels(&[("com.example.team", "x")]),
+            exit_code: None,
+            time_ms: 1_791_837_794_011,
+        }
+    );
+}
+
+#[test]
+fn the_noise_the_engine_prints_gives_none() {
+    for (what, line) in [
+        ("kill", DOCKER_KILL),
+        ("stop", DOCKER_STOP),
+        ("exec_die", DOCKER_EXEC_DIE),
+        ("exec_start", DOCKER_EXEC_START),
+        ("create", DOCKER_CREATE),
+        ("destroy", DOCKER_DESTROY),
+        ("network connect", DOCKER_NETWORK_CONNECT),
+        ("image create", DOCKER_IMAGE_CREATE),
+        ("image pull", DOCKER_IMAGE_PULL),
+        ("image untag", DOCKER_IMAGE_UNTAG),
+    ] {
+        assert_eq!(parse_line(line), None, "{what} must be ignored");
+    }
+}
+
+#[test]
+fn actions_are_compared_whole_not_by_prefix() {
+    let longer = DOCKER_DIE_3.replace(r#""Action":"die""#, r#""Action":"die_later""#);
+    assert_eq!(parse_line(&longer), None);
+    let shorter = DOCKER_START.replace(r#""Action":"start""#, r#""Action":"star""#);
+    assert_eq!(parse_line(&shorter), None);
+}
+
+#[test]
+fn a_container_die_is_never_taken_from_an_image_or_network_line() {
+    let line = DOCKER_DIE_3.replace(r#""Type":"container""#, r#""Type":"network""#);
+    assert_eq!(parse_line(&line), None);
+}
+
+#[test]
+fn a_tag_on_a_container_is_not_an_image_built() {
+    let line = DOCKER_IMAGE_TAG.replace(r#""Type":"image""#, r#""Type":"container""#);
+    assert_eq!(parse_line(&line), None);
+}

@@ -44,3 +44,17 @@ pub const DOCKER_NETWORK_CONNECT: &str = r#"{"Type":"network","Action":"connect"
 
 /// Hand made, a verdict R01 says may exist: `starting` must be ignored.
 pub const DOCKER_HEALTH_STARTING: &str = r#"{"Type":"container","Action":"health_status: starting","Actor":{"ID":"ef63764e96795c073e6f76c2d2512d8f3b52874bea6b51f94d0c166088379afe","Attributes":{"image":"r01test:1","name":"r01c"}},"scope":"local","time":1791837794,"timeNano":1791837794700000000}"#;
+
+/// Captured: BuildKit with the containerd image store, the first of the two
+/// lines a whole build prints. Must be ignored (it also fires once per step
+/// of a legacy build).
+pub const DOCKER_IMAGE_CREATE: &str = r#"{"Type":"image","Action":"create","Actor":{"ID":"sha256:d760162063cb2959aa76446b17be2d95caa8289dd13aca56a65e12ec54eafa9f","Attributes":{"com.example.team":"x","name":"sha256:d760162063cb2959aa76446b17be2d95caa8289dd13aca56a65e12ec54eafa9f"}},"scope":"local","time":1791837793,"timeNano":1791837793998815716}"#;
+
+/// Captured: the second line of that build, the one that means "built".
+pub const DOCKER_IMAGE_TAG: &str = r#"{"Type":"image","Action":"tag","Actor":{"ID":"sha256:d760162063cb2959aa76446b17be2d95caa8289dd13aca56a65e12ec54eafa9f","Attributes":{"com.example.team":"x","name":"r01test:1"}},"scope":"local","time":1791837794,"timeNano":1791837794011737591}"#;
+
+/// Hand made. Must be ignored.
+pub const DOCKER_IMAGE_PULL: &str = r#"{"Type":"image","Action":"pull","Actor":{"ID":"docker.io/library/alpine:3","Attributes":{"name":"docker.io/library/alpine"}},"scope":"local","time":1791837700,"timeNano":1791837700000000000}"#;
+
+/// Hand made. Must be ignored.
+pub const DOCKER_IMAGE_UNTAG: &str = r#"{"Type":"image","Action":"untag","Actor":{"ID":"sha256:d760162063cb2959aa76446b17be2d95caa8289dd13aca56a65e12ec54eafa9f","Attributes":{"name":"sha256:d760162063cb2959aa76446b17be2d95caa8289dd13aca56a65e12ec54eafa9f"}},"scope":"local","time":1791837900,"timeNano":1791837900000000000}"#;

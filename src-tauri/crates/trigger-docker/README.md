@@ -81,3 +81,5 @@ cargo clippy -p trigger-docker --all-targets -- -D warnings
 ## Known limits
 
 What does not work, on which platform, and why.
+
+- `docker.image-built` fires on any `image tag` event, so a manual `docker tag` fires it too. Docker has no event that says a build ran; a tagged build always ends with a tag event, so this is the best signal. An untagged build fires nothing.

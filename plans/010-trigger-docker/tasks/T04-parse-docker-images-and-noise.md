@@ -2,7 +2,7 @@
 id: T04
 epic: 010-trigger-docker
 title: Parse Docker image tags and prove noise is ignored
-status: todo
+status: done
 depends_on: [T03]
 size: S
 model: haiku
@@ -149,3 +149,5 @@ fn a_tag_on_a_container_is_not_an_image_built() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
