@@ -2,7 +2,7 @@
 id: T03
 epic: 007-trigger-clock
 title: Validate each kind's fields, cron and title glob in rule.rs
-status: todo
+status: done
 depends_on: [T02]
 size: M
 model: haiku
@@ -333,3 +333,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (trigger-clock 9 lib tests, readme 1 pass, live 1 ignored; clippy and fmt clean; check-crates exit 0 with the expected template warnings; croner 4.0.1 compiled as specified)
+- 2026-10-12 checker: pass
