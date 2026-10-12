@@ -2,7 +2,7 @@
 id: T23
 epic: 002-trigger-internal
 title: Publish tg.pane-opened-in-repo from create_terminal
-status: todo
+status: done
 depends_on: [T20]
 size: S
 model: haiku
@@ -85,3 +85,6 @@ After a pane is spawned, `create_terminal` publishes `InternalSignal::PaneOpened
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy baseline 7, after edit 7. `cargo test -p terminal-grid pty::` matched 0 tests (passes, nothing run); `cargo test --workspace` all green.
+- 2026-10-12 architect: moved the refresh and the publish onto one spawned blocking thread, so a new pane never waits for sources to start (git snapshots, docker's version check, gh's sign in check can take seconds). Order is kept: refresh, then publish. Tests 205 pass, clippy 7.
+- 2026-10-12 checker: pass

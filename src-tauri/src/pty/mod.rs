@@ -570,7 +570,27 @@ pub async fn create_terminal(
         let config = state.state.config();
         let info = state.pty.spawn(&app, id, cwd, cols, rows, &config)?;
         state.agent.wake();
-        crate::triggers::refresh_app(&app);
+        // The rules that name this pane's repository (`${repo.root}`) must be
+        // armed before the signal goes out, so refresh first and publish after,
+        // on one spawned thread. Starting a source can take seconds, and the
+        // new pane must not wait for it.
+        let (pane, pane_cwd) = (info.id.clone(), info.cwd.clone());
+        let pane_app = app.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let state = pane_app.state::<crate::AppState>();
+            crate::triggers::refresh_now(&state);
+            if crate::triggers::feeds::enabled(&state) {
+                let repo_root = crate::triggers::feeds::repo_root_of(&state, Path::new(&pane_cwd));
+                crate::triggers::feeds::publish(
+                    &pane_app,
+                    crate::triggers::internal::InternalSignal::PaneOpened {
+                        pane,
+                        cwd: pane_cwd,
+                        repo_root,
+                    },
+                );
+            }
+        });
         Ok(info)
     })
     .await?
