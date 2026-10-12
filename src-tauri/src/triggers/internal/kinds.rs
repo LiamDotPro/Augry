@@ -333,4 +333,20 @@ mod tests {
             .collect();
         assert_eq!(required, vec!["tg.command-slow", "tg.output-matched"]);
     }
+
+    #[test]
+    fn readme_kinds_table_is_current() {
+        let readme = include_str!("README.md");
+        let table = trigger_core::kinds_markdown(KINDS);
+        let between = readme
+            .split("<!-- kinds -->")
+            .nth(1)
+            .and_then(|rest| rest.split("<!-- /kinds -->").next())
+            .expect("README.md has <!-- kinds --> and <!-- /kinds --> markers");
+        assert_eq!(
+            between.trim(),
+            table.trim(),
+            "README.md Kinds table is stale: replace the text between the markers with the right side"
+        );
+    }
 }

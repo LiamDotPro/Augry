@@ -2,7 +2,7 @@
 id: T09
 epic: 002-trigger-internal
 title: Write the README and run the full check
-status: todo
+status: done
 depends_on: [T08]
 size: M
 model: haiku
@@ -238,3 +238,5 @@ and replace it with:
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy baseline (app crate, before changes): 7 warnings; after: 7. File sizes: kinds.rs 352, logic.rs 190, mod.rs 284, rule.rs 335, logic/tests.rs 335 (all under 400). Internal tests: 44 passed. check-crates.mjs exit 0 (2 existing warnings, not from this card). Changed: README.md (new), kinds.rs (readme test added), this card.
+- 2026-10-12 checker: pass
