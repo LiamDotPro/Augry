@@ -3,6 +3,7 @@
 //! worked out by pure code in `rules.rs`, `variables.rs` and `store.rs`.
 //! Design: plans/001-trigger-core/epic.md Decisions 10 to 16.
 
+pub mod internal;
 pub mod rules;
 pub mod status;
 pub mod store;

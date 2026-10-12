@@ -2,7 +2,7 @@
 id: T01
 epic: 002-trigger-internal
 title: Add regex and the internal module with InternalSignal
-status: todo
+status: done
 depends_on: []
 size: S
 model: haiku
@@ -139,3 +139,5 @@ pub enum InternalSignal {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7, after 7; Cargo.lock adds only globset and regex to terminal-grid; triggers::internal 0 passed; workspace tests ok; no-default-features check ok; fmt check ok)
+- 2026-10-12 checker: pass
