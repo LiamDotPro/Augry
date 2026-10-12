@@ -2,7 +2,7 @@
 id: T21
 epic: 002-trigger-internal
 title: Publish tg.agent-finished from the agent watcher
-status: todo
+status: done
 depends_on: [T20]
 size: S
 model: haiku
@@ -138,3 +138,6 @@ and put this test directly above them:
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: clippy baseline before edits = 7 warnings
+- 2026-10-12 haiku: built, acceptance passed (agent::tests 7 ok, workspace tests ok, fmt --check 0, no-default-features check 0, clippy 7 = baseline, feeds::publish count 1)
+- 2026-10-12 checker: pass

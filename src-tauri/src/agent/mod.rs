@@ -21,7 +21,9 @@ use serde::Serialize;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::pty::TerminalId;
+use crate::pty::{path_string, TerminalId};
+use crate::triggers::feeds;
+use crate::triggers::internal::InternalSignal;
 
 pub const EVENT_AGENT: &str = "terminal://agent";
 pub const EVENT_STATS: &str = "terminal://stats";
@@ -269,6 +271,7 @@ fn tick(
 }
 
 fn emit_transition(app: &AppHandle, id: &TerminalId, transition: Transition) {
+    let finished = finished_agent(&transition).map(str::to_string);
     let event = match transition {
         Transition::Started { name } => AgentEvent {
             id: id.clone(),
@@ -286,6 +289,33 @@ fn emit_transition(app: &AppHandle, id: &TerminalId, transition: Transition) {
         },
     };
     let _ = app.emit_to("main", EVENT_AGENT, event);
+
+    // This runs on the watcher thread, so only in memory lookups happen here:
+    // the pane's directory is a map read, never a git call.
+    if let Some(agent) = finished {
+        let cwd = app
+            .state::<crate::AppState>()
+            .pty
+            .cwd_of(id)
+            .map(|cwd| path_string(&cwd))
+            .unwrap_or_default();
+        feeds::publish(
+            app,
+            InternalSignal::AgentFinished {
+                pane: id.clone(),
+                cwd,
+                agent,
+            },
+        );
+    }
+}
+
+/// The agent's name when the transition is a finish; a start names nobody.
+fn finished_agent(transition: &Transition) -> Option<&str> {
+    match transition {
+        Transition::Finished { name, .. } => Some(name),
+        Transition::Started { .. } => None,
+    }
 }
 
 /// Executable name plus full command line, lowercased by the matcher.
@@ -427,6 +457,19 @@ mod tests {
             Some(Transition::Finished { ref name, .. }) if name == "claude"
         ));
         assert!(matches!(state, AgentState::Running { ref name, .. } if name == "codex"));
+    }
+
+    #[test]
+    fn only_a_finish_names_an_agent_for_the_trigger_feed() {
+        let started = Transition::Started {
+            name: "claude".to_string(),
+        };
+        let finished = Transition::Finished {
+            name: "claude".to_string(),
+            duration_ms: 9000,
+        };
+        assert_eq!(finished_agent(&started), None);
+        assert_eq!(finished_agent(&finished), Some("claude"));
     }
 
     #[test]
