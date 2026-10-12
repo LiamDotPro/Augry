@@ -2,7 +2,7 @@
 id: T07
 epic: 001-trigger-core
 title: Add Clock, FixedClock and FakeSource to the testkit
-status: todo
+status: done
 depends_on: [T06]
 size: S
 model: haiku
@@ -200,3 +200,5 @@ mod fake_tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (step 1 replaced the whole import header, lines for crate, collections, sync and time, with the exact block; cargo fmt reflowed nothing else; check-crates warns lib.rs 508 lines, exit 0)
+- 2026-10-12 checker: pass
