@@ -2,7 +2,7 @@
 id: T11
 epic: 007-trigger-clock
 title: Add feed.rs with the Fetcher trait, normalise and split_by_uid
-status: todo
+status: done
 depends_on: [T10]
 size: M
 model: haiku
@@ -373,3 +373,5 @@ fn text_with_no_events_splits_into_nothing() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (feed:: 8 tests, full crate 46 passed + 1 ignored, clippy and fmt clean, feed.rs 172 lines, check-crates exit 0)
+- 2026-10-12 checker: pass

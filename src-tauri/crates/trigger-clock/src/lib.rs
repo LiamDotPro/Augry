@@ -10,6 +10,7 @@
 // That card removes this line.
 #![allow(dead_code)]
 
+mod feed;
 mod logic;
 mod os;
 mod rule;
