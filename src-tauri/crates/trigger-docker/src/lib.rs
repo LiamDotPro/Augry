@@ -6,6 +6,7 @@
 
 mod logic;
 mod os;
+mod plan;
 mod rule;
 mod supervisor;
 

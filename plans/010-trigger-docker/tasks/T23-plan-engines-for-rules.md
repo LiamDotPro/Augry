@@ -2,7 +2,7 @@
 id: T23
 epic: 010-trigger-docker
 title: Plan which engine serves which rules
-status: todo
+status: done
 depends_on: [T22]
 size: S
 model: haiku
@@ -339,3 +339,5 @@ fn no_rules_means_no_groups_and_no_questions() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
