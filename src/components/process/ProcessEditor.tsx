@@ -22,7 +22,7 @@ import { useProcess } from "./store";
  * the draft as a version.
  */
 export function ProcessEditor({ processId }: { processId: string }) {
-  const { state, dispatch } = useProcess();
+  const { state, dispatch, saveProcess, runProcess, offline } = useProcess();
   const record = recordOf(state, processId);
   const ui = editorUi(state, processId);
   const [picker, setPicker] = useState(false);
@@ -48,7 +48,8 @@ export function ProcessEditor({ processId }: { processId: string }) {
     setPalette(false);
   };
   const save = () => {
-    if (record.draft) dispatch({ type: "save", processId, message: changeSentence(changes), now: Date.now() });
+    // A team process can't save while offline; its draft waits.
+    if (record.draft && !offline(processId)) saveProcess(processId, changeSentence(changes));
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -103,7 +104,7 @@ export function ProcessEditor({ processId }: { processId: string }) {
             json={ui.json}
             onLayout={(layout) => dispatch({ type: "editor-ui", processId, patch: { layout } })}
             onJson={() => dispatch({ type: "editor-ui", processId, patch: { json: !ui.json } })}
-            onRun={() => dispatch({ type: "run", processId, now: Date.now() })}
+            onRun={() => runProcess(processId)}
           />
         </div>
         {picker && selection?.kind === "start" && (

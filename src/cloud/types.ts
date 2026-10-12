@@ -117,6 +117,36 @@ export interface Template {
   installs: number;
 }
 
+/**
+ * A team connection (cloud epic 005, not built yet: only used behind the
+ * `connections` feature). `settings` is readable by every member; the secret
+ * is write only and never comes back here.
+ */
+export interface TeamConnection {
+  id: string;
+  teamId: string;
+  /** Unique per team, lower case: processes refer to it as `${conn:<name>}`. */
+  name: string;
+  /** "github", "postgresql"… */
+  kind: string;
+  settings: Record<string, string>;
+  hasSecret: boolean;
+  /** Who can change it: owners and admins, or every member. */
+  editors: "admins" | "members";
+  version: number;
+  seq: number;
+  deleted: boolean;
+  createdBy: PublicUser;
+  updatedBy: PublicUser;
+  updatedAt: string;
+}
+
+export interface TeamConnectionPage {
+  connections: TeamConnection[];
+  lastSeq: number;
+  hasMore: boolean;
+}
+
 /** A notes sync space: one personal per user, one per team. */
 export interface Space {
   id: string;

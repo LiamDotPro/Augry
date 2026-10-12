@@ -5,16 +5,24 @@ import { cx } from "../../lib/cx";
 import { InspectorField, type Field } from "./InspectorField";
 import { ProcessIcon } from "./ProcessIcon";
 import { useProcess } from "./store";
+import { TeamConnectionsView } from "./TeamConnections";
 import { useKeptScroll } from "./useKeptScroll";
 
-const GROUP_NAME = { work: "Project management", local: "On this computer", systems: "Systems and data" };
+export const GROUP_NAME = { work: "Project management", local: "On this computer", systems: "Systems and data" };
 
 /**
  * Connections (board 05): what processes start from and what their steps
  * can reach, grouped by kind. Set one up once and every process can use it;
- * process files name a connection and never hold its secrets.
+ * process files name a connection and never hold its secrets. With a team
+ * selected, this shows the team's connections instead (board 11).
  */
 export function ConnectionsView() {
+  const { team } = useProcess();
+  return team ? <TeamConnectionsView /> : <PersonalConnections />;
+}
+
+/** Your own connections, as board 05 draws them. */
+function PersonalConnections() {
   const { state, dispatch } = useProcess();
   const [query, setQuery] = useState("");
   const scroll = useKeptScroll<HTMLDivElement>("connections");
@@ -73,7 +81,7 @@ export function ConnectionsView() {
   );
 }
 
-function Tile({ connection, size = 34 }: { connection: Connection; size?: number }) {
+export function Tile({ connection, size = 34 }: { connection: Connection; size?: number }) {
   const color = CONNECTION_COLORS[connection.icon];
   return (
     <span
@@ -85,7 +93,18 @@ function Tile({ connection, size = 34 }: { connection: Connection; size?: number
   );
 }
 
-function ConnectionCard({ connection: c, picked, onOpen }: { connection: Connection; picked: boolean; onOpen(): void }) {
+/** What a team's Connections changes on a card: its status, the line under it and the button. */
+export interface CardView {
+  on: boolean;
+  status: string;
+  used: string;
+  /** The button, or null for none. */
+  action: string | null;
+}
+
+export function ConnectionCard({ connection, picked, onOpen, view }: { connection: Connection; picked: boolean; onOpen(): void; view?: CardView }) {
+  const c = view ? { ...connection, on: view.on, status: view.status, used: view.used } : connection;
+  const action = view ? view.action : c.on ? "Manage" : "Set up";
   return (
     <div className={cx("process-conn", c.on ? "process-conn--on" : "process-conn--off", picked && "process-conn--picked")}>
       <div className="process-conn__top">
@@ -101,15 +120,17 @@ function ConnectionCard({ connection: c, picked, onOpen }: { connection: Connect
       <div className="process-conn__desc">{c.desc}</div>
       <div className="process-conn__foot">
         <span className="process-conn__used">{c.on ? c.used : ""}</span>
-        <button type="button" className={cx("process-btn process-btn--small", !c.on && "process-btn--primary")} onClick={onOpen} aria-pressed={picked}>
-          {c.on ? "Manage" : "Set up"}
-        </button>
+        {action && (
+          <button type="button" className={cx("process-btn process-btn--small", !c.on && "process-btn--primary")} onClick={onOpen} aria-pressed={picked}>
+            {action}
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function SetupPanel({ connection: c, onClose }: { connection: Connection; onClose(): void }) {
+export function SetupPanel({ connection: c, onClose }: { connection: Connection; onClose(): void }) {
   const { dispatch } = useProcess();
   // Secrets are typed here but never kept in the settings (or a process file).
   const [secrets, setSecrets] = useState<Record<string, string>>({});
