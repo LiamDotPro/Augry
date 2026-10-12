@@ -185,6 +185,74 @@ pub trait Source: Send + Sync + 'static {
     fn start(&self, rules: Vec<Rule>, sink: Sink) -> Result<Handle, SourceError>;
 }
 
+/// Renders a kinds table for a README. Checked by each crate's tests/readme.rs.
+pub fn kinds_markdown(kinds: &[KindInfo]) -> String {
+    let mut out = String::from("| Kind | Title | Platforms | Permission | When | Payload |\n");
+    out.push_str("| --- | --- | --- | --- | --- | --- |\n");
+    for k in kinds {
+        let permission = k.permission.map_or("none".to_string(), permission_label);
+        out.push_str(&format!(
+            "| {} | {} | {} | {} | {} | {} |\n",
+            k.id,
+            k.title,
+            platforms_label(k.platforms),
+            permission,
+            fields_label(k.when, true),
+            fields_label(k.payload, false),
+        ));
+    }
+    out
+}
+
+fn platforms_label(p: Platforms) -> String {
+    let all = [
+        (Platforms::MACOS, "macOS"),
+        (Platforms::WINDOWS, "Windows"),
+        (Platforms::LINUX, "Linux"),
+    ];
+    let names: Vec<&str> = all
+        .iter()
+        .filter(|(f, _)| p.has(*f))
+        .map(|(_, n)| *n)
+        .collect();
+    if names.is_empty() {
+        "none".to_string()
+    } else {
+        names.join(", ")
+    }
+}
+
+fn permission_label(p: Permission) -> String {
+    match p {
+        Permission::Accessibility => "accessibility".to_string(),
+        Permission::ScreenRecording => "screen recording".to_string(),
+        Permission::Location => "location".to_string(),
+        Permission::Calendar => "calendar".to_string(),
+        Permission::Reminders => "reminders".to_string(),
+        Permission::Folder(name) => format!("folder {name}"),
+        Permission::Microphone => "microphone".to_string(),
+        Permission::Camera => "camera".to_string(),
+        Permission::Notifications => "notifications".to_string(),
+    }
+}
+
+fn fields_label(fields: &[FieldInfo], mark_required: bool) -> String {
+    if fields.is_empty() {
+        return "none".to_string();
+    }
+    let names: Vec<String> = fields
+        .iter()
+        .map(|f| {
+            if mark_required && f.required {
+                format!("{}*", f.name)
+            } else {
+                f.name.to_string()
+            }
+        })
+        .collect();
+    names.join(", ")
+}
+
 #[cfg(test)]
 mod platforms_tests {
     use super::*;
@@ -364,5 +432,74 @@ mod handle_tests {
         );
         assert_eq!(SourceError::Os("boom".into()).to_string(), "boom");
         assert_eq!(SourceError::Unavailable("no".into()).to_string(), "no");
+    }
+}
+
+#[cfg(test)]
+mod markdown_tests {
+    use super::*;
+
+    const WHEN: &[FieldInfo] = &[
+        FieldInfo {
+            name: "path",
+            doc: "Folder to watch",
+            required: true,
+        },
+        FieldInfo {
+            name: "glob",
+            doc: "Which files",
+            required: false,
+        },
+    ];
+    const PAYLOAD: &[FieldInfo] = &[
+        FieldInfo {
+            name: "path",
+            doc: "Where",
+            required: true,
+        },
+        FieldInfo {
+            name: "name",
+            doc: "File name",
+            required: true,
+        },
+    ];
+    const KINDS: &[KindInfo] = &[
+        KindInfo {
+            id: "fs.file-saved",
+            title: "File saved",
+            summary: "A file was saved",
+            platforms: Platforms::ALL,
+            permission: Some(Permission::Folder("Downloads")),
+            when: WHEN,
+            payload: PAYLOAD,
+        },
+        KindInfo {
+            id: "x.thing",
+            title: "Thing",
+            summary: "s",
+            platforms: Platforms::MACOS.or(Platforms::LINUX),
+            permission: None,
+            when: &[],
+            payload: &[],
+        },
+    ];
+
+    #[test]
+    fn renders_the_exact_table() {
+        let expected = "\
+| Kind | Title | Platforms | Permission | When | Payload |
+| --- | --- | --- | --- | --- | --- |
+| fs.file-saved | File saved | macOS, Windows, Linux | folder Downloads | path*, glob | path, name |
+| x.thing | Thing | macOS, Linux | none | none | none |
+";
+        assert_eq!(kinds_markdown(KINDS), expected);
+    }
+
+    #[test]
+    fn no_kinds_gives_only_the_header() {
+        assert_eq!(
+            kinds_markdown(&[]),
+            "| Kind | Title | Platforms | Permission | When | Payload |\n| --- | --- | --- | --- | --- | --- |\n"
+        );
     }
 }

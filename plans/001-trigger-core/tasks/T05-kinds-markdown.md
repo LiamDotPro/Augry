@@ -2,7 +2,7 @@
 id: T05
 epic: 001-trigger-core
 title: Add kinds_markdown with an exact output test
-status: todo
+status: done
 depends_on: [T04]
 size: S
 model: haiku
@@ -163,3 +163,5 @@ mod markdown_tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (markdown 2/2, trigger-core 13 unit tests, clippy, fmt, check-crates exit 0 with a file-length warning only at 506 lines)
+- 2026-10-12 checker: pass
