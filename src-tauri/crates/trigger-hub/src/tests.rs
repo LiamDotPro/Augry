@@ -187,3 +187,49 @@ mod publish_tests {
         assert!(rx.recv_timeout(Duration::from_secs(2)).is_err());
     }
 }
+
+mod check_tests {
+    use crate::test_support::shared;
+    use crate::Hub;
+    use serde_json::json;
+    use trigger_core::testkit::{rule, FakeSource};
+    use trigger_core::RuleError;
+
+    fn hub() -> Hub {
+        let (fs, _, _) = shared(FakeSource::new("fs", &[]), true);
+        let (git, _, _) = shared(FakeSource::new("git", &[]), false);
+        Hub::new(vec![fs, git])
+    }
+
+    #[test]
+    fn a_good_rule_passes_the_owning_source() {
+        assert!(hub().check(&rule("r1", "fs.file-saved", json!({}))).is_ok());
+        assert!(hub().check(&rule("r2", "git.commit", json!({}))).is_ok());
+    }
+
+    #[test]
+    fn the_owning_source_can_reject_a_rule() {
+        let err = hub()
+            .check(&rule("r1", "fs.file-saved", json!({"bad": 1})))
+            .unwrap_err();
+        assert_eq!(err.to_string(), "field bad: not allowed");
+        // The git source in this test does not reject "bad".
+        assert!(hub()
+            .check(&rule("r2", "git.commit", json!({"bad": 1})))
+            .is_ok());
+    }
+
+    #[test]
+    fn a_kind_no_source_owns_is_unknown() {
+        let err = hub().check(&rule("r1", "other.x", json!({}))).unwrap_err();
+        assert!(matches!(err, RuleError::UnknownKind(ref k) if k == "other.x"));
+    }
+
+    #[test]
+    fn only_the_part_before_the_first_dot_picks_the_source() {
+        // "fsx.y" must not match the source "fs", and "fs" alone is not "fs.".
+        assert!(hub().check(&rule("r1", "fsx.y", json!({}))).is_err());
+        assert!(hub().check(&rule("r2", "fs", json!({}))).is_ok());
+        assert!(hub().check(&rule("r3", "fs.a.b", json!({}))).is_ok());
+    }
+}

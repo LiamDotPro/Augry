@@ -10,10 +10,15 @@ use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
 use std::time::Duration;
-use trigger_core::{Availability, Event, KindInfo, Source};
+use trigger_core::{Availability, Event, KindInfo, Rule, RuleError, Source};
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+// Some helpers are used only by later tests.
+#[allow(dead_code)]
+mod test_support;
 
 const DEFAULT_COOL_DOWN: Duration = Duration::from_secs(2);
 
@@ -107,6 +112,23 @@ impl Hub {
                 availability: s.availability(),
             })
             .collect()
+    }
+
+    /// The index of the source that owns this kind. A kind belongs to the
+    /// source whose id is the part before the first dot: `fs.file-saved`
+    /// belongs to `fs`.
+    fn source_index(&self, kind: &str) -> Option<usize> {
+        let prefix = kind.split('.').next().unwrap_or("");
+        self.sources.iter().position(|s| s.id() == prefix)
+    }
+
+    /// Asks the source that owns the rule's kind to check the rule. A kind no
+    /// source owns is `RuleError::UnknownKind`.
+    pub fn check(&self, rule: &Rule) -> Result<(), RuleError> {
+        match self.source_index(&rule.kind) {
+            Some(index) => self.sources[index].check(rule),
+            None => Err(RuleError::UnknownKind(rule.kind.clone())),
+        }
     }
 
     /// Sends an event into the same channel the sources use, so it goes through
