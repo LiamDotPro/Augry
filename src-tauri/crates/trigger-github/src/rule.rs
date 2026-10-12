@@ -3,6 +3,7 @@
 // Removed in slice C, when the poll loop reads everything in this file.
 #![allow(dead_code)]
 
+use globset::{GlobBuilder, GlobMatcher};
 use serde::Deserialize;
 use trigger_core::{Rule, RuleError};
 
@@ -57,10 +58,40 @@ fn check_repo(repo: &str) -> Result<(), String> {
     }
 }
 
-/// A parsed rule: the typed fields plus anything compiled from them.
+/// A parsed rule: the typed fields plus the compiled branch glob.
 #[derive(Debug, Clone)]
 pub struct Parsed {
     pub when: When,
+    /// None when `when.branch` is not given, which matches every branch.
+    pub branch: Option<GlobMatcher>,
+}
+
+impl Parsed {
+    /// Whether a branch name passes `when.branch`.
+    pub fn matches_branch(&self, name: &str) -> bool {
+        self.branch.as_ref().is_none_or(|glob| glob.is_match(name))
+    }
+
+    /// The branch when it has no glob characters, so the request can ask
+    /// GitHub for exactly that branch. None for a glob or no branch at all.
+    pub fn literal_branch(&self) -> Option<&str> {
+        let branch = self.when.branch.as_deref()?;
+        (!branch.contains(['*', '?', '[', ']', '{', '}', '\\'])).then_some(branch)
+    }
+}
+
+/// Branch names are case sensitive and contain `/`, so unlike the file globs
+/// in trigger-fs, `*` here does cross `/`: `release/*` matches `release/1/x`.
+fn compile_branch(pattern: &str) -> Result<GlobMatcher, String> {
+    if pattern.is_empty() {
+        return Err("must not be empty".into());
+    }
+    GlobBuilder::new(pattern)
+        .literal_separator(false)
+        .case_insensitive(false)
+        .build()
+        .map(|glob| glob.compile_matcher())
+        .map_err(|e| e.to_string())
 }
 
 /// Checks that the kind belongs to this crate and the fields parse. Used by
@@ -96,7 +127,13 @@ pub fn parse(rule: &Rule) -> Result<Parsed, RuleError> {
             "must list at least one login, with no empty or spaced entries".into(),
         ));
     }
-    Ok(Parsed { when })
+    let branch = when
+        .branch
+        .as_deref()
+        .map(compile_branch)
+        .transpose()
+        .map_err(|problem| field("branch", problem))?;
+    Ok(Parsed { when, branch })
 }
 
 #[cfg(test)]
@@ -213,6 +250,47 @@ mod tests {
         for bad in [json!([]), json!([""]), json!(["a b"]), json!(["ok", " "])] {
             let err = parsed(json!({ "repo": "a/b", "author": bad })).unwrap_err();
             assert_eq!(field_of(err), "author");
+        }
+    }
+
+    #[test]
+    fn no_branch_matches_every_branch() {
+        let p = parsed(json!({ "repo": "a/b" })).unwrap();
+        assert!(p.matches_branch("main"));
+        assert!(p.matches_branch("feature/x/y"));
+        assert_eq!(p.literal_branch(), None);
+    }
+
+    #[test]
+    fn branch_globs_are_case_sensitive_and_cross_slashes() {
+        let main = parsed(json!({ "repo": "a/b", "branch": "main" })).unwrap();
+        assert!(main.matches_branch("main"));
+        assert!(!main.matches_branch("Main"));
+        assert!(!main.matches_branch("main2"));
+        let release = parsed(json!({ "repo": "a/b", "branch": "release/*" })).unwrap();
+        assert!(release.matches_branch("release/1.x"));
+        assert!(release.matches_branch("release/1/x"));
+        assert!(!release.matches_branch("hotfix/1"));
+        let either = parsed(json!({ "repo": "a/b", "branch": "{main,trunk}" })).unwrap();
+        assert!(either.matches_branch("trunk"));
+        assert!(!either.matches_branch("dev"));
+    }
+
+    #[test]
+    fn a_bad_or_empty_branch_names_its_field() {
+        for bad in ["[", "{a", ""] {
+            let err = parsed(json!({ "repo": "a/b", "branch": bad })).unwrap_err();
+            assert_eq!(field_of(err), "branch", "{bad:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn literal_branch_is_only_set_without_glob_characters() {
+        let literal = parsed(json!({ "repo": "a/b", "branch": "feature/login" })).unwrap();
+        assert_eq!(literal.literal_branch(), Some("feature/login"));
+        for glob in ["release/*", "v?", "[ab]", "{a,b}"] {
+            let p = parsed(json!({ "repo": "a/b", "branch": glob })).unwrap();
+            assert_eq!(p.literal_branch(), None, "{glob} is a glob");
         }
     }
 }
