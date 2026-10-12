@@ -706,10 +706,19 @@ pub fn set_focused_terminal(
     state: State<'_, crate::AppState>,
     id: Option<TerminalId>,
 ) -> Result<()> {
+    let previous = state.pty.focused();
     state.pty.set_focused(id.clone());
     let Some(id) = id else {
         return Ok(());
     };
+
+    if let Some(cwd) = state.pty.cwd_of(&id) {
+        if let Some(signal) =
+            crate::triggers::feeds::focus_entered(previous.as_deref(), &id, &path_string(&cwd))
+        {
+            crate::triggers::feeds::publish(&app, signal);
+        }
+    }
 
     let app_handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {

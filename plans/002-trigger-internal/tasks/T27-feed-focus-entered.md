@@ -2,7 +2,7 @@
 id: T27
 epic: 002-trigger-internal
 title: Publish tg.focus-entered from set_focused_terminal
-status: todo
+status: done
 depends_on: [T23]
 size: S
 model: haiku
@@ -83,3 +83,5 @@ Leave everything after those lines (the `app_handle` clone and the `spawn_blocki
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed. Clippy baseline 7 warnings before edit, 7 after. feeds::publish count 2, feeds::focus_entered count 1. cargo fmt --check exit 0, no-default-features check exit 0, feeds tests 5 passed, workspace tests all ok.
+- 2026-10-13 checker: pass
