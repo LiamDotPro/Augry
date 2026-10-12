@@ -2,7 +2,7 @@
 id: T24
 epic: 007-trigger-clock
 title: Finish the clock README
-status: todo
+status: done
 depends_on: [T23]
 size: S
 model: haiku
@@ -117,3 +117,5 @@ and replace it with these bullets:
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

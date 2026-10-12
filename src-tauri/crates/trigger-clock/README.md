@@ -41,8 +41,8 @@ error too.
 A `feed` is read like this. A path is read from disk. A URL is fetched with
 `If-None-Match` and `If-Modified-Since`, `webcal://` counts as `https://`, a
 request gives up after 15 seconds, and a feed over 10 MiB is refused. Each
-distinct feed is read at most every 5 minutes, and only the events in the next
-24 hours are kept. Event times written without a time zone are read in this
+distinct feed is read at most every 5 minutes, and only the events from 15 minutes ago to
+24 hours ahead are kept (the 15 minutes let an event that just ended still fire). Event times written without a time zone are read in this
 machine's zone. Each event fires once, however often the feed is read again.
 
 ## Payload
@@ -72,6 +72,11 @@ A gap of more than 90 seconds between two readings means the machine slept.
 Waits do not count time spent asleep on any of the three systems, so the crate
 never trusts the length of a wait, only the wall clock.
 
+While rules are armed there are two threads. `trigger-clock` waits at most 30
+seconds, reads the wall clock and fires what is due. `trigger-clock-feed`
+exists only when a rule names a feed: it reads each feed when the source starts
+and then every 5 minutes. Stopping the source stops both within a second.
+
 ## Permissions
 
 None. Reading a calendar file or feed needs no permission from the OS.
@@ -94,7 +99,9 @@ None. Reading a calendar file or feed needs no permission from the OS.
 
 | File | What it holds |
 |---|---|
-| `src/lib.rs` | `KINDS`, `ClockSource` and the thread that joins the wall clock to the logic. Glue only |
+| `src/lib.rs` | `KINDS`, `ClockSource` and `start`, which parses the rules and starts the threads. Glue only |
+| `src/threads.rs` | The two threads: `launch`, the clock loop and the feed loop. Joins the wall clock, the feeds and the pure logic to the sink |
+| `src/threads/tests.rs` | Tests for the threads with a moved `FixedClock` and a fake `Fetcher`: no sleeping, no network |
 | `src/rule.rs` | The typed `When`, `Parsed` and `parse`, with the per kind checks. Pure, unit tested |
 | `src/logic.rs` | Pure: `State`, `Fire`, `next_due`, `step` and `wait`. Takes `now` as an argument and never sleeps |
 | `src/logic/tests.rs` | Unit tests for normal ticks, jumps, catch up, backwards jumps and daily first use |
@@ -106,13 +113,13 @@ None. Reading a calendar file or feed needs no permission from the OS.
 | `src/logic/events.rs` | Pure: `fire_events`, called by `step` for `clock.event-starting` and `clock.event-ended` |
 | `src/logic/event_tests.rs` | Unit tests for the two event kinds |
 | `src/os.rs` | The only file that talks to the OS: `availability()`, `UreqFetcher` (HTTP with `ureq`), `read_feed_file` and `local_zone` |
-| `tests/live.rs` | `#[ignore]` tests against the real clock |
+| `tests/live.rs` | `#[ignore]` tests with the real clock: an interval rule fires, and event rules fire from a feed file. About ten seconds in all |
 | `tests/readme.rs` | Fails when the Kinds table above is stale |
 
 ```
 cd src-tauri
 cargo test -p trigger-clock                       # pure and readme tests, any OS, offline
-cargo test -p trigger-clock -- --ignored          # live tests on this machine
+cargo test -p trigger-clock -- --ignored --test-threads=1   # live tests on this machine, about 10 seconds
 cargo clippy -p trigger-clock --all-targets -- -D warnings
 ```
 
@@ -140,5 +147,11 @@ cargo clippy -p trigger-clock --all-targets -- -D warnings
   before it is parsed, because the calendar library reads those as local time.
 - Feeds are checked with the certificates bundled in the app, not the system
   store, so a feed behind a company proxy that re-signs HTTPS can fail.
-- Not finished yet: the threads that run the logic and fetch feeds, so `start`
-  still returns unavailable.
+- A feed that cannot be read (no network, a wrong address, a file that is gone)
+  keeps its last good copy and is tried again at the next 5 minute read. Nothing
+  says why: feed addresses often hold a secret token, so the crate never logs
+  them or the reason.
+- A change to a feed is seen at the next 5 minute read, so an event added a
+  minute before it starts can be missed.
+- Stopping the source does not cancel a request already running. It ends by
+  itself, at the latest at its 15 second timeout, and its answer is dropped.
