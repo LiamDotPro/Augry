@@ -2,7 +2,7 @@
 id: T18
 epic: 002-trigger-internal
 title: Make shell-integration.sh safe under set -u
-status: todo
+status: in-progress
 depends_on: [T17]
 size: S
 model: haiku
@@ -37,7 +37,7 @@ way those three names are read changes; behaviour is the same.
 ## Acceptance
 
 - [ ] `grep -c '"\$ZSH_VERSION"' src-tauri/resources/shell-integration.sh` prints `0`
-- [ ] `grep -c '${ZSH_VERSION:-}' src-tauri/resources/shell-integration.sh` prints `3`
+- [ ] `grep -cF '${ZSH_VERSION:-}' src-tauri/resources/shell-integration.sh` prints `3`
 - [ ] `git diff --numstat -- src-tauri/resources/shell-integration.sh` prints `5	5	src-tauri/resources/shell-integration.sh`
 - [ ] `bash -c 'set -u; source src-tauri/resources/shell-integration.sh; __tg_precmd; __tg_precmd; echo SAFE' | tail -c 5` prints `SAFE`, and the command prints nothing on stderr
 - [ ] `zsh -c 'set -u; source src-tauri/resources/shell-integration.sh; __tg_precmd; __tg_precmd; echo SAFE' | tail -c 5` prints `SAFE`, and the command prints nothing on stderr
@@ -59,3 +59,5 @@ way those three names are read changes; behaviour is the same.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: blocked. Five edits applied to src-tauri/resources/shell-integration.sh (lines 6, 13, 16, 18, 25); numstat 5 5 passes. Acceptance check `grep -c '${ZSH_VERSION:-}' src-tauri/resources/shell-integration.sh` prints 0 on this macOS grep, not 3 as the card says (`grep -cF` gives 3, and the file has exactly 3 occurrences on lines 6, 18, 25). Card check is wrong, so stopped per "If stuck". Passed: bash and zsh `set -u` runs print SAFE with 0 bytes on stderr. Not run: cargo tests, git status check.
+- 2026-10-12 architect: the BRE grep for ${ZSH_VERSION:-} does not match on this grep; changed the check to grep -cF. The edits stand; sent to the checker, which runs the remaining checks.
