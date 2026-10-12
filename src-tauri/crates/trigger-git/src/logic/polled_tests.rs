@@ -1,3 +1,6 @@
+use std::collections::BTreeSet;
+use std::path::Path;
+
 use super::polled::*;
 use super::*;
 
@@ -121,4 +124,47 @@ fn uncommitted_payload_has_exactly_the_listed_fields() {
     assert_eq!(payload["branch"], "feat/x");
     assert_eq!(payload["minutes"], 75);
     assert_eq!(uncommitted_payload("/r", None, 1)["branch"], "");
+}
+
+fn names(list: &[&str]) -> BTreeSet<String> {
+    list.iter().map(|s| s.to_string()).collect()
+}
+
+#[test]
+fn the_first_scan_is_a_baseline() {
+    let mut scan = CloneScan::new();
+    assert!(scan.observe(names(&["a", "b"])).is_empty());
+    assert!(scan.observe(names(&["a", "b"])).is_empty());
+}
+
+#[test]
+fn a_new_child_fires_once_in_sorted_order() {
+    let mut scan = CloneScan::new();
+    scan.observe(names(&["a"]));
+    assert_eq!(scan.observe(names(&["a", "z", "c"])), vec!["c", "z"]);
+    assert!(scan.observe(names(&["a", "z", "c"])).is_empty());
+}
+
+#[test]
+fn an_empty_first_scan_still_makes_the_second_one_count() {
+    let mut scan = CloneScan::new();
+    assert!(scan.observe(BTreeSet::new()).is_empty());
+    assert_eq!(scan.observe(names(&["fresh"])), vec!["fresh"]);
+}
+
+#[test]
+fn a_removed_and_cloned_again_repository_fires_again() {
+    let mut scan = CloneScan::new();
+    scan.observe(names(&["a", "b"]));
+    assert!(scan.observe(names(&["a"])).is_empty());
+    assert_eq!(scan.observe(names(&["a", "b"])), vec!["b"]);
+}
+
+#[test]
+fn cloned_payload_has_exactly_the_listed_fields() {
+    let folder = Path::new("/work/projects");
+    let payload = cloned_payload(folder, "new-repo");
+    assert_eq!(keys(&payload), listed("git.repo-cloned"));
+    let expected = folder.join("new-repo");
+    assert_eq!(payload["path"], expected.to_string_lossy().as_ref());
 }

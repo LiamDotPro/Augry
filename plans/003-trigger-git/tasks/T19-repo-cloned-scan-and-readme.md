@@ -2,7 +2,7 @@
 id: T19
 epic: 003-trigger-git
 title: Add the repo-cloned scan logic and update the README
-status: todo
+status: done
 depends_on: [T18]
 size: M
 model: haiku
@@ -182,3 +182,5 @@ Note on `check-crates.mjs`: it prints warnings, not errors, about template text.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

@@ -86,6 +86,8 @@ What the OS asks the user for, and when. "None" is a fine answer.
 | `src/logic.rs` | Pure: which rules a `Signal` fires, with what payload, and any debounce state. Unit tested |
 | `src/git.rs` | The git command line, std only: `run` (timeout, no console window on Windows, a fallback to the Homebrew paths on macOS) and `value`. A copy of the app's pattern, since a trigger crate cannot depend on the app |
 | `src/git/repo.rs` | `GitRepo`, the real `Repo`: builds a `RepoSnapshot` from read only git commands, counts commits behind the upstream, finds the age of the oldest uncommitted change |
+| `src/logic/repo.rs` | The `Repo` trait: what the glue asks about a repository. `src/logic/fake.rs` is the fake used in tests |
+| `src/logic/polled.rs` | Pure transitions for the polled kinds: `BehindWatch`, `UncommittedWatch`, `CloneScan`, and their payloads |
 | `src/os.rs` | The only file that talks to the OS: `availability()` and `listen()`, per platform behind `cfg` |
 | `tests/live.rs` | `#[ignore]` tests against the real OS |
 | `tests/readme.rs` | Fails when the Kinds table above is stale |
@@ -106,3 +108,7 @@ What does not work, on which platform, and why.
 - Every git call has a 3 second limit (30 seconds for `git fetch`). A call that times out leaves its part of the snapshot empty.
 - Remote refs are not read, so a `git fetch` fires nothing. With `fetch: true` the fetch runs with `--no-tags`, so tags on the remote do not become local tags and do not fire `git.tag-created`. A fetch that fails (offline) is ignored and the count uses the remote refs already on disk.
 - `git.uncommitted-older-than` uses the modified time of each tracked file that `git status` lists. Untracked files and deleted files are not counted, and a file saved again looks younger.
+- The polled kinds check once per `interval_s`, not on file events, so an event can arrive up to one interval late.
+- `git.behind-remote` fires when the count goes from 0 to above 0. The first check is only a baseline, and behind by 2 and then by 5 is one event. A repository with no upstream, or a detached HEAD, never fires it.
+- `git.uncommitted-older-than` fires once and waits for a clean tree before it can fire again. Work that is already old when the rule starts fires on the first check.
+- `git.repo-cloned` sees only direct children of `folder` that contain `.git`. The first scan is a baseline, so repositories already there fire nothing.

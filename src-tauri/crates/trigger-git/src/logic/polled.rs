@@ -3,6 +3,9 @@
 //! these; they say whether the answer fires. No git, no clock, no threads.
 //! Decision 10 of plans/003-trigger-git/epic.md.
 
+use std::collections::BTreeSet;
+use std::path::Path;
+
 use trigger_core::Value;
 
 use super::Payload;
@@ -85,5 +88,42 @@ pub fn uncommitted_payload(repo: &str, branch: Option<&str>, minutes: u64) -> Pa
     out.insert("repo".into(), Value::from(repo));
     out.insert("branch".into(), Value::from(branch.unwrap_or_default()));
     out.insert("minutes".into(), Value::from(minutes));
+    out
+}
+
+/// `git.repo-cloned`: fires for each new child of a folder that holds a
+/// repository. The first scan is the baseline.
+#[derive(Debug, Default)]
+pub struct CloneScan {
+    known: Option<BTreeSet<String>>,
+}
+
+impl CloneScan {
+    pub fn new() -> CloneScan {
+        CloneScan::default()
+    }
+
+    /// Feeds one scan. `repos` is the names of the children of the folder
+    /// that contain `.git` (the OS layer lists them). Returns the names that
+    /// were not in the previous scan, in sorted order.
+    ///
+    /// - The first scan returns nothing, whatever it holds.
+    /// - A repository that disappears is forgotten, so cloning it again
+    ///   fires again.
+    pub fn observe(&mut self, repos: BTreeSet<String>) -> Vec<String> {
+        let new = match &self.known {
+            Some(known) => repos.difference(known).cloned().collect(),
+            None => Vec::new(),
+        };
+        self.known = Some(repos);
+        new
+    }
+}
+
+/// The payload of `git.repo-cloned`: exactly the fields listed in `KINDS`.
+pub fn cloned_payload(folder: &Path, name: &str) -> Payload {
+    let mut out = Payload::new();
+    let path = folder.join(name);
+    out.insert("path".into(), Value::from(path.to_string_lossy().as_ref()));
     out
 }
