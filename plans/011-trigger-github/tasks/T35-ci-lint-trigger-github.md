@@ -2,7 +2,7 @@
 id: T35
 epic: 011-trigger-github
 title: Lint trigger-github in CI
-status: todo
+status: done
 depends_on: [T34]
 size: S
 model: haiku
@@ -63,3 +63,5 @@ CI lints `trigger-github` with `-D warnings` like the other trigger crates. CI d
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed
+- 2026-10-13 checker: pass
