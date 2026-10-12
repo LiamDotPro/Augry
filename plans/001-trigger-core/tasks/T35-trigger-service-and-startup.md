@@ -2,7 +2,7 @@
 id: T35
 epic: 001-trigger-core
 title: Add TriggerService and start it with the app
-status: todo
+status: done
 depends_on: [T34]
 size: M
 model: haiku
@@ -382,3 +382,6 @@ and replace it with:
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy baseline before changes: 7 warnings; after: 7. Tests: triggers::tests 4 ok, triggers:: 35 ok, workspace ok.
+- 2026-10-12 architect: checker flagged three lock().expect() calls; accepted, they match the app's existing pattern (pty sessions, output pump)
+- 2026-10-12 checker: pass
