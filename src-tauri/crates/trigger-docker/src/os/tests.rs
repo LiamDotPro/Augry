@@ -158,3 +158,94 @@ fn probe_is_consistent_with_find_engine() {
         }
     }
 }
+
+#[test]
+fn the_docker_command_line_is_the_one_in_the_epic() {
+    assert_eq!(
+        events_args(Engine::Docker),
+        [
+            "events",
+            "--format",
+            "{{json .}}",
+            "--filter",
+            "type=container",
+            "--filter",
+            "type=image"
+        ]
+    );
+}
+
+#[test]
+fn the_podman_command_line_asks_for_json() {
+    assert_eq!(
+        events_args(Engine::Podman),
+        [
+            "events",
+            "--format",
+            "json",
+            "--filter",
+            "type=container",
+            "--filter",
+            "type=image"
+        ]
+    );
+}
+
+#[test]
+fn no_command_line_uses_since() {
+    for engine in [Engine::Docker, Engine::Podman] {
+        assert!(!events_args(engine).contains(&"--since"));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn child_lines_reads_lines_then_none_when_the_child_exits() {
+    let mut lines = ChildLines::spawn(sh("echo one; printf 'two\\r\\n'; printf three")).unwrap();
+    assert_eq!(lines.next_line(), Some("one".to_string()));
+    assert_eq!(lines.next_line(), Some("two".to_string()));
+    assert_eq!(lines.next_line(), Some("three".to_string()));
+    assert_eq!(lines.next_line(), None);
+    // Reaps the child. Killing one that has exited is fine, twice too.
+    let killer = lines.killer();
+    killer.kill();
+    killer.kill();
+}
+
+#[cfg(unix)]
+#[test]
+fn killing_ends_a_child_that_never_prints_again() {
+    let mut lines = ChildLines::spawn(sh("echo up; exec sleep 30")).unwrap();
+    assert_eq!(lines.next_line(), Some("up".to_string()));
+    let killer = lines.killer();
+    let started = Instant::now();
+    let reader = std::thread::spawn(move || lines.next_line());
+    std::thread::sleep(Duration::from_millis(100));
+    killer.kill();
+    assert_eq!(reader.join().unwrap(), None);
+    assert!(started.elapsed() < Duration::from_secs(5));
+    killer.kill();
+}
+
+#[cfg(unix)]
+#[test]
+fn killing_waits_so_the_child_is_gone() {
+    let lines = ChildLines::spawn(sh("exec sleep 30")).unwrap();
+    let child = lines.child.clone();
+    lines.killer().kill();
+    // `try_wait` on a child that was already waited for still reports it.
+    let status = child.lock().unwrap().try_wait().unwrap();
+    assert!(status.is_some());
+}
+
+#[test]
+fn a_program_that_does_not_exist_fails_to_spawn() {
+    let missing = Command::new("/nonexistent/trigger-docker-test-program");
+    assert!(ChildLines::spawn(missing).is_err());
+    let real = RealEngine::new(
+        Engine::Docker,
+        PathBuf::from("/nonexistent/trigger-docker-test-program"),
+    );
+    assert!(real.spawn().is_err());
+    assert_eq!(real.engine(), Engine::Docker);
+}

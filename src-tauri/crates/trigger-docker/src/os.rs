@@ -6,15 +6,16 @@
 #![allow(dead_code)]
 
 use std::ffi::OsString;
-use std::io::Read;
+use std::io::{self, BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::OnceLock;
+use std::process::{Child, ChildStdout, Command, Stdio};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
 
 use trigger_core::Availability;
 
 use crate::logic::Engine;
+use crate::supervisor::{EngineProcess, Kill, Lines};
 
 /// The file name of the engine's command line tool.
 fn binary_name(engine: Engine) -> String {
@@ -194,6 +195,108 @@ pub fn probe(engine: Engine) -> Probe {
     match answer(version, VERSION_TIMEOUT) {
         Some(_) => Probe::Ready(path),
         None => Probe::Silent(path),
+    }
+}
+
+/// The arguments for the engine's event stream (Decision 6 of the epic). Only
+/// container and image events are asked for: the `exec_*` events of health
+/// checks are most of the traffic otherwise. There is no `--since`, so a
+/// restarted child does not replay old events.
+pub fn events_args(engine: Engine) -> Vec<&'static str> {
+    let format = match engine {
+        Engine::Docker => "{{json .}}",
+        Engine::Podman => "json",
+    };
+    vec![
+        "events",
+        "--format",
+        format,
+        "--filter",
+        "type=container",
+        "--filter",
+        "type=image",
+    ]
+}
+
+/// A running child and a reader on its stdout.
+struct ChildLines {
+    // Shared with `ChildKill`. The reader below owns stdout, so this lock is
+    // never held while a thread waits for a line.
+    child: Arc<Mutex<Child>>,
+    out: BufReader<ChildStdout>,
+}
+
+impl ChildLines {
+    /// Starts the command with stdin and stderr closed and stdout piped.
+    fn spawn(mut command: Command) -> io::Result<ChildLines> {
+        let mut child = command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()?;
+        let Some(stdout) = child.stdout.take() else {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(io::Error::other("the child has no stdout"));
+        };
+        Ok(ChildLines {
+            child: Arc::new(Mutex::new(child)),
+            out: BufReader::new(stdout),
+        })
+    }
+}
+
+impl Lines for ChildLines {
+    fn next_line(&mut self) -> Option<String> {
+        let mut bytes = Vec::new();
+        match self.out.read_until(b'\n', &mut bytes) {
+            Ok(0) | Err(_) => None,
+            Ok(_) => {
+                while matches!(bytes.last(), Some(b'\n' | b'\r')) {
+                    bytes.pop();
+                }
+                Some(String::from_utf8_lossy(&bytes).into_owned())
+            }
+        }
+    }
+
+    fn killer(&self) -> Arc<dyn Kill> {
+        Arc::new(ChildKill(self.child.clone()))
+    }
+}
+
+struct ChildKill(Arc<Mutex<Child>>);
+
+impl Kill for ChildKill {
+    fn kill(&self) {
+        let mut child = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        // Both fail when the child already exited, which is fine.
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}
+
+/// The real event stream: the engine's tool run as a child process.
+pub struct RealEngine {
+    engine: Engine,
+    path: PathBuf,
+}
+
+impl RealEngine {
+    pub fn new(engine: Engine, path: PathBuf) -> RealEngine {
+        RealEngine { engine, path }
+    }
+}
+
+impl EngineProcess for RealEngine {
+    fn engine(&self) -> Engine {
+        self.engine
+    }
+
+    fn spawn(&self) -> io::Result<Box<dyn Lines>> {
+        let mut events = command(&self.path);
+        events.args(events_args(self.engine));
+        Ok(Box::new(ChildLines::spawn(events)?))
     }
 }
 
