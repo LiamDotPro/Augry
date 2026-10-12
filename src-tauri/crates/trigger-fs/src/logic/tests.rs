@@ -242,3 +242,135 @@ fn a_file_without_an_extension_has_an_empty_ext() {
     assert_eq!(payload["ext"], json!(""));
     assert_eq!(payload["relative"], json!("Makefile"));
 }
+
+#[test]
+fn windows_rename_from_and_to_is_one_renamed() {
+    let mut fx = Fx::new("fs.file-renamed", json!({}), &["a.txt"]);
+    fx.delete("a.txt");
+    fx.put("b.txt");
+    fx.raw(1000, RawKind::Name, &["a.txt"]);
+    fx.raw(1000, RawKind::Name, &["b.txt"]);
+    assert_eq!(
+        fx.tick(1600),
+        vec![Obs::Renamed {
+            from: fx.p("a.txt"),
+            to: fx.p("b.txt")
+        }]
+    );
+}
+
+#[test]
+fn macos_rename_into_a_subfolder_is_one_renamed() {
+    // R03: one Name(Any) per path, no pairing in the kind.
+    let mut fx = Fx::new("fs.file-renamed", json!({}), &["a.txt"]);
+    fx.delete("a.txt");
+    fx.put("sub/a.txt");
+    fx.raw(1000, RawKind::Name, &["a.txt"]);
+    fx.raw(1000, RawKind::Name, &["sub/a.txt"]);
+    let out = fx.tick(1600);
+    assert_eq!(
+        out,
+        vec![Obs::Renamed {
+            from: fx.p("a.txt"),
+            to: fx.p("sub/a.txt")
+        }]
+    );
+    let payload = out[0].payload(&fx.armed);
+    assert_eq!(payload["from"], json!(fx.p("a.txt").to_string_lossy()));
+    assert_eq!(payload["relative"], json!("sub/a.txt"));
+}
+
+#[test]
+fn linux_rename_with_both_is_one_renamed() {
+    let mut fx = Fx::new("fs.file-renamed", json!({}), &["a.txt"]);
+    fx.delete("a.txt");
+    fx.put("b.txt");
+    fx.raw(1000, RawKind::Name, &["a.txt"]);
+    fx.raw(1000, RawKind::Name, &["b.txt"]);
+    fx.raw(1000, RawKind::Both, &["a.txt", "b.txt"]);
+    assert_eq!(
+        fx.tick(1600),
+        vec![Obs::Renamed {
+            from: fx.p("a.txt"),
+            to: fx.p("b.txt")
+        }]
+    );
+    assert!(fx.state.pairs.is_empty());
+}
+
+#[test]
+fn both_pairs_two_removes_and_creates_without_guessing() {
+    let mut fx = Fx::new("fs.file-renamed", json!({}), &["a.txt", "c.txt"]);
+    fx.delete("a.txt");
+    fx.delete("c.txt");
+    fx.put("b.txt");
+    fx.put("d.txt");
+    fx.raw(1000, RawKind::Both, &["a.txt", "b.txt"]);
+    fx.raw(1000, RawKind::Both, &["c.txt", "d.txt"]);
+    let out = fx.tick(1600);
+    assert_eq!(out.len(), 2);
+    assert!(out.contains(&Obs::Renamed {
+        from: fx.p("a.txt"),
+        to: fx.p("b.txt")
+    }));
+    assert!(out.contains(&Obs::Renamed {
+        from: fx.p("c.txt"),
+        to: fx.p("d.txt")
+    }));
+}
+
+#[test]
+fn linux_atomic_save_with_both_is_one_saved() {
+    // R03: Create temp, Data temp, Name(From) temp, Name(To) target,
+    // Name(Both) [temp, target].
+    let mut fx = Fx::new("fs.file-saved", json!({}), &["a.txt"]);
+    fx.put("a.txt.swp-new");
+    fx.raw(1000, RawKind::Create, &["a.txt.swp-new"]);
+    fx.raw(1000, RawKind::Modify, &["a.txt.swp-new"]);
+    fx.delete("a.txt.swp-new");
+    fx.raw(1001, RawKind::Name, &["a.txt.swp-new"]);
+    fx.raw(1001, RawKind::Name, &["a.txt"]);
+    fx.raw(1001, RawKind::Both, &["a.txt.swp-new", "a.txt"]);
+    assert_eq!(fx.tick(1600), vec![Obs::Saved(fx.p("a.txt"))]);
+    assert!(fx.state.pairs.is_empty(), "the pair is forgotten");
+}
+
+#[test]
+fn a_delete_and_an_unrelated_create_are_not_a_rename() {
+    // macOS puts a stale rename flag on a deleted path, but a new file
+    // has none.
+    let mut fx = Fx::new("fs.file-renamed", json!({}), &["a.txt"]);
+    fx.delete("a.txt");
+    fx.put("b.txt");
+    fx.raw(1000, RawKind::Remove, &["a.txt"]);
+    fx.raw(1000, RawKind::Name, &["a.txt"]);
+    fx.raw(1000, RawKind::Create, &["b.txt"]);
+    assert_eq!(
+        fx.tick(1600),
+        vec![Obs::Removed(fx.p("a.txt")), Obs::Created(fx.p("b.txt"))]
+    );
+}
+
+#[test]
+fn two_removed_and_one_created_stay_separate() {
+    let mut fx = Fx::new("fs.file-renamed", json!({}), &["a.txt", "b.txt"]);
+    fx.delete("a.txt");
+    fx.delete("b.txt");
+    fx.put("c.txt");
+    for rel in ["a.txt", "b.txt", "c.txt"] {
+        fx.raw(1000, RawKind::Name, &[rel]);
+    }
+    let out = fx.tick(1600);
+    assert_eq!(out.len(), 3);
+    assert!(out.iter().all(|o| !matches!(o, Obs::Renamed { .. })));
+}
+
+#[test]
+fn renaming_to_an_ignored_name_is_only_a_removal() {
+    let mut fx = Fx::new("fs.file-renamed", json!({}), &["a.txt"]);
+    fx.delete("a.txt");
+    fx.put("a.txt~");
+    fx.raw(1000, RawKind::Name, &["a.txt"]);
+    fx.raw(1000, RawKind::Name, &["a.txt~"]);
+    assert_eq!(fx.tick(1600), vec![Obs::Removed(fx.p("a.txt"))]);
+}

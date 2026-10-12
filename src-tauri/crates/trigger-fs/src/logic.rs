@@ -253,12 +253,45 @@ fn resolve(
 }
 
 fn settle(state: &mut State, armed: &Armed, now: u64, is_file: &dyn Fn(&Path) -> bool) -> Vec<Obs> {
-    let resolved = resolve(state, armed, now, is_file);
-    let mut obs = Vec::new();
+    let mut resolved = resolve(state, armed, now, is_file);
+    let mut obs = pair_renames(state, &mut resolved);
     obs.extend(resolved.removed.into_iter().map(|r| Obs::Removed(r.path)));
     obs.extend(resolved.created.into_iter().map(|r| Obs::Created(r.path)));
     obs.extend(resolved.saved.into_iter().map(|r| Obs::Saved(r.path)));
     obs
+}
+
+/// Takes renames out of `resolved`. First the `[from, to]` pairs the OS gave
+/// us (Linux). Then, for macOS and Windows where the halves arrive unpaired:
+/// exactly one removed and exactly one created in the batch, both touched by
+/// a rename event. Anything else stays removed plus created.
+fn pair_renames(state: &mut State, resolved: &mut Resolved) -> Vec<Obs> {
+    let mut renamed = Vec::new();
+    let mut keep = Vec::new();
+    for (from, to) in std::mem::take(&mut state.pairs) {
+        let removed = resolved.removed.iter().position(|r| r.path == from);
+        let created = resolved.created.iter().position(|r| r.path == to);
+        if let (Some(i), Some(j)) = (removed, created) {
+            resolved.removed.remove(i);
+            resolved.created.remove(j);
+            renamed.push(Obs::Renamed { from, to });
+        } else if state.pending.contains_key(&from) || state.pending.contains_key(&to) {
+            // One half has not settled yet: keep the pair for the next batch.
+            keep.push((from, to));
+        }
+    }
+    state.pairs = keep;
+    if let ([removed], [created]) = (resolved.removed.as_slice(), resolved.created.as_slice()) {
+        if removed.name && created.name {
+            renamed.push(Obs::Renamed {
+                from: removed.path.clone(),
+                to: created.path.clone(),
+            });
+            resolved.removed.clear();
+            resolved.created.clear();
+        }
+    }
+    renamed
 }
 
 impl Obs {

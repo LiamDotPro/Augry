@@ -2,7 +2,7 @@
 id: T24
 epic: 001-trigger-core
 title: Add rename pairing to the logic
-status: todo
+status: done
 depends_on: [T23]
 size: S
 model: haiku
@@ -248,3 +248,5 @@ fn renaming_to_an_ignored_name_is_only_a_removal() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
