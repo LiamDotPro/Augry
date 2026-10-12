@@ -10,25 +10,26 @@ depends_on: [001-trigger-core]
 ## Goal
 
 The crate `src-tauri/crates/trigger-input` fires when the clipboard gets text,
-a URL or an image that matches a rule, when a global hotkey is pressed, when a
-file is dropped on the app or opened with it, and when a tray menu entry is
-chosen. These are the "I want this now" triggers.
+a URL or an image that matches a rule, and when a global hotkey is pressed.
+These are the "I want this now" triggers.
 
 ## Non goals
 
 - Selected text in other apps, Services menus and share targets: the
-  platform crates.
+  platform crates or `launch.cli` recipes.
+- File drops, "open with" and the tray: those are app events and live in the
+  app's internal source (epic 002), so this crate never needs the app to feed
+  it.
 
 ## Decisions
 
 1. **Crate** `trigger-input`, source id `input`, depends on `trigger-core`
-   and the clipboard and hotkey crates research names. The drop, open with and
-   tray kinds are fed by the app through `publish`, since Tauri owns those.
+   and the clipboard and hotkey crates research names, and nothing from Tauri:
+   global hotkeys use a plain Rust crate, not the Tauri plugin.
 2. **Kinds**: `input.clipboard-text`, `input.clipboard-url`,
-   `input.clipboard-image`, `input.hotkey`, `input.file-dropped`,
-   `input.file-opened`, `input.tray-menu`.
+   `input.clipboard-image`, `input.hotkey`.
 3. **`when`**: `pattern` (regex) or `host` (glob on the URL host), `keys`
-   (such as `cmd+shift+r`), `ext` (list) for files, `label` for the tray.
+   (such as `cmd+shift+r`).
 4. **Clipboard watching is opt in and visible**: it only runs while a rule is
    armed, polls the change count every 500 ms, never stores what it reads, and
    puts at most 200 characters of a match in the payload. Image payloads are a
@@ -48,14 +49,14 @@ trait with a fake.
 | A | kinds, `When`, matchers, fake clipboard tests | |
 | B | clipboard and hotkeys on macOS and Windows | A |
 | C | clipboard and hotkeys on Linux X11, Wayland reported as unsupported | A |
-| D | app feeds for drop, open with and tray; live tests, README, feature flag, registration, repo map | B, C |
+| D | live tests, README, feature flag, registration, repo map | B, C |
 
 ## Open questions
 
 | Id | Question | Why it matters | Answer (filled after research) |
 |---|---|---|---|
-| R01 | Current versions of `arboard` (clipboard) and `tauri-plugin-global-shortcut`, and whether `arboard` exposes a change count or the crate must hash | Decision 1 and 4 | |
-| R02 | What Tauri 2 emits for a file drop and for "open with" on each OS, and the capability it needs | Slice D | |
+| R01 | Current version of `arboard` (clipboard), and whether it exposes a change count or the crate must hash | Decision 1 and 4 | |
+| R02 | A plain Rust global hotkey crate (such as `global-hotkey`) that works without Tauri on all three platforms, its version, and whether it needs the main thread's event loop | Decision 1 | |
 
 ## Risks
 

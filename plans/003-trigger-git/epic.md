@@ -17,7 +17,8 @@ It works on all three platforms with the git CLI and file watching only.
 
 ## Non goals
 
-- Git hooks that call the app. That is `trigger-launch` (the `tg` CLI).
+- Git hooks that call the app. That is `launch.cli` with a recipe in
+  `trigger-launch`; this crate watches the repository and nothing else.
 - Anything that needs GitHub: `trigger-github`.
 
 ## Decisions

@@ -9,12 +9,14 @@ depends_on: [001-trigger-core]
 
 ## Goal
 
-The crate `src-tauri/crates/trigger-macos` holds the triggers only macOS has:
-a Shortcuts action or automation, a Folder Action, a Services menu entry on
-selected text, a Finder Quick Action, a system Calendar event or Reminder, an
-iOS Simulator booting, an Xcode build finishing, a track starting in Music,
-Low Power Mode, a Space change and a finished Time Machine backup. It compiles
-on every platform and is `Unsupported` off macOS.
+The crate `src-tauri/crates/trigger-macos` holds what only macOS lets the app
+observe: a system Calendar event or Reminder, an iOS Simulator booting, an
+Xcode build finishing, a track starting in Music, Low Power Mode, a Space change
+and a finished Time Machine backup. It compiles on every platform and is
+`Unsupported` off macOS.
+
+Shortcuts, Folder Actions, Services and Quick Actions are not here: they all
+call `tg run`, so they are `launch.cli` with recipes in `trigger-launch`.
 
 ## Non goals
 
@@ -25,15 +27,12 @@ on every platform and is `Unsupported` off macOS.
 
 1. **Crate** `trigger-macos`, source id `macos`, depends on `trigger-core`
    and, on macOS only, the `objc2` crates the app already uses.
-2. **Kinds**: `macos.shortcut`, `macos.folder-action`, `macos.service`,
-   `macos.quick-action`, `macos.calendar-event`, `macos.reminder-due`,
+2. **Kinds** (eight): `macos.calendar-event`, `macos.reminder-due`,
    `macos.simulator-booted`, `macos.xcode-build-finished`,
    `macos.music-track`, `macos.low-power-mode`, `macos.space-changed`,
    `macos.time-machine-finished`.
-3. **Shortcuts, Folder Actions, Services and Quick Actions** all reach the
-   app through the `tg` CLI or the deep link from `trigger-launch`; this crate
-   ships the Shortcuts action definition, the Services entry and the
-   Automator workflow, and the kinds that name them.
+3. **Nothing from `trigger-launch`.** This crate neither calls nor knows about
+   `tg`. The Shortcuts, Services and Quick Action recipes are epic 012 slice D.
 4. **Calendar and Reminders** need their permissions; `availability` reports
    `NeedsPermission` with the Settings path until granted.
 5. Distributed notifications (`com.apple.Music.playerInfo`,
@@ -51,14 +50,13 @@ notification observer behind a trait.
 | A | kinds, `When`, matchers, the non macOS stub | |
 | B | distributed notifications, Low Power Mode, Spaces, Music | A |
 | C | Calendar and Reminders through EventKit | A |
-| D | Shortcuts action, Services and Quick Action definitions, Simulator and Xcode, live tests, README, feature flag, registration, repo map | B, C |
+| D | Simulator and Xcode, live tests, README, feature flag, registration, repo map | B, C |
 
 ## Open questions
 
 | Id | Question | Why it matters | Answer (filled after research) |
 |---|---|---|---|
-| R01 | How a Tauri app exposes an App Intent for Shortcuts, or whether a Shortcuts "Run Shell Script" calling `tg` is the only workable route today | Decision 3 | |
-| R02 | EventKit access from `objc2-event-kit`, its version and the entitlement and Info.plist keys needed | Slice C | |
+| R01 | EventKit access from `objc2-event-kit`, its version and the entitlement and Info.plist keys needed | Slice C | |
 
 ## Risks
 

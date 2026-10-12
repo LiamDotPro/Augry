@@ -29,9 +29,12 @@ feed (an ICS URL or file). It catches up after sleep when a rule asks for it.
 4. **Time** comes from the `Clock` trait in the test kit, so every schedule is
    unit tested with a fixed clock. The thread sleeps until the next due time
    and re-plans on wake.
-5. **`daily-first-use`** fires the first time the machine is active on a
-   calendar day, using the same idle signal as `trigger-system` if it is
-   present and the app's own activity otherwise.
+5. **`daily-first-use`** fires the first time the app sees the machine in use
+   on a calendar day: the first tick after midnight local time at which the
+   wall clock has moved normally for a minute (so a machine that slept through
+   the night fires on wake). It reads no idle signal and needs no other crate;
+   a process that wants "first time I unlock" uses `system.unlock` with a
+   condition instead.
 
 ## Shape
 

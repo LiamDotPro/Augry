@@ -45,6 +45,25 @@ them.
 - Temporary files in tests go under `std::env::temp_dir()` with a uuid, and
   are removed at the end.
 
+## Trigger crates
+
+The rules are in `docs/process-triggers.md` Part 2, "Simple and isolated: the
+rules". In short, and checked by `node plans/_tools/check-crates.mjs`:
+
+- A crate is made with `node plans/_tools/new-trigger-crate.mjs <name>
+  "<summary>"`, never by hand, and keeps the template's files: `src/lib.rs`
+  (glue), `src/rule.rs` and `src/logic.rs` (pure, with the unit tests),
+  `src/os.rs` (the only OS code), `tests/readme.rs`, `tests/live.rs`.
+- It depends on `trigger-core` and outside crates only. Never another trigger
+  crate, never `tauri`, never the app.
+- Its README has the eight sections: Kinds, Rule fields, Payload, Platforms,
+  Permissions, Example, Develop, Known limits. A card that changes what a crate
+  does updates its README in the same card. Refresh the Kinds table with
+  `cargo run -p trigger-<name> --example readme`.
+- About ten kinds and one OS mechanism family per crate. A file over 400 lines
+  is a warning, over 800 an error.
+- A bug fix lands in `rule.rs` or `logic.rs` with a unit test whenever it can.
+
 ## TypeScript and React
 
 - Strict TypeScript, React 19, no new UI libraries. `npm run build` (which

@@ -49,6 +49,12 @@ slices you may depend on.
   "anything else: set status blocked and stop".
 - Set `model: sonnet` only for a card that genuinely needs judgement, and
   say why in the Goal. Prefer splitting the card instead.
+- **Trigger crates.** The first card of a new crate runs
+  `node plans/_tools/new-trigger-crate.mjs <name> "<summary>"` and lists every
+  file it creates under `files:`. Every card that changes what a crate does also
+  lists its `README.md` and says which sections to update. Acceptance includes
+  `node plans/_tools/check-crates.mjs` exiting 0. Never write a card that makes
+  one trigger crate depend on another, or on `tauri` or the app.
 
 ## Rules
 

@@ -55,7 +55,7 @@ types there are the contract; this file writes them out in full.
    `tests/readme.rs` asserting its README contains that table between
    `<!-- kinds -->` and `<!-- /kinds -->`, and `examples/readme.rs` printing it.
 6. **`trigger-fs` uses `notify` 8** through `notify::recommended_watcher`, with
-   its own debounce and settle state machine in `matcher.rs` (pure, tested).
+   its own debounce and settle state machine in `logic.rs` (pure, tested).
    No debouncer crate. Globs use `globset` at the version R02 finds. Default
    ignores: `.git/`, `node_modules/`, `target/`, `.DS_Store`, and the partial
    download suffixes `.crdownload`, `.part`, `.download`, `.tmp`.
@@ -109,6 +109,18 @@ types there are the contract; this file writes them out in full.
     `cargo test --workspace`, and the live tests `cargo test -p trigger-fs --
     --ignored` on all three runners (R04 confirms they can).
 18. **No new frontend dependencies.** New Rust dependencies: `globset` only.
+19. **Every crate comes from the template.** `trigger-fs` is created with
+    `node plans/_tools/new-trigger-crate.mjs fs "<summary>"` from
+    `plans/_templates/trigger-crate/` and then filled in, so the template is
+    proven by the first real crate. If the template turns out wrong against the
+    real `trigger-core`, the same card fixes the template.
+20. **Isolation is checked.** `plans/_tools/check-crates.mjs` runs in CI after
+    the Rust checks and must report no errors. `trigger-core` and `trigger-hub`
+    have a README with at least a Develop section; `trigger-fs` has all eight
+    sections and no template text left.
+21. **`os.rs` per platform.** `trigger-fs` keeps one `os.rs` because `notify`
+    hides the platform differences. That is the expected case for crates built on
+    a cross platform library.
 
 ## Shape
 
@@ -350,9 +362,9 @@ Reducer: `triggers: { status: TriggersStatus | null }`, actions
 |---|---|---|
 | A (T01 to T09) | workspace, `trigger-core` types, test kit, `kinds_markdown`, README | |
 | B (T10 to T19) | `trigger-hub`: registry, apply, cool down, publish, subscribe, tests with `FakeSource` | A |
-| C (T20 to T29) | `trigger-fs`: rule, matcher state machine, notify layer, live tests, README check, example | A |
+| C (T20 to T29) | `trigger-fs`: scaffold from the template, `rule.rs`, `logic.rs` (debounce and settle), `os.rs` over notify, live tests, README | A |
 | D (T30 to T39) | app: store, variables, service, config, commands, event, Settings rows, notice toast | B, C |
-| E (T40 to T49) | CI, technical design sections 2, 3, 9, 10 and 14, repo map, architecture table | D |
+| E (T40 to T49) | CI (including `check-crates.mjs`), technical design sections 2, 3, 9, 10 and 14, repo map, architecture table | D |
 
 ## Open questions
 

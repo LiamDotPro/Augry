@@ -23,8 +23,9 @@ on every platform.
 ## Decisions
 
 1. **Crate** `trigger-process`, source id `process`, depends on `trigger-core`
-   and `sysinfo` (workspace). One shared poller thread, interval from the
-   rules (default 2 seconds), the same approach as the app's `AgentWatcher`.
+   and `sysinfo` (workspace). Its own poller thread, interval from the rules
+   (default 2 seconds), modelled on the app's `AgentWatcher` but independent of
+   it: the crate never imports app code and the app's watcher is not changed.
 2. **Kinds**: `process.started`, `process.stopped`, `process.crashed`,
    `process.high-cpu`, `process.high-memory`, `process.port-opened`,
    `process.port-closed`, `process.frontmost-changed` (macOS and Windows),
@@ -50,8 +51,8 @@ macOS and a Windows implementation.
 |---|---|---|
 | A | kinds, `When`, snapshot diff `step` with tests | |
 | B | the `sysinfo` poller and the port table per platform | A |
-| C | frontmost app and window title, macOS | A |
-| D | frontmost app and window title, Windows | A |
+| C | frontmost app and window title, macOS (`src/os/macos.rs`) | A |
+| D | frontmost app and window title, Windows (`src/os/windows.rs`) | A |
 | E | live tests, README, feature flag, app registration, repo map | B, C, D |
 
 ## Open questions
@@ -64,6 +65,7 @@ macOS and a Windows implementation.
 
 ## Risks
 
-- Polling the whole process table every two seconds is what the app already
-  does once; this crate must share that cost, not double it. A later card may
-  move `AgentWatcher` onto this crate's poller.
+- Two pollers of the process table (the app's `AgentWatcher` and this crate)
+  cost more than one. Accepted for isolation: this crate only polls while a
+  `process.*` rule is armed, refreshes only the fields its rules need, and uses
+  the longest interval its rules allow.

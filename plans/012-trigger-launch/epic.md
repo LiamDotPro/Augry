@@ -23,9 +23,15 @@ socket and the endpoint; the app feeds it deep links.
 ## Decisions
 
 1. **Crate** `trigger-launch`, source id `launch`, depends on `trigger-core`
-   and the socket crate research names. Deep links come from
-   `tauri-plugin-deep-link` in the app and are published into the crate.
-2. **Kinds**: `launch.link`, `launch.cli`, `launch.http`, `launch.hook`.
+   and the socket crate research names. It never needs the app to feed it: the
+   app registers `terminalgrid://` with `tauri-plugin-deep-link`, and its
+   handler writes `link <url>` to this crate's socket like any other client.
+   The crate only listens on its socket and its endpoint.
+2. **Kinds**: `launch.link`, `launch.cli`, `launch.http`. A git hook, cron, a
+   Shortcut, a Folder Action, a Services entry, a Task Scheduler task, an
+   Explorer menu entry or a udev rule all run `tg run <id> --via <name>`, so
+   they are all `launch.cli` with a `via` field in the payload. No other crate
+   fires kinds for them.
 3. **The socket** is a Unix socket in the app config dir, a named pipe on
    Windows, with a line protocol: `run <process id> [key=value ...]`. The
    `tg` CLI is a small binary in the same crate (`src/bin/tg.rs`), installed
@@ -35,7 +41,12 @@ socket and the endpoint; the app feeds it deep links.
    shows in the Settings status. `POST /run/<id>` with a JSON body as the
    payload.
 5. **`when`**: `process` is implied (the rule belongs to it); `port` and
-   `token` for HTTP, `name` for hooks (`pre-push`, `post-commit`).
+   `token` for HTTP, `via` (glob, optional) to accept only some callers.
+6. **Recipes, not kinds.** The README has a "Recipes" section after Example:
+   one short recipe per way of calling `tg` (git hook, cron, launchd, Shortcuts,
+   Folder Action, Services, Quick Action, Task Scheduler, Explorer menu, Jump
+   List, udev rule, systemd timer), each with the exact file or command. A recipe
+   that ships a file keeps it in `recipes/` in this crate.
 
 ## Shape
 
@@ -49,6 +60,7 @@ the socket listener behind a trait, the `tg` binary.
 | A | kinds, protocol parser, HTTP request parser, tests | |
 | B | socket listener per platform, the `tg` binary | A |
 | C | the HTTP listener, deep link feed, live tests, README, feature flag, registration, repo map | B |
+| D | the recipes: README section and `recipes/` files, one card per platform | C |
 
 ## Open questions
 

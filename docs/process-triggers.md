@@ -458,6 +458,42 @@ Hardware and setups that Macs do not have.
   with variables (`${repo.root}`), never a path that exists on one machine, the
   same rule as for steps. Secrets never enter a definition or an event payload.
 
+### Simple and isolated: the rules
+
+These rules are what keep a trigger cheap to write and cheap to maintain. Most
+are checked by `node plans/_tools/check-crates.mjs`, which CI runs.
+
+1. **A crate depends on `trigger-core` and outside crates only.** Never on another
+   trigger crate, never on `tauri`, never on the app. If two crates need the same
+   helper, it goes in `trigger-core` or is copied; a shared idle signal or a shared
+   poller between two crates is not allowed. *(checked)*
+2. **A crate fires its own kinds only**, all starting with its source id. It never
+   relies on another crate being present at runtime either.
+3. **Every crate has the same five files**: `src/lib.rs` (glue), `src/rule.rs`
+   (the typed `when`, pure), `src/logic.rs` (decisions, pure), `src/os.rs` (the
+   only file that talks to the OS), and `tests/`. A new crate is made with
+   `node plans/_tools/new-trigger-crate.mjs <name> "<summary>"`, never by hand.
+   *(checked)*
+4. **Every crate has a README with the same sections**: Kinds, Rule fields,
+   Payload, Platforms, Permissions, Example, Develop, Known limits. The Kinds table
+   is generated from the code and a test fails when it is stale. Someone new to a
+   crate reads its README and nothing else to know what it does and how to work on
+   it. *(checked)*
+5. **Small.** A crate covers one OS mechanism family and about ten kinds at most.
+   A file over 400 lines is a warning, over 800 an error. A crate that grows past
+   that is split. *(checked)*
+6. **Pure first.** `rule.rs` and `logic.rs` hold every decision and have the unit
+   tests; `os.rs` only turns OS callbacks into `Signal`s. A bug fix almost always
+   lands in a pure file with a test.
+7. **Things only the app knows are not a crate.** Panes, agents, notes, file drops,
+   "open with" and the tray belong to the app's internal source (`tg`), not to a
+   crate that would need the app to feed it.
+8. **"Something calls `tg run`" is one trigger, not many.** Shortcuts, Folder
+   Actions, Services, Task Scheduler, the Explorer menu, udev rules, systemd
+   timers, git hooks and cron all end in the `tg` CLI, so they are all
+   `launch.cli`. The platform setup for each is a recipe in `trigger-launch`'s
+   README, not a kind in a platform crate.
+
 ### Layout
 
 ```
@@ -476,14 +512,14 @@ src-tauri/
     trigger-system/           wake, sleep, lock, idle, battery, displays, theme
     trigger-network/          online, Wi-Fi, VPN, reachability, mDNS
     trigger-clock/            schedules and calendar feeds
-    trigger-input/            clipboard, global hotkeys, drops, open with
-    trigger-devices/          USB, drives, Bluetooth, audio, MIDI, HID
+    trigger-input/            clipboard, global hotkeys
+    trigger-devices/          USB, drives, Bluetooth, audio output, mic, camera
     trigger-docker/           Docker and Podman events
     trigger-github/           issues, reviews, CI, releases, polled with gh
-    trigger-launch/           deep links, the tg CLI, a local endpoint, hooks
-    trigger-macos/            Shortcuts, Folder Actions, Services, Calendar
-    trigger-windows/          Event Log, Task Scheduler, WMI, Explorer menu
-    trigger-linux/            D-Bus, systemd, journald, udev
+    trigger-launch/           deep links, the tg CLI, a local endpoint, recipes for hooks
+    trigger-macos/            Calendar, Reminders, Music, Spaces, Low Power Mode
+    trigger-windows/          Event Log, WMI, registry, virtual desktops, WSL
+    trigger-linux/            D-Bus, systemd units, journald, workspaces
 ```
 
 The workspace is declared in `src-tauri/Cargo.toml` (`[workspace] members =
@@ -578,32 +614,61 @@ Rules every source follows:
 
 ### Anatomy of a source crate
 
+Every crate is made from `plans/_templates/trigger-crate/` by
+`node plans/_tools/new-trigger-crate.mjs <name> "<summary>"`, so they all look
+alike. A freshly made crate already builds, passes its tests and clippy, and has
+a README with every section to fill in.
+
 ```
-crates/trigger-fs/
-  Cargo.toml          trigger-core = { path = "../trigger-core" }, notify (workspace)
-  README.md           the kinds table, platforms, permissions, payload fields,
-                      how to run the live tests, what is known not to work
+crates/trigger-git/
+  Cargo.toml          trigger-core and outside crates only
+  README.md           the eight sections, Kinds table generated from the code
   src/
-    lib.rs            pub struct FsSource; impl Source; pub static KINDS
-    rule.rs           the typed `when` struct, parsing, check (pure)
-    matcher.rs        pure: does an OS event match a rule, debounce state machine
-    watch.rs          the OS layer behind a small trait (trait Watch)
-    windows.rs        only where one platform needs its own code
+    lib.rs            KINDS, GitSource (impl Source), the thread joining os to logic. Glue only
+    rule.rs           pure: the typed `When`, parse, unit tests
+    logic.rs          pure: Signal, State, step(state, armed, signal) -> events, unit tests
+    os.rs             the only OS code: availability(), listen(armed, stop, tx)
+  examples/readme.rs  prints the Kinds table
   tests/
+    readme.rs         fails when the README's Kinds table is stale
     live.rs           #[ignore] tests against the real OS
 ```
+
+The data flows one way, which is what makes a crate easy to follow:
+
+```
+OS callback ──▶ os.rs: Signal ──▶ logic::step(state, armed, signal) ──▶ Event ──▶ Sink
+                                       ▲
+                    rule.rs: When ─────┘   (parsed once, at start and in check)
+```
+
+When `os.rs` grows past a few lines for one platform, that platform moves to
+`src/os/macos.rs` (or `windows.rs`, `linux.rs`) behind the same two functions.
+Nothing else changes.
 
 Three levels of tests, so a crate is trusted before it ever touches the OS:
 
 | Level | What | Runs where |
 |---|---|---|
-| Pure | rule parsing, matching, state machines (`step` functions, like `agent::step` today) | every `cargo test`, all three platforms in CI |
-| Fake OS | the OS layer is a trait; tests drive a fake and read the sink | every `cargo test` |
-| Live | `#[ignore]` tests against the real OS: `cargo test -p trigger-fs -- --ignored` | a developer's machine; CI too for the crates where the runner allows it (fs, git, clock, process) |
+| Pure | `rule.rs` and `logic.rs`: parsing, matching, debounce, state changes | every `cargo test`, all three platforms in CI |
+| README | `tests/readme.rs`: the Kinds table matches `KINDS` | every `cargo test` |
+| Live | `tests/live.rs`, `#[ignore]`: arm a rule, cause the real thing, wait for the event | a developer's machine; CI too where the runner allows it (fs, git, clock, process) |
 
-A crate's README is part of its definition of done: the kinds table in it is
-generated from `KINDS` by `cargo run -p trigger-hub --example catalogue`, and a
-test fails when the README is stale.
+### The README
+
+The README is the crate's whole manual. It has these sections, in this order,
+and `check-crates.mjs` fails a crate that misses one:
+
+| Section | What it says |
+|---|---|
+| Kinds | The generated table: id, title, platforms, permission |
+| Rule fields | Every `when` field: required, default, meaning |
+| Payload | Every payload field, available to steps as `${trigger.<field>}` |
+| Platforms | Per platform: how it is detected, and the limits |
+| Permissions | What the OS asks the user for, and when. "None" is a fine answer |
+| Example | One trigger as it appears in a process definition |
+| Develop | The file map and the three test commands |
+| Known limits | What does not work, where, and why |
 
 ### The hub: `trigger-hub`
 
@@ -611,7 +676,7 @@ The one place that knows every source. It is still app agnostic.
 
 - `Hub::new(sources: Vec<Box<dyn Source>>)`.
 - `catalogue()`: every source with its kinds and current availability. This is
-  what the trigger picker in the UI shows, and what regenerates the README tables.
+  what the trigger picker in the UI shows.
 - `apply(rules: Vec<Rule>)`: groups rules by source, runs `check` on each, starts
   the sources that have rules and restarts the ones whose rules changed, drops
   the rest. Idempotent, so the app can call it whenever anything changes.
@@ -674,20 +739,21 @@ server stays indifferent to the field either way.
 | Apps and processes | `trigger-process` | `process` |
 | System state | `trigger-system` | `system` |
 | Network | `trigger-network` | `network` |
-| Devices and hardware | `trigger-devices` | `devices` |
-| Input and clipboard | `trigger-input` | `input` |
+| Devices and hardware | `trigger-devices` (USB, drives, Bluetooth, audio output, mic, camera) | `devices` |
+| Input and clipboard | `trigger-input` (clipboard, global hotkeys); drops, open with and the tray are the app's `tg` source | `input` |
 | Time and calendar | `trigger-clock` | `clock` |
 | Launching from outside | `trigger-launch` | `launch` |
 | Services the app can poll | `trigger-github` (GitHub, CI, Dependabot); the rest later | `github` |
 | macOS and Windows | split between `trigger-process` (frontmost app, window titles) and `trigger-devices` (mic, camera) | |
 | macOS and Linux, Windows and Linux | folded into `trigger-launch` (signals, FIFOs) and `trigger-system` (tablet mode, GPU) | |
-| macOS only | `trigger-macos` | `macos` |
-| Windows only | `trigger-windows` | `windows` |
-| Linux only | `trigger-linux` | `linux` |
+| macOS only | `trigger-macos` for what it can observe; Shortcuts, Folder Actions, Services and Quick Actions are `launch.cli` recipes | `macos` |
+| Windows only | `trigger-windows` for what it can observe; Task Scheduler, the Explorer menu and Jump Lists are `launch.cli` recipes | `windows` |
+| Linux only | `trigger-linux` for what it can observe; udev rules and systemd timers are `launch.cli` recipes | `linux` |
 
-Not covered yet, by choice: Slack, Linear, Jira, Sentry, email and RSS. Each is a
-small polling crate on the same pattern as `trigger-github`, worth adding when a
-process needs it.
+Not covered yet, by choice: MIDI, HID macro pads, print jobs and smart cards
+(each a small crate of its own when wanted, not a feature inside
+`trigger-devices`), and Slack, Linear, Jira, Sentry, email and RSS (each a small
+polling crate on the same pattern as `trigger-github`).
 
 ## Building it with the planning pipeline
 
@@ -729,10 +795,15 @@ and build:
    the facts: crate versions, API behaviour, what CI runners allow).
 2. **Shape** writes out the `KINDS` table with every id, the typed `when` struct
    and the payload fields. Those ids are the contract with definitions.
-3. **Slices**: A the pure core (rule, matcher, kinds) with unit tests; B the OS
-   layer, one card per platform; C live tests, README, the cargo feature and the
-   one line that registers the source in the app; D the repo map update.
+3. **Slices**: A scaffolds the crate with `new-trigger-crate.mjs` and fills in
+   `KINDS`, `rule.rs` and `logic.rs` with their unit tests and the README's Kinds,
+   Rule fields, Payload and Example sections; B fills in `os.rs`, one card per
+   platform, each also filling in that platform's README row; C the live tests,
+   the rest of the README, the cargo feature and the one line that registers the
+   source in the app; D the repo map. A card that changes a crate updates its
+   README in the same card.
 4. **Done** means: `cargo test --workspace` and `cargo clippy --workspace
-   --all-targets -- -D warnings` pass on all three platforms in CI, the live
-   tests pass on at least one real machine per supported platform (the Log says
-   which), and the README's kinds table matches `KINDS`.
+   --all-targets -- -D warnings` pass on all three platforms in CI,
+   `node plans/_tools/check-crates.mjs` reports no errors and no template text,
+   every README section is filled in, and the live tests pass on at least one
+   real machine per supported platform (the Log says which).

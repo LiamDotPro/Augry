@@ -23,8 +23,12 @@ it, and you do not fix it. You decide PASS or FAIL and say why.
    did not ask for (extra refactors, renamed things, commented out tests,
    skipped checks, `TODO` stubs where the card asked for an implementation).
 5. **Health.** Run the repo level checks from `plans/_context/repo-map.md`
-   that cover the touched projects (for example `npx nx affected -t test lint`
-   once Nx exists, otherwise the commands listed there).
+   that cover the touched projects.
+6. **Trigger crates.** If the diff touches `src-tauri/crates/`, run
+   `node plans/_tools/check-crates.mjs` (must exit 0) and
+   `cd src-tauri && cargo test -p <crate>` for each touched crate. If the card
+   changed a crate's kinds, rule fields, payload or platform behaviour and its
+   README did not change to match, that is a FAIL.
 
 ## Rules
 

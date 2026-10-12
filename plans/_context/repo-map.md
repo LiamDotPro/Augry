@@ -41,6 +41,7 @@ A Tauri 2 desktop app: a Rust core in `src-tauri/` and a React frontend in
 | `design/` | Export of the Claude Design project. `CLAUDE.md` says how to port it |
 | `.github/workflows/ci.yml` | On every push and pull request, on macOS, Windows and Ubuntu: `npm test`, `npm run build`, `cargo test` in `src-tauri` |
 | `plans/`, `.claude/` | The planning pipeline. See `plans/README.md` |
+| `plans/_templates/trigger-crate/` | The template every trigger crate is made from: Cargo.toml, README with the eight sections, `src/lib.rs`, `rule.rs`, `logic.rs`, `os.rs`, `examples/readme.rs`, `tests/readme.rs`, `tests/live.rs` |
 
 ### Commands
 
@@ -56,6 +57,8 @@ Run from the repo root unless stated.
 | Run the app | `npm run tauri dev` |
 | Regenerate the cloud clients | `npm run api:generate` |
 | Cloud tests against a running API | `npm run test:cloud`; `cd src-tauri && AUGRY_API_URL=http://localhost:8080 cargo test cloud` |
+| New trigger crate | `node plans/_tools/new-trigger-crate.mjs <name> "<summary>"` |
+| Trigger crate rules (isolation, README, size) | `node plans/_tools/check-crates.mjs` |
 
 The checker runs the first five for every card that touches `src/` or
 `src-tauri/`.

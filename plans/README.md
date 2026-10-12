@@ -67,8 +67,10 @@ plans/
     repo-map.md             where things live and which command does what
     conventions.md          code, test, commit and writing rules
     architecture.md         the app's big picture and the triggers design (Opus owned)
-  _templates/               epic.md, research.md, task.md
+  _templates/               epic.md, research.md, task.md, trigger-crate/
   _tools/lint-cards.mjs     structural checks for task cards
+  _tools/new-trigger-crate.mjs   makes a new trigger crate from the template
+  _tools/check-crates.mjs   checks every trigger crate is isolated, small and has its README
   _tools/dashboard.mjs      live progress page (see Watching progress)
   _runs/                    local activity log for the dashboard, git ignored
   NNN-slug/                 one folder per epic, numbered in build order
@@ -102,6 +104,9 @@ The design the epics implement is `docs/process-triggers.md`, Part 2.
    files to read, with line ranges where it helps. `_context/` covers the rest.
 8. **Platform work is one card per platform.** A card that says "on macOS do
    X, on Windows do Y" is two cards. The builder may be on either.
+9. **Trigger crates stay simple and isolated.** Made from the template, one
+   README per crate kept current in the same card, no dependency on another
+   trigger crate. `check-crates.mjs` is part of every crate card's acceptance.
 
 ## Card status
 

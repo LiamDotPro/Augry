@@ -33,11 +33,14 @@ pressing a button; `docs/process-triggers.md` is their catalogue and design.
    the technical design. Cloud: `libs/api-contract/openapi.yaml`, with both
    clients generated from it. Triggers: `trigger-core`. A change to a contract
    is a Decision in an epic, never a side effect of a card.
-4. **One crate per integration.** Each source of triggers is a crate under
-   `src-tauri/crates/` that depends on `trigger-core` only, compiles on every
-   platform, and reports what it cannot do at runtime. The app composes them
-   through `trigger-hub`. Part 2 of `docs/process-triggers.md` is the design;
-   this principle is why.
+4. **One crate per integration, simple and isolated.** Each source of triggers
+   is a small crate under `src-tauri/crates/`, made from the same template, with
+   its own README and tests. It depends on `trigger-core` only (never on another
+   trigger crate, `tauri` or the app), compiles on every platform, and reports
+   what it cannot do at runtime. The app composes them through `trigger-hub`.
+   Anyone can work on one crate by reading its README and nothing else.
+   `plans/_tools/check-crates.mjs` enforces the rules; Part 2 of
+   `docs/process-triggers.md` has them in full.
 5. **Pure core, thin shell.** OS specific code is a thin layer over pure
    functions with unit tests, so the logic is proven on every platform in CI
    and the live tests only confirm the OS layer.

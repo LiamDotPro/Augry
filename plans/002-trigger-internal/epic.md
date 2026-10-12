@@ -22,15 +22,19 @@ because they tie processes to what the user is already doing in the grid.
 
 ## Decisions
 
-1. **No crate.** The source lives in `src-tauri/src/triggers/internal.rs` as
-   `InternalSource` (id `tg`), so the catalogue and the editor see it like any
-   other source. The pure matchers (output patterns, exit codes, note tags) are
-   tested like any crate's.
+1. **No crate, same shape.** Only the app sees these events, so a crate would
+   need the app to feed it, which breaks isolation. The source lives in
+   `src-tauri/src/triggers/internal/` with the same split as a crate: `mod.rs`
+   (`KINDS`, `InternalSource` with id `tg`), `rule.rs` and `logic.rs` (pure,
+   tested), and `README.md` with the same eight sections. The catalogue and the
+   editor see it like any other source.
 2. **Kinds**: `tg.agent-finished`, `tg.agent-waiting`, `tg.command-failed`,
    `tg.command-slow`, `tg.output-matched`, `tg.bell`, `tg.task-reported`,
    `tg.pane-opened-in-repo`, `tg.worktree-created`, `tg.worktree-removed`,
    `tg.review-staged`, `tg.note-saved`, `tg.note-tagged`, `tg.focus-entered`,
-   `tg.app-started`.
+   `tg.app-started`, `tg.file-dropped`, `tg.file-opened`, `tg.tray-menu`. The
+   last three are app events (Tauri owns drag and drop, "open with" and the
+   tray), so they live here and not in `trigger-input`.
 3. **Payload** carries pane id, cwd, repo root, agent name, exit code,
    duration, the matched line (at most 200 characters), the note path. Never
    the full output.

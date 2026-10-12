@@ -11,29 +11,26 @@ depends_on: [001-trigger-core]
 
 The crate `src-tauri/crates/trigger-devices` fires when hardware comes and
 goes: a USB device, a drive or SD card, a Bluetooth device, a change of audio
-output, a MIDI note, a button on a HID device such as a macro pad, a finished
-print job, a smart card, and the microphone or camera turning on.
+output, and the microphone or camera turning on.
 
 ## Non goals
 
 - Displays: `trigger-system`.
+- MIDI, HID macro pads, print jobs and smart cards. Each is a small crate of its
+  own later, made from the template, not a feature inside this one.
 
 ## Decisions
 
 1. **Crate** `trigger-devices`, source id `devices`, depends on `trigger-core`
-   and the device crates research names, one per family, each behind its own
-   cargo feature inside the crate so a build can leave MIDI or HID out.
-2. **Kinds**: `devices.usb-attached`, `devices.usb-detached`,
+   and the device crates research names. No cargo features inside the crate.
+2. **Kinds** (nine): `devices.usb-attached`, `devices.usb-detached`,
    `devices.drive-mounted`, `devices.drive-ejected`,
    `devices.bluetooth-connected`, `devices.bluetooth-disconnected`,
-   `devices.audio-output-changed`, `devices.midi-note`, `devices.hid-button`,
-   `devices.print-job-done`, `devices.smart-card-inserted`,
-   `devices.microphone-on`, `devices.camera-on` (macOS and Windows).
+   `devices.audio-output-changed`, `devices.microphone-on`,
+   `devices.camera-on` (the last two macOS and Windows).
 3. **`when`**: `vendor` and `product` (hex ids or glob on the name), `label`
-   for drives, `name` (glob) for Bluetooth and audio, `note` and `channel` for
-   MIDI, `button` for HID.
-4. **Payload**: ids, names, the mount path for drives, note and velocity for
-   MIDI.
+   for drives, `name` (glob) for Bluetooth and audio.
+4. **Payload**: ids, names, the mount path for drives.
 
 ## Shape
 
@@ -47,19 +44,18 @@ a snapshot, a `Probe` trait per family and platform.
 | A | kinds, `When`, snapshot diffs with tests | |
 | B | USB, drives and Bluetooth per platform | A |
 | C | audio output, microphone and camera per platform | A |
-| D | MIDI and HID | A |
-| E | printing and smart cards, live tests, README, feature flags, registration, repo map | B, C, D |
+| D | live tests, README, feature flag, registration, repo map | B, C |
 
 ## Open questions
 
 | Id | Question | Why it matters | Answer (filled after research) |
 |---|---|---|---|
-| R01 | Current cross platform crates for USB hot plug (`nusb` or `rusb`), HID (`hidapi`), MIDI (`midir`) and their versions and build requirements per OS | Decision 1 | |
+| R01 | Current cross platform crate for USB hot plug (`nusb` or `rusb`), its version and build requirements per OS (a system library such as libusb or libudev?) | Decision 1 | |
 | R02 | How to see mounted volumes change on each OS without polling `df` | `devices.drive-mounted` | |
 | R03 | How to know the microphone or camera is in use on macOS and Windows from Rust | Decision 2 | |
 
 ## Risks
 
 - Device crates often need system libraries at build time (libusb, libudev).
-  Each one must be behind a feature and CI must prove the default build works
-  on the three runners.
+  Prefer pure Rust crates; CI must prove the default build works on the three
+  runners.

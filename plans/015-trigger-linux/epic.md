@@ -9,12 +9,15 @@ depends_on: [001-trigger-core]
 
 ## Goal
 
-The crate `src-tauri/crates/trigger-linux` holds the triggers only Linux
-has: any D-Bus signal matching a rule, a systemd unit failing, a systemd user
-timer, a journald entry matching, a udev rule, a desktop notification from
-another app, an MPRIS media player starting or stopping, a workspace change, a
-package manager transaction and a power profile change. It compiles on every
-platform and is `Unsupported` off Linux.
+The crate `src-tauri/crates/trigger-linux` holds what only Linux lets the app
+observe: any D-Bus signal matching a rule, a systemd unit failing, a journald
+entry matching, a desktop notification from another app, an MPRIS media player
+starting or stopping, a workspace change, a package manager transaction and a
+power profile change. It compiles on every platform and is `Unsupported` off
+Linux.
+
+udev rules and systemd timers are not here: they call `tg run`, so they are
+`launch.cli` with recipes in `trigger-launch`.
 
 ## Non goals
 
@@ -24,18 +27,17 @@ platform and is `Unsupported` off Linux.
 
 1. **Crate** `trigger-linux`, source id `linux`, depends on `trigger-core`
    and, on Linux only, `zbus` at the version research finds.
-2. **Kinds**: `linux.dbus-signal`, `linux.systemd-unit-failed`,
-   `linux.systemd-timer`, `linux.journal-match`, `linux.udev`,
-   `linux.notification`, `linux.mpris`, `linux.workspace-changed`,
-   `linux.package-installed`, `linux.power-profile`.
+2. **Kinds** (eight): `linux.dbus-signal`, `linux.systemd-unit-failed`,
+   `linux.journal-match`, `linux.notification`, `linux.mpris`,
+   `linux.workspace-changed`, `linux.package-installed`,
+   `linux.power-profile`.
 3. **D-Bus** is the general escape hatch: `when` has `bus` (`session` or
    `system`), `interface`, `member`, `path` and optional argument matches.
    The systemd, notification, MPRIS and power profile kinds are fixed match
    rules on top of it.
 4. **journald** runs `journalctl -f -o json` with the rule's filters as a
-   child process, like `trigger-docker` does with the engine. **udev** rules
-   and **systemd timers** reach the app through the `tg` CLI from
-   `trigger-launch`; this crate ships example unit and rule files.
+   child process, like `trigger-docker` does with the engine. Nothing from
+   `trigger-launch`: the udev and systemd timer recipes are epic 012 slice D.
 5. **Workspaces** support X11 (`_NET_CURRENT_DESKTOP`), sway and Hyprland
    IPC and KDE over D-Bus; others report `Unsupported` with the desktop name.
 
@@ -52,7 +54,7 @@ trait.
 | A | kinds, `When`, matchers with fixtures, the non Linux stub | |
 | B | D-Bus connection, signal subscription, the fixed rules on top | A |
 | C | journald child process, workspaces per desktop | A |
-| D | example unit and udev files, live tests, README, feature flag, registration, repo map | B, C |
+| D | live tests, README, feature flag, registration, repo map | B, C |
 
 ## Open questions
 
