@@ -171,7 +171,7 @@ pub use repo::GitRepo;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod testutil;
+pub(crate) mod testutil;
 
 #[cfg(test)]
 mod testutil_tests;
