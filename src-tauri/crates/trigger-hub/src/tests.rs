@@ -353,3 +353,144 @@ mod apply_tests {
         assert!(b_started.started.lock().unwrap().is_empty());
     }
 }
+
+mod lifecycle_tests {
+    use crate::test_support::shared;
+    use crate::{Hub, RuleState};
+    use serde_json::json;
+    use std::sync::atomic::Ordering;
+    use trigger_core::testkit::{rule, FakeSource};
+
+    #[test]
+    fn applying_the_same_rules_again_does_not_restart() {
+        let (fake, fake_ref, stops) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        let first = hub.apply(vec![
+            rule("r1", "fake.x", json!({"a": 1})),
+            rule("r2", "fake.x", json!({})),
+        ]);
+        // Same rules, given in the other order.
+        let second = hub.apply(vec![
+            rule("r2", "fake.x", json!({})),
+            rule("r1", "fake.x", json!({"a": 1})),
+        ]);
+        assert_eq!(first, second);
+        assert_eq!(second["r1"], RuleState::Active);
+        assert_eq!(fake_ref.started.lock().unwrap().len(), 1);
+        assert_eq!(stops.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn adding_a_rule_restarts_the_source() {
+        let (fake, fake_ref, stops) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        hub.apply(vec![rule("r1", "fake.x", json!({}))]);
+        let states = hub.apply(vec![
+            rule("r1", "fake.x", json!({})),
+            rule("r2", "fake.x", json!({})),
+        ]);
+        assert_eq!(states["r2"], RuleState::Active);
+        let calls = fake_ref.started.lock().unwrap();
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].len(), 1);
+        assert_eq!(calls[1].len(), 2);
+        // The first run was stopped before the second started.
+        assert_eq!(stops.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn changing_a_rules_fields_restarts_the_source() {
+        let (fake, fake_ref, stops) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        hub.apply(vec![rule("r1", "fake.x", json!({"a": 1}))]);
+        hub.apply(vec![rule("r1", "fake.x", json!({"a": 2}))]);
+        let calls = fake_ref.started.lock().unwrap();
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[1][0].when["a"], json!(2));
+        assert_eq!(stops.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn applying_no_rules_stops_the_source() {
+        let (fake, fake_ref, stops) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        hub.apply(vec![rule("r1", "fake.x", json!({}))]);
+        assert_eq!(stops.load(Ordering::SeqCst), 0);
+        let states = hub.apply(vec![]);
+        assert!(states.is_empty());
+        assert_eq!(stops.load(Ordering::SeqCst), 1);
+        // Applying nothing again stops nothing more and starts nothing.
+        hub.apply(vec![]);
+        assert_eq!(stops.load(Ordering::SeqCst), 1);
+        assert_eq!(fake_ref.started.lock().unwrap().len(), 1);
+        // Applying a rule again starts the source again.
+        hub.apply(vec![rule("r1", "fake.x", json!({}))]);
+        assert_eq!(fake_ref.started.lock().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn rejecting_every_rule_of_a_source_stops_it() {
+        let (fake, _, stops) = shared(FakeSource::new("fake", &[]), true);
+        let hub = Hub::new(vec![fake]);
+        hub.apply(vec![rule("r1", "fake.x", json!({}))]);
+        let states = hub.apply(vec![rule("r1", "fake.x", json!({"bad": 1}))]);
+        assert!(matches!(states["r1"], RuleState::Rejected { .. }));
+        assert_eq!(stops.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_change_for_one_source_leaves_the_other_running() {
+        let (a, a_ref, a_stops) = shared(FakeSource::new("alpha", &[]), false);
+        let (b, b_ref, b_stops) = shared(FakeSource::new("beta", &[]), false);
+        let hub = Hub::new(vec![a, b]);
+        hub.apply(vec![
+            rule("r1", "alpha.x", json!({})),
+            rule("r2", "beta.x", json!({})),
+        ]);
+        hub.apply(vec![
+            rule("r1", "alpha.x", json!({})),
+            rule("r2", "beta.x", json!({"changed": true})),
+        ]);
+        assert_eq!(a_ref.started.lock().unwrap().len(), 1);
+        assert_eq!(a_stops.load(Ordering::SeqCst), 0);
+        assert_eq!(b_ref.started.lock().unwrap().len(), 2);
+        assert_eq!(b_stops.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_failing_start_fails_only_its_source_and_is_retried() {
+        let mut failing = FakeSource::new("alpha", &[]);
+        failing.fail_start = true;
+        let (a, a_ref, _) = shared(failing, false);
+        let (b, b_ref, _) = shared(FakeSource::new("beta", &[]), false);
+        let hub = Hub::new(vec![a, b]);
+        let rules = vec![
+            rule("r1", "alpha.x", json!({})),
+            rule("r2", "beta.x", json!({})),
+        ];
+        let states = hub.apply(rules.clone());
+        assert_eq!(
+            states["r1"],
+            RuleState::SourceFailed {
+                reason: "fake start failure".to_string()
+            }
+        );
+        assert_eq!(states["r2"], RuleState::Active);
+        assert_eq!(a_ref.started.lock().unwrap().len(), 1);
+        assert_eq!(b_ref.started.lock().unwrap().len(), 1);
+        // Applying the same rules again tries the failed source again and
+        // leaves the working one alone.
+        hub.apply(rules);
+        assert_eq!(a_ref.started.lock().unwrap().len(), 2);
+        assert_eq!(b_ref.started.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn dropping_the_hub_stops_every_source() {
+        let (fake, _, stops) = shared(FakeSource::new("fake", &[]), false);
+        let hub = Hub::new(vec![fake]);
+        hub.apply(vec![rule("r1", "fake.x", json!({}))]);
+        drop(hub);
+        assert_eq!(stops.load(Ordering::SeqCst), 1);
+    }
+}
