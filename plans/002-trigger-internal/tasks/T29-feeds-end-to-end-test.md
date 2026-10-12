@@ -2,7 +2,7 @@
 id: T29
 epic: 002-trigger-internal
 title: Test every app feed signal end to end
-status: todo
+status: in-progress
 depends_on: [T21, T22, T23, T24, T25, T26, T27, T28]
 size: S
 model: haiku
@@ -147,7 +147,7 @@ One test in `feeds.rs` arms a rule for each of the nine kinds the app feeds from
 - [ ] `cd src-tauri && cargo clippy -p terminal-grid --all-targets 2>&1 | grep -c warning` prints the same number as the baseline in the Log, or a lower one (the app crate has existing warnings; this card must not add any)
 - [ ] `git status --porcelain` lists only paths under `files:`, ignoring other card files under `plans/002-trigger-internal/tasks/`
 - [ ] `grep -rn "feeds::publish\|publish_internal" src-tauri/src --include=*.rs | grep -v "^src-tauri/src/triggers/" | wc -l` prints at least `8` (agent finished, task reported, pane opened, worktree created, worktree removed, review staged, note saved, focus entered; slice B adds more)
-- [ ] `grep -n "publish_internal(InternalSignal::AppStarted)" src-tauri/src/triggers/mod.rs` prints one line from `start`
+- [ ] `grep -n "publish_internal(InternalSignal::AppStarted)" src-tauri/src/triggers/mod.rs` prints three lines: one in `start` and two in T28's test `app_started_fires_only_once_the_rules_are_armed`
 
 ## Out of scope
 
@@ -167,3 +167,5 @@ One test in `feeds.rs` arms a rule for each of the nine kinds the app feeds from
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built; clippy baseline 7, after 7. feeds 6 passed, workspace tests pass, fmt --check 0, check --no-default-features 0, feed call grep 9 (>=8). NOT PASSED: `grep -n "publish_internal(InternalSignal::AppStarted)" src-tauri/src/triggers/mod.rs` prints 3 lines (175 in start; 425 and 429 in the existing test `app_started_fires_only_once_the_rules_are_armed`), not one. Line 175 is the expected one; the fix would need mod.rs, which is outside files:, so left for the checker.
+- 2026-10-13 architect: the AppStarted grep also matches T28's test (2 lines); corrected the expected count to 3. Sent to the checker.
