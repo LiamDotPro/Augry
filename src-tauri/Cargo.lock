@@ -4898,6 +4898,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "trigger-docker"
+version = "0.1.0"
+dependencies = [
+ "globset",
+ "serde",
+ "serde_json",
+ "trigger-core",
+]
+
+[[package]]
 name = "trigger-fs"
 version = "0.1.0"
 dependencies = [
