@@ -57,6 +57,26 @@ function writeSaved(teamId: string, cache: TeamCache, at: number) {
   }
 }
 
+const membersKey = (teamId: string) => `augry.teamMembers.${teamId}`;
+
+/** A team's members as last seen here, so "<Name> saved v3" still has names offline. */
+function readSavedMembers(teamId: string): Member[] | null {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(membersKey(teamId)) ?? "null");
+    return Array.isArray(parsed) ? (parsed as Member[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedMembers(teamId: string, members: Member[]) {
+  try {
+    localStorage.setItem(membersKey(teamId), JSON.stringify(members));
+  } catch {
+    // Unavailable: names show once the server answers.
+  }
+}
+
 /**
  * Team processes for the Process tab: loads each team's change feed into the
  * reducer (team-page), polls the selected team while the tab shows it, and
@@ -125,9 +145,15 @@ export function useTeam(state: ProcessState, dispatch: Dispatch<Action>): TeamAp
     if (!teamId) return;
     void load(teamId);
     let cancelled = false;
+    const saved = readSavedMembers(teamId);
+    if (saved) setMembers((m) => (m[teamId] ? m : { ...m, [teamId]: saved }));
     api
       .getTeam(teamId)
-      .then((detail) => !cancelled && setMembers((m) => ({ ...m, [teamId]: detail.members })))
+      .then((detail) => {
+        if (cancelled) return;
+        writeSavedMembers(teamId, detail.members);
+        setMembers((m) => ({ ...m, [teamId]: detail.members }));
+      })
       .catch(() => {});
     if (hasTemplates && templates === null) {
       api

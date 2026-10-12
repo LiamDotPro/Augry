@@ -203,6 +203,11 @@ export interface CloudSession {
   selectedSpace: "personal" | string;
   /** Null until the user answered the sync dialog. */
   notesSync: NotesSyncChoice | null;
+  /**
+   * The server's features as last heard while signed in, so a launch with no
+   * network still shows the team and sync UI (offline) instead of hiding it.
+   */
+  features?: Feature[];
 }
 
 export const EMPTY_CLOUD_SESSION: CloudSession = {

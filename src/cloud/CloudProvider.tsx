@@ -96,7 +96,8 @@ export function CloudProvider({ children }: { children: ReactNode }) {
 
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
-  const [features, setFeatures] = useState<Feature[]>([]);
+  /** Null until the server answered this launch. */
+  const [heardFeatures, setHeardFeatures] = useState<Feature[] | null>(null);
   const [online, setOnline] = useState(true);
   const [lastSyncedAt, setLastSyncedAt] = useState<Record<string, number>>({});
   const [signedOutNotice, setSignedOutNotice] = useState(false);
@@ -111,11 +112,13 @@ export function CloudProvider({ children }: { children: ReactNode }) {
 
   const refreshFeatures = useCallback(async () => {
     try {
-      setFeatures(await api.getFeatures());
+      const features = await api.getFeatures();
+      setHeardFeatures(features);
+      if (signedInRef.current) setSession({ features });
     } catch {
       // Offline: keep what we had.
     }
-  }, []);
+  }, [setSession]);
 
   const refreshTeams = useCallback(async () => {
     const teams = await api.listTeams();
@@ -142,7 +145,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
 
   const forgetAccount = useCallback(() => {
     setSignedIn(false);
-    setSession({ user: null, teams: [], selectedSpace: "personal" });
+    setSession({ user: null, teams: [], selectedSpace: "personal", features: [] });
     setProcessCounts((counts) => ({ personal: counts.personal ?? 0 }));
   }, [setSession]);
 
@@ -289,6 +292,8 @@ export function CloudProvider({ children }: { children: ReactNode }) {
   }, [forgetAccount, refreshFeatures]);
 
   const value = useMemo<CloudContextValue>(() => {
+    // Started offline: go by what the server listed last time.
+    const features = heardFeatures ?? (signedIn ? (session.features ?? []) : []);
     const selectedTeam =
       session.selectedSpace === "personal" ? null : (session.teams.find((t) => t.id === session.selectedSpace) ?? null);
     return {
@@ -331,7 +336,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     ready,
     signedIn,
     session,
-    features,
+    heardFeatures,
     online,
     lastSyncedAt,
     signedOutNotice,

@@ -56,28 +56,6 @@ export function saveIndex(userId: string, space: string, index: SpaceIndex): voi
   }
 }
 
-/**
- * The server's features as last seen by this user here. Started offline,
- * the app hasn't heard them yet, and sync should still look the way it did
- * (offline, with changes waiting) rather than vanish.
- */
-export function lastFeatures(userId: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(storage()?.getItem(`${PREFIX}.${userId}.features`) ?? "[]");
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-export function rememberFeatures(userId: string, features: string[]): void {
-  try {
-    storage()?.setItem(`${PREFIX}.${userId}.features`, JSON.stringify(features));
-  } catch {
-    // Blocked: offline starts then show sync once the server answers.
-  }
-}
-
 /** Member counts as last seen, so "team · 6" still reads right offline. */
 export function lastMemberCounts(userId: string): Record<string, number> {
   try {

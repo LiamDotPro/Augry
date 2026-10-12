@@ -21,7 +21,7 @@ import {
 } from "react";
 import * as api from "../cloud/api";
 import { useCloud } from "../cloud/CloudProvider";
-import type { Feature, TeamDetail } from "../cloud/types";
+import type { TeamDetail } from "../cloud/types";
 import { on } from "../ipc/client";
 import { EVENTS, type NoteNode } from "../ipc/types";
 import { useAppActions, useAppState } from "../state/AppProvider";
@@ -30,10 +30,8 @@ import { notesIO, syncApi } from "./io";
 import { isSyncableNote, PERSONAL, type SpaceKey, type SpaceLayout } from "./paths";
 import { footerCopy, type SyncTone } from "./status";
 import {
-  lastFeatures,
   lastMemberCounts,
   loadIndex,
-  rememberFeatures,
   rememberMemberCount,
   saveIndex,
   teamFolderFor,
@@ -120,13 +118,8 @@ export function NotesSyncProvider({ children }: { children: ReactNode }) {
   const choice = cloud.notesSync;
   const userId = cloud.user?.id ?? null;
   const root = notes.root;
-  // Until the server answers (started offline), go by the features it last listed.
-  const heard = cloud.features.length > 0;
-  useEffect(() => {
-    if (heard && userId) rememberFeatures(userId, cloud.features);
-  }, [heard, userId, cloud.features]);
-  const has = (feature: Feature) =>
-    heard ? cloud.has(feature) : userId !== null && lastFeatures(userId).includes(feature);
+  // Started offline, cloud.has goes by the features the server listed last time.
+  const has = cloud.has;
   const allowed = cloud.signedIn && has("sync") && choice !== null && root !== null && userId !== null;
   const teams = has("teams") ? cloud.teams : [];
   const syncedTeams = allowed ? teams.filter((team) => choice!.teams.includes(team.id)) : [];
