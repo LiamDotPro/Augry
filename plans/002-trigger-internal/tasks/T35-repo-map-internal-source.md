@@ -2,7 +2,7 @@
 id: T35
 epic: 002-trigger-internal
 title: Add the internal source and pty marks to the repo map
-status: todo
+status: done
 depends_on: [T17, T29]
 size: S
 model: haiku
@@ -103,3 +103,5 @@ To add a kind: add it to `KINDS` in `kinds.rs`, parse its `when` in `rule.rs`, h
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed. All named paths and functions exist in the code. Note: `docs/technical-design.md` has no section 9.2 yet (section 9 has only 9.1), so the new section's pointer to 9.2 is not yet true; it depends on T33/T30 landing.
+- 2026-10-13 checker: pass

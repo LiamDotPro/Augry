@@ -28,12 +28,16 @@ A Tauri 2 desktop app: a Rust core in `src-tauri/` and a React frontend in
 | `src-tauri/Cargo.toml` | The app crate `terminal-grid` (lib `terminal_grid_lib`), also the root of a Cargo workspace whose members are `crates/*`. `[workspace.dependencies]` holds the shared versions. Feature `trigger-fs` (on by default) wires in the file source. Rust 2021, stable toolchain |
 | `src-tauri/src/lib.rs` | Builder, plugins, `AppState` (`pty`, `git`, `agent`, `notes`, `state`), the `generate_handler![...]` command list, `blocking()` |
 | `src-tauri/src/error.rs` | `AppError`: thiserror enum, serialised with `code` tag in PascalCase |
-| `src-tauri/src/pty/` | PTY sessions, shell integration, the reader thread. `create_terminal`, `write_terminal` |
+| `src-tauri/src/pty/` | PTY sessions, shell integration, the reader thread. `create_terminal`, `write_terminal`. `shell.rs` picks the shell and its launch arguments and `env` (zsh `ZDOTDIR` wrapper, bash `--rcfile`, `sh` bare) and writes the scripts and wrapper files to the app data dir |
+| `src-tauri/src/pty/marks.rs`, `src-tauri/src/pty/tap.rs` | `marks.rs`: the pure `Scanner` that reads a shell's bytes for `OSC 133` marks, the bell and (on request) printable lines. `tap.rs`: `CommandClock` (command timing) and `Tap`, which turn marks into `InternalSignal`s for the reader thread to publish |
+| `src-tauri/src/pty/shell/live.rs` | Unix only tests that start the real zsh and bash with the app's launch arguments in a fake home; a shell that is not installed skips |
+| `src-tauri/resources/` | `shell-integration.sh` and `.ps1`, the bash wrapper `bashrc` and the zsh wrapper `zsh/.zshenv`, `.zprofile`, `.zshrc`, `.zlogin`. The wrapper files are compiled in with `include_str!` and written by `install_scripts` |
 | `src-tauri/src/agent/` | `AgentWatcher`: 1 s process tree poll, `step` state machine (pure, tested), `terminal://agent` and `terminal://stats` events, task file |
 | `src-tauri/src/git/` | git CLI wrapper, worktree parser, `GitService` cache, review commands |
 | `src-tauri/src/notes/` | `NotesService`: sandboxed file tree under a notes root, `notify` watcher for external changes |
 | `src-tauri/src/state/` | `config.json` and `session.json` in the app config dir (`~/Library/Application Support/com.liamread.terminalgrid` on macOS), atomic writes, `Config` and `ConfigPatch` |
-| `src-tauri/src/triggers/` | `mod.rs` (`TriggerService` in `AppState`, `sources()`, `refresh()`, the forward thread, the four commands), `store.rs` (definition files in `<config dir>/processes/`), `variables.rs` (`${home}`, `${downloads}`, `${notes.root}`, `${screenshots}`, `${repo.root}`), `rules.rs` (the pure planner), `status.rs` (status and `trigger://fired` JSON) |
+| `src-tauri/src/triggers/` | `mod.rs` (`TriggerService` in `AppState`, `sources()`, `refresh()`, the forward thread, the four commands), `store.rs` (definition files in `<config dir>/processes/`), `variables.rs` (`${home}`, `${downloads}`, `${notes.root}`, `${screenshots}`, `${repo.root}`), `rules.rs` (the pure planner), `status.rs` (status and `trigger://fired` JSON), `feeds.rs` (`publish` and the small builders the feed points call) |
+| `src-tauri/src/triggers/internal/` | The `tg` source, not a crate because only the app sees these events. `mod.rs` (`InternalSource`, `InternalSignal`), `kinds.rs` (`KINDS`, thirteen `tg.*` kinds), `rule.rs`, `logic.rs` (pure `step`, tests in `logic/tests.rs`), `README.md` with the same sections as a crate |
 | `src-tauri/crates/trigger-core/` | The contract (`Source`, `Rule`, `Event`, `KindInfo`, `kinds_markdown`) and `testkit` (`RecordingSink`, `FixedClock`, `FakeSource`) |
 | `src-tauri/crates/trigger-hub/` | `Hub`: catalogue, `check`, `apply`, `publish`, `subscribe`, the two second cool down, the `trigger-hub` thread |
 | `src-tauri/crates/trigger-fs/` | The reference source. Kinds `fs.file-saved`, `fs.file-created`, `fs.file-removed`, `fs.file-renamed`, `fs.download-finished`, over `notify` |
@@ -90,3 +94,23 @@ How a trigger gets from a file on disk to a toast:
 IPC added by the epic: commands `triggers_catalogue`, `triggers_check`, `triggers_status`, `triggers_arm`, and the event `trigger://fired`. `triggers_status` returns, per rule, the state `active`, `rejected`, `sourceFailed` or `skipped`.
 
 To add a source: `node plans/_tools/new-trigger-crate.mjs <name> "<summary>"`, fill in the crate, then add its optional dependency and feature to `src-tauri/Cargo.toml` and one line to `sources()` in `src-tauri/src/triggers/mod.rs`. `node plans/_tools/check-crates.mjs` must exit 0.
+
+## Internal triggers (epic 002)
+
+The `tg` source is registered first in `sources()` and is always on. `TriggerService::publish_internal(signal)` is the one entry point; every feed builds an `InternalSignal` and calls `triggers::feeds::publish` after the work it reports has succeeded. Design: `docs/technical-design.md` 9.2. The kinds and their rule fields are in `src-tauri/src/triggers/internal/README.md`.
+
+Where each signal comes from:
+
+| Signal | Feed point |
+|---|---|
+| `CommandEnded`, `Bell`, `OutputLine` | the reader thread in `pty/mod.rs`, through `pty::tap::Tap` and `pty::marks::Scanner` |
+| `AgentFinished` | `agent/mod.rs` |
+| `TaskReported` | `agent/task.rs` |
+| `PaneOpened` | `create_terminal` in `pty/mod.rs` |
+| `FocusEntered` | `set_focused_terminal` in `pty/mod.rs` |
+| `WorktreeCreated`, `WorktreeRemoved` | `git/worktree.rs` |
+| `ReviewStaged` | `git/review.rs` |
+| `NoteSaved` | `notes/mod.rs` |
+| `AppStarted` | `triggers::start` in `triggers/mod.rs` |
+
+To add a kind: add it to `KINDS` in `kinds.rs`, parse its `when` in `rule.rs`, handle its signal in `logic.rs` with a test, call `feeds::publish` from the feed point, and refresh the Kinds table in `internal/README.md` (a test fails while it is stale).
