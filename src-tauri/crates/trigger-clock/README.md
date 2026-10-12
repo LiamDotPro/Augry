@@ -38,6 +38,13 @@ error too.
 
 `clock.daily-first-use` takes no fields.
 
+A `feed` is read like this. A path is read from disk. A URL is fetched with
+`If-None-Match` and `If-Modified-Since`, `webcal://` counts as `https://`, a
+request gives up after 15 seconds, and a feed over 10 MiB is refused. Each
+distinct feed is read at most every 5 minutes, and only the events in the next
+24 hours are kept. Event times written without a time zone are read in this
+machine's zone. Each event fires once, however often the feed is read again.
+
 ## Payload
 
 What an event carries, available to steps as `${trigger.<field>}`. Never an
@@ -92,7 +99,13 @@ None. Reading a calendar file or feed needs no permission from the OS.
 | `src/logic.rs` | Pure: `State`, `Fire`, `next_due`, `step` and `wait`. Takes `now` as an argument and never sleeps |
 | `src/logic/tests.rs` | Unit tests for normal ticks, jumps, catch up, backwards jumps and daily first use |
 | `src/logic/dst_tests.rs` | Unit tests for the daylight saving cases, in the America/New_York zone |
-| `src/os.rs` | The only file that talks to the OS: `availability()` |
+| `src/feed.rs` | Pure: `Fetcher`, `Fetched`, `feed_url`, `normalise`, `split_by_uid` and `expand`, which turns calendar text into the occurrences in a window. Uses `calcard` |
+| `src/feed/tests.rs` | Unit tests for URLs, line unfolding, the UTC rewrite and splitting by UID |
+| `src/feed/fixture_tests.rs` | `expand` against the files in `tests/fixtures/` |
+| `tests/fixtures/*.ics` | Handwritten calendar files: weekly Europe/London, an excluded date, a moved occurrence, all day, UTC with a `Z`, floating, Outlook `GMT Standard Time`, and two old endless series |
+| `src/logic/events.rs` | Pure: `fire_events`, called by `step` for `clock.event-starting` and `clock.event-ended` |
+| `src/logic/event_tests.rs` | Unit tests for the two event kinds |
+| `src/os.rs` | The only file that talks to the OS: `availability()`, `UreqFetcher` (HTTP with `ureq`), `read_feed_file` and `local_zone` |
 | `tests/live.rs` | `#[ignore]` tests against the real clock |
 | `tests/readme.rs` | Fails when the Kinds table above is stale |
 
@@ -117,5 +130,15 @@ cargo clippy -p trigger-clock --all-targets -- -D warnings
   schedule is planned again from the new time, so a time can fire twice.
 - `clock.daily-first-use` remembers the last day only in memory. After the app
   restarts it fires again on the same day, a minute after it starts.
-- Not finished yet: the threads that run the logic, so `start` still returns
-  unavailable, and the calendar feed code behind the two event kinds.
+- An event rule fires from its moment (the start minus `minutes_before`, or the
+  end) until 10 minutes after. If the app only sees an event later than that,
+  for example after a long sleep, that firing is skipped.
+- A recurring event is expanded for at most 20000 occurrences from its first
+  date. An hourly or finer series that began years ago can show no
+  occurrences.
+- A recurring event whose times are written in UTC (with a `Z`) is rewritten
+  before it is parsed, because the calendar library reads those as local time.
+- Feeds are checked with the certificates bundled in the app, not the system
+  store, so a feed behind a company proxy that re-signs HTTPS can fail.
+- Not finished yet: the threads that run the logic and fetch feeds, so `start`
+  still returns unavailable.

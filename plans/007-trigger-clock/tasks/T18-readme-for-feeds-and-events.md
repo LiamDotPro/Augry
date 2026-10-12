@@ -2,7 +2,7 @@
 id: T18
 epic: 007-trigger-clock
 title: Document feeds and event kinds in the clock README
-status: todo
+status: done
 depends_on: [T15, T17]
 size: S
 model: haiku
@@ -111,3 +111,5 @@ and replace them with:
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
