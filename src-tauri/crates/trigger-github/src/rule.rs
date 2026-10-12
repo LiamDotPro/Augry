@@ -9,6 +9,10 @@ use trigger_core::{Rule, RuleError};
 /// Who counts as a dependency bot when `author` is not given.
 pub const DEFAULT_AUTHORS: &[&str] = &["dependabot[bot]", "renovate[bot]"];
 
+/// GitHub allows 5000 requests an hour; a floor of a minute keeps many rules
+/// well inside that.
+pub const MIN_INTERVAL_S: u64 = 60;
+
 fn default_interval_s() -> u64 {
     120
 }
@@ -70,10 +74,28 @@ pub fn parse(rule: &Rule) -> Result<Parsed, RuleError> {
         field: "when".into(),
         problem: e.to_string(),
     })?;
-    check_repo(&when.repo).map_err(|problem| RuleError::Field {
-        field: "repo".into(),
+    let field = |field: &str, problem: String| RuleError::Field {
+        field: field.into(),
         problem,
-    })?;
+    };
+    check_repo(&when.repo).map_err(|problem| field("repo", problem))?;
+    if when.interval_s < MIN_INTERVAL_S {
+        return Err(field(
+            "interval_s",
+            format!("must be at least {MIN_INTERVAL_S} seconds"),
+        ));
+    }
+    if when.author.is_empty()
+        || when
+            .author
+            .iter()
+            .any(|a| a.is_empty() || a.contains(char::is_whitespace))
+    {
+        return Err(field(
+            "author",
+            "must list at least one login, with no empty or spaced entries".into(),
+        ));
+    }
     Ok(Parsed { when })
 }
 
@@ -170,6 +192,27 @@ mod tests {
         ] {
             let err = parsed(json!({ "repo": bad })).unwrap_err();
             assert_eq!(field_of(err), "repo", "{bad:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn interval_has_a_floor_of_sixty_seconds() {
+        for good in [60, 61, 120, 86_400] {
+            assert!(parsed(json!({ "repo": "a/b", "interval_s": good })).is_ok());
+        }
+        for bad in [0, 1, 59] {
+            let err = parsed(json!({ "repo": "a/b", "interval_s": bad })).unwrap_err();
+            assert_eq!(field_of(err), "interval_s", "{bad} should be rejected");
+        }
+    }
+
+    #[test]
+    fn author_needs_real_logins() {
+        let ok = parsed(json!({ "repo": "a/b", "author": ["dependabot[bot]", "me"] }));
+        assert!(ok.is_ok());
+        for bad in [json!([]), json!([""]), json!(["a b"]), json!(["ok", " "])] {
+            let err = parsed(json!({ "repo": "a/b", "author": bad })).unwrap_err();
+            assert_eq!(field_of(err), "author");
         }
     }
 }

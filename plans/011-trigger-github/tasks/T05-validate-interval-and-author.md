@@ -2,7 +2,7 @@
 id: T05
 epic: 011-trigger-github
 title: Validate interval_s (at least 60) and author
-status: todo
+status: done
 depends_on: [T04]
 size: S
 model: haiku
@@ -269,3 +269,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
