@@ -1,6 +1,8 @@
 //! The contract between trigger sources and whatever runs them. A source
 //! depends on this crate only. See docs/process-triggers.md Part 2.
 
+pub mod testkit;
+
 use std::collections::BTreeMap;
 use std::sync::mpsc::Sender;
 use std::time::SystemTime;
