@@ -2,7 +2,7 @@
 id: T09
 epic: 001-trigger-core
 title: Move trigger-core's unit tests into src/tests.rs
-status: todo
+status: done
 depends_on: [T07]
 size: S
 model: haiku
@@ -83,3 +83,5 @@ mod tests;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (21 unit tests, 2 markdown_tests, clippy and fmt clean, lib.rs 258 lines, check-crates 0 warnings)
+- 2026-10-12 checker: pass
