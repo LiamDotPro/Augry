@@ -3,7 +3,7 @@ id: T08
 epic: 001-trigger-core
 title: Finish the trigger-core README and run the full check
 status: todo
-depends_on: [T07]
+depends_on: [T09]
 size: S
 model: haiku
 files:
