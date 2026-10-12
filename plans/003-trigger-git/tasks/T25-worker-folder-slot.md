@@ -2,7 +2,7 @@
 id: T25
 epic: 003-trigger-git
 title: Add FolderSlot for git.repo-cloned
-status: todo
+status: done
 depends_on: [T24]
 size: S
 model: haiku
@@ -243,3 +243,5 @@ Note on `check-crates.mjs`: it prints warnings, not errors. A warning about `src
 <!-- one line per attempt: date, model, result, short note -->
 - 2026-10-12 haiku: blocked before step 4. The "If stuck" rule says worker.rs must be 13 to 15 lines before step 4. `wc -l src-tauri/crates/trigger-git/src/worker.rs` gives 12. The file holds only `//!` header lines, `#![allow(dead_code)]`, `mod repo;`, and `pub use repo::{Entry, RepoSlot};` with its allow. `worker/repo.rs` has `pub(crate) fn event` at line 65, so that check passed. Step 1 passed (`worker/folder.rs` does not exist). No files were changed except this card.
 - 2026-10-12 architect: the 13 to 15 bound was a miscount; T23's worker.rs is 12 lines and matches its card. Fixed the If stuck line, reset to todo.
+- 2026-10-12 haiku: built, acceptance passed. worker.rs was 12 lines as the fixed card says; added worker/folder.rs, worker/folder/tests.rs, and the new worker.rs. cargo fmt reflowed one closure in folder.rs. worker::folder 4 passed, worker::repo 15 passed, full trigger-git suite passed, clippy and check-crates exit 0. Cargo.lock unchanged.
+- 2026-10-12 checker: pass

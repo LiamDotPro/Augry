@@ -5,8 +5,11 @@
 // Removed when lib.rs reads everything in this file.
 #![allow(dead_code)]
 
+mod folder;
 mod repo;
 
 // The allow is removed when lib.rs uses these.
+#[allow(unused_imports)]
+pub use folder::FolderSlot;
 #[allow(unused_imports)]
 pub use repo::{Entry, RepoSlot};
