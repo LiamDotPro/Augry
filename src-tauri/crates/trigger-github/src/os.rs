@@ -13,7 +13,10 @@ use std::time::{Duration, Instant};
 
 use trigger_core::Availability;
 
-use crate::logic::cli::{candidate_dirs, exe_name};
+use crate::logic::cli::{
+    api_args, candidate_dirs, exe_name, login_from_body, signed_in, Gh, AUTH_ARGS,
+};
+use crate::logic::response::{parse_gh_output, GhResponse};
 
 /// Why the source is unavailable when `gh` is not installed.
 pub const NOT_FOUND: &str = "GitHub CLI not found. Install it from https://cli.github.com";
@@ -129,6 +132,63 @@ pub fn run(exe: &Path, args: &[String], timeout: Duration) -> Result<Finished, R
     Ok(Finished { stdout, exit })
 }
 
+/// How long one request may take before it counts as no answer.
+const GET_TIMEOUT: Duration = Duration::from_secs(30);
+/// `gh auth status` makes a network call to check the token, so it gets less
+/// time than a request but more than a local command.
+const AUTH_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// The real `gh`: one child process per request, one at a time because the
+/// poll loop is serial.
+pub struct GhCli {
+    exe: PathBuf,
+}
+
+impl GhCli {
+    pub fn at(exe: &Path) -> GhCli {
+        GhCli {
+            exe: exe.to_path_buf(),
+        }
+    }
+}
+
+impl Gh for GhCli {
+    fn get(&self, path: &str, etag: Option<&str>) -> GhResponse {
+        match run(&self.exe, &api_args(path, etag), GET_TIMEOUT) {
+            Ok(done) => parse_gh_output(&done.stdout, done.exit),
+            Err(RunError::TimedOut) => {
+                GhResponse::Transport("gh did not answer within 30 seconds".into())
+            }
+            Err(RunError::Spawn(why)) => GhResponse::Transport(format!("could not run gh: {why}")),
+        }
+    }
+
+    fn login(&self) -> Option<String> {
+        match self.get("user", None) {
+            GhResponse::Ok { body, .. } => login_from_body(&body),
+            _ => None,
+        }
+    }
+}
+
+/// Whether `gh` is signed in to github.com, from `gh auth status --json
+/// hosts`. Ok(false) means no login. Err is anything that stops the question
+/// being answered (could not start, too slow, exit code other than 0), which
+/// is not the same thing and must not be shown as "not signed in". The output
+/// is read but never logged or kept.
+pub fn auth_ok(exe: &Path) -> Result<bool, String> {
+    let args: Vec<String> = AUTH_ARGS.iter().map(|s| s.to_string()).collect();
+    let done = run(exe, &args, AUTH_TIMEOUT).map_err(|e| match e {
+        RunError::TimedOut => "gh auth status did not answer within 10 seconds".to_string(),
+        RunError::Spawn(why) => format!("could not run gh: {why}"),
+    })?;
+    match done.exit {
+        Some(0) => Ok(signed_in(&String::from_utf8_lossy(&done.stdout))),
+        Some(code) => Err(format!("gh auth status exited with code {code}")),
+        None => Err("gh auth status was stopped before it answered".to_string()),
+    }
+}
+
 #[cfg(windows)]
 fn no_window(command: &mut Command) {
     use std::os::windows::process::CommandExt;
@@ -148,6 +208,8 @@ pub(crate) fn spawn_lock() -> std::sync::MutexGuard<'static, ()> {
     LOCK.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+#[cfg(test)]
+mod cli_tests;
 #[cfg(test)]
 mod find_tests;
 #[cfg(test)]

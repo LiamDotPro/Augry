@@ -2,7 +2,7 @@
 id: T23
 epic: 011-trigger-github
 title: Add GhCli and the sign in check
-status: todo
+status: done
 depends_on: [T22]
 size: M
 model: haiku
@@ -302,3 +302,5 @@ fn auth_ok_is_an_error_when_the_question_cannot_be_answered() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
