@@ -1,7 +1,7 @@
 ---
 id: 010-trigger-docker
 title: trigger-docker
-status: carding
+status: done
 depends_on: [001-trigger-core]
 ---
 
