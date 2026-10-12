@@ -104,3 +104,84 @@ mod loop_tests {
         assert!(seen.lock().unwrap().is_empty());
     }
 }
+
+mod restart_tests {
+    use super::super::fakes::*;
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    fn secs(delays: &Delays) -> Vec<u64> {
+        delays.lock().unwrap().iter().map(|d| d.as_secs()).collect()
+    }
+
+    fn spawns(process: &FakeProcess) -> usize {
+        process.spawns.load(Ordering::SeqCst)
+    }
+
+    #[test]
+    fn a_child_that_exits_at_once_is_restarted_with_growing_waits() {
+        let process = FakeProcess::new(
+            Engine::Docker,
+            vec![Script::Fail, Script::Lines(vec![]), Script::Lines(vec![])],
+        );
+        let (_seen, emit) = recorder();
+        let (delays, pause) = recording_pause();
+        let sup = Supervisor::start(process.clone(), vec![], emit, pause).unwrap();
+        wait_until("three waits", || delays.lock().unwrap().len() == 3);
+        wait_until("the fourth spawn", || spawns(&process) == 4);
+        sup.stop();
+        assert_eq!(secs(&delays), vec![1, 2, 4]);
+        assert_eq!(spawns(&process), 4);
+    }
+
+    #[test]
+    fn the_wait_stops_growing_at_sixty_seconds() {
+        let scripts = (0..9).map(|_| Script::Fail).collect();
+        let process = FakeProcess::new(Engine::Docker, scripts);
+        let (_seen, emit) = recorder();
+        let (delays, pause) = recording_pause();
+        let sup = Supervisor::start(process, vec![], emit, pause).unwrap();
+        wait_until("nine waits", || delays.lock().unwrap().len() == 9);
+        sup.stop();
+        assert_eq!(secs(&delays), vec![1, 2, 4, 8, 16, 32, 60, 60, 60]);
+    }
+
+    #[test]
+    fn a_child_that_gave_lines_starts_the_waits_over() {
+        let process = FakeProcess::new(
+            Engine::Docker,
+            vec![
+                Script::Fail,
+                Script::Fail,
+                Script::Lines(vec![START]),
+                Script::Fail,
+            ],
+        );
+        let (_seen, emit) = recorder();
+        let (delays, pause) = recording_pause();
+        let sup = Supervisor::start(process, vec![], emit, pause).unwrap();
+        wait_until("four waits", || delays.lock().unwrap().len() == 4);
+        sup.stop();
+        // Two failures, then a healthy run (wait 1, counter back to zero),
+        // then one failure (wait 1 again).
+        assert_eq!(secs(&delays), vec![1, 2, 1, 1]);
+    }
+
+    #[test]
+    fn stop_cuts_a_long_wait_short() {
+        let process = FakeProcess::new(Engine::Docker, vec![Script::Lines(vec![])]);
+        let (_seen, emit) = recorder();
+        let waiting = Arc::new(AtomicBool::new(false));
+        let flag = waiting.clone();
+        let pause: Pause = Arc::new(move |_delay, stop| {
+            flag.store(true, Ordering::SeqCst);
+            stop.wait(Duration::from_secs(60));
+        });
+        let sup = Supervisor::start(process.clone(), vec![], emit, pause).unwrap();
+        wait_until("the wait to begin", || waiting.load(Ordering::SeqCst));
+        let started = std::time::Instant::now();
+        sup.stop();
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert_eq!(spawns(&process), 1);
+    }
+}
