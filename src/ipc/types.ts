@@ -109,6 +109,13 @@ export type HotkeyModifier = "ctrl+alt" | "ctrl+shift";
  */
 export type ThemePreference = "system" | "light" | "dark" | "black" | "glass";
 
+/** Process triggers; local to this machine (config.json), never synced. */
+export interface TriggersConfig {
+  enabled: boolean;
+  /** Ids of the local process definitions the user armed. */
+  armed: string[];
+}
+
 export interface Config {
   version: 1;
   shell: string | null;
@@ -127,7 +134,11 @@ export interface Config {
   focusColor: string | null;
   /** `#rrggbb` for a pane whose agent finished; null follows the theme. */
   finishedColor: string | null;
+  triggers: TriggersConfig;
 }
+
+/** What `config_set` takes: any field of Config, and `triggers` may carry just some of its fields. */
+export type ConfigPatch = Partial<Omit<Config, "triggers">> & { triggers?: Partial<TriggersConfig> };
 
 /**
  * A note copied out of a pane's output, linked to that terminal session
@@ -387,7 +398,7 @@ export interface Commands {
 
   // config and session
   config_get: { in: Record<string, never>; out: Config };
-  config_set: { in: { patch: Partial<Config> }; out: Config };
+  config_set: { in: { patch: ConfigPatch }; out: Config };
   session_get: { in: Record<string, never>; out: Session | null };
   session_set: { in: { session: Session }; out: void };
 
