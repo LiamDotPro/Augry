@@ -2,7 +2,7 @@
 id: T18
 epic: 011-trigger-github
 title: Fire pr-commented from the two comment lists
-status: todo
+status: done
 depends_on: [T17]
 size: M
 model: haiku
@@ -310,3 +310,5 @@ pub mod comments;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (101 lib tests, full crate tests, clippy, fmt check, check-crates all exit 0)
+- 2026-10-12 checker: pass
