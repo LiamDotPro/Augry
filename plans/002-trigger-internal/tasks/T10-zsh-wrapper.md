@@ -2,7 +2,7 @@
 id: T10
 epic: 002-trigger-internal
 title: Load the zsh integration through a ZDOTDIR wrapper
-status: todo
+status: done
 depends_on: [T09]
 size: M
 model: sonnet
@@ -559,3 +559,5 @@ fn zsh_follows_a_zdotdir_that_the_users_zshenv_sets() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: clippy baseline 7 warnings; built, acceptance passed (clippy 7)
+- 2026-10-12 checker: pass

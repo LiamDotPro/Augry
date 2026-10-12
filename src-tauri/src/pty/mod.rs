@@ -212,6 +212,9 @@ impl PtyManager {
         for arg in &shell.args {
             command.arg(arg);
         }
+        for (key, value) in &shell.env {
+            command.env(key, value);
+        }
         command.cwd(&cwd);
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
