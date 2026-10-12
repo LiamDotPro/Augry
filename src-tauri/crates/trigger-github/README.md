@@ -66,7 +66,15 @@ while the app runs is noticed after a restart. Availability only says whether
 
 ## Permissions
 
-What the OS asks the user for, and when. "None" is a fine answer.
+None. The crate asks the OS for nothing. It uses the login that `gh auth login`
+already stored, and never reads, asks for or keeps a token. To check the login
+it runs `gh auth status --json hosts` (never `gh auth token`, never plain
+`gh auth status`, and what they print is never logged). Every request is
+`gh api`.
+
+When `gh` is missing, or has no login, every rule shows the reason in Settings:
+"GitHub CLI not found. Install it from https://cli.github.com" or "Run gh auth
+login in a terminal".
 
 ## Example
 

@@ -2,7 +2,7 @@
 id: T27
 epic: 011-trigger-github
 title: Start the trigger-github thread from Source::start
-status: in-progress
+status: done
 depends_on: [T26]
 size: M
 model: haiku
@@ -438,3 +438,4 @@ login in a terminal".
 <!-- one line per attempt: date, model, result, short note -->
 - 2026-10-12 haiku: blocked. Steps 1 to 10 done and every acceptance check passes except the grep check: `grep -rn "not implemented yet\|Slice C\|slice C" src-tauri/crates/trigger-github/src/lib.rs src-tauri/crates/trigger-github/src/os.rs src-tauri/crates/trigger-github/README.md` prints `src-tauri/crates/trigger-github/src/os.rs:5:// Removed in the last card of slice C, when the poll loop uses everything here.` (line 5 of os.rs, a comment the card does not edit; the card's "Out of scope" keeps the allow(dead_code) removal for the last card). Not changed, since no step covers it.
 - 2026-10-12 architect: the grep also hit os.rs's allow comment, which T29 removes; narrowed the check. The build stands; sent to the checker.
+- 2026-10-12 checker: pass

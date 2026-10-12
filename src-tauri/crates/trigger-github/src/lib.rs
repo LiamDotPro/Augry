@@ -7,6 +7,7 @@
 mod logic;
 mod os;
 mod rule;
+mod run;
 
 use trigger_core::{
     Availability, FieldInfo, Handle, KindInfo, Platforms, Rule, RuleError, Sink, Source,
@@ -221,7 +222,7 @@ impl Source for GithubSource {
     }
 
     fn start(&self, rules: Vec<Rule>, sink: Sink) -> Result<Handle, SourceError> {
-        let _armed = rules
+        let armed = rules
             .iter()
             .map(|r| {
                 rule::parse(r).map(|parsed| logic::Armed {
@@ -232,8 +233,15 @@ impl Source for GithubSource {
             })
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| SourceError::Os(e.to_string()))?;
-        // The poll thread is added by slice C.
-        let _ = sink;
-        Err(SourceError::Unavailable("not implemented yet".into()))
+        if armed.is_empty() {
+            return Ok(Handle::new(|| {}));
+        }
+        let exe = run::check_login(os::find_gh(), &os::auth_ok)?;
+        run::spawn(
+            armed,
+            Box::new(os::GhCli::at(&exe)),
+            sink,
+            Box::new(os::now_s),
+        )
     }
 }

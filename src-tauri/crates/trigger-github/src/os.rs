@@ -9,7 +9,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{mpsc, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use trigger_core::Availability;
 
@@ -130,6 +130,14 @@ pub fn run(exe: &Path, args: &[String], timeout: Duration) -> Result<Finished, R
     // wait is only a guard against a grandchild that kept the pipe open.
     let stdout = rx.recv_timeout(Duration::from_secs(5)).unwrap_or_default();
     Ok(Finished { stdout, exit })
+}
+
+/// The time in whole seconds since the Unix epoch.
+pub fn now_s() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 /// How long one request may take before it counts as no answer.

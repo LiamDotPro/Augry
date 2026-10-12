@@ -23,7 +23,7 @@ pub(crate) mod fake_gh;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod testutil;
+pub(crate) mod testutil;
 
 use std::collections::BTreeMap;
 
