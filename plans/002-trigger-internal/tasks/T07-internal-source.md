@@ -2,7 +2,7 @@
 id: T07
 epic: 002-trigger-internal
 title: Add InternalSource, the tg Source
-status: todo
+status: done
 depends_on: [T06]
 size: M
 model: haiku
@@ -342,3 +342,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7, after 7; triggers::internal 43 passed; workspace tests ok; fmt ok; no-default-features check ok)
+- 2026-10-12 checker: pass
