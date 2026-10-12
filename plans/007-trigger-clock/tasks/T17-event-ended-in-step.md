@@ -2,7 +2,7 @@
 id: T17
 epic: 007-trigger-clock
 title: Fire clock.event-ended from step
-status: todo
+status: done
 depends_on: [T16]
 size: S
 model: haiku
@@ -192,3 +192,5 @@ fn a_multi_day_event_ends_once() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

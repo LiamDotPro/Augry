@@ -38,7 +38,7 @@ pub(super) fn fire_events(
     state.fired_events.retain(|_, forget_at| *forget_at > now);
     for armed in rules {
         let starting = armed.kind == "clock.event-starting";
-        if !starting {
+        if !starting && armed.kind != "clock.event-ended" {
             continue;
         }
         let Some(feed) = armed.parsed.when.feed.as_deref() else {
@@ -52,7 +52,12 @@ pub(super) fn fire_events(
                     continue;
                 }
             }
-            let Some(at) = occurrence.start.checked_sub(before) else {
+            let at = if starting {
+                occurrence.start.checked_sub(before)
+            } else {
+                Some(occurrence.end)
+            };
+            let Some(at) = at else {
                 continue;
             };
             // Not yet due, or too late to matter.

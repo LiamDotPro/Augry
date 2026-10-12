@@ -1,6 +1,6 @@
 //! `clock.event-starting` and `clock.event-ended` in `step`.
 
-use super::tests::{armed, at, run, secs};
+use super::tests::{armed, at, run, secs, walk};
 use super::*;
 use serde_json::json;
 
@@ -176,4 +176,90 @@ fn the_memory_of_fired_events_is_forgotten_once_they_cannot_be_due() {
     assert_eq!(state.fired_events.len(), 1);
     run(&mut state, at(2026, 3, 6, 10, 15, 30), &rules);
     assert!(state.fired_events.is_empty());
+}
+
+fn ended(id: &str, extra: serde_json::Value) -> Armed {
+    let mut when = json!({ "feed": FEED });
+    when.as_object_mut()
+        .unwrap()
+        .extend(extra.as_object().unwrap().clone());
+    armed(id, "clock.event-ended", when)
+}
+
+#[test]
+fn ended_fires_when_the_event_ends_and_once() {
+    let rules = [ended("e", json!({}))];
+    let mut state = State::new(ClockConfig::default(), at(2026, 3, 6, 10, 20, 0));
+    send(&mut state, vec![standup()]);
+    // Not at the start, and not five minutes before the end.
+    assert!(run(&mut state, at(2026, 3, 6, 10, 25, 0), &rules).is_empty());
+    assert!(run(&mut state, at(2026, 3, 6, 10, 29, 30), &rules).is_empty());
+    let fired = run(&mut state, at(2026, 3, 6, 10, 30, 0), &rules);
+    assert_eq!(fired.len(), 1);
+    assert_eq!(fired[0].rule, "e");
+    assert_eq!(fired[0].kind, "clock.event-ended");
+    assert_eq!(fired[0].payload["title"], json!("Standup"));
+    assert_eq!(fired[0].payload["feed"], json!(FEED));
+    assert_eq!(
+        fired[0].payload["end"].as_u64().unwrap(),
+        millis(at(2026, 3, 6, 10, 30, 0))
+    );
+    assert!(run(&mut state, at(2026, 3, 6, 10, 30, 30), &rules).is_empty());
+    send(&mut state, vec![standup()]);
+    assert!(run(&mut state, at(2026, 3, 6, 10, 31, 0), &rules).is_empty());
+}
+
+#[test]
+fn ended_is_skipped_when_more_than_ten_minutes_late() {
+    let rules = [ended("e", json!({}))];
+    let mut state = State::new(ClockConfig::default(), at(2026, 3, 6, 10, 0, 0));
+    send(&mut state, vec![standup()]);
+    assert!(run(&mut state, at(2026, 3, 6, 10, 40, 1), &rules).is_empty());
+    let mut state = State::new(ClockConfig::default(), at(2026, 3, 6, 10, 0, 0));
+    send(&mut state, vec![standup()]);
+    assert_eq!(run(&mut state, at(2026, 3, 6, 10, 40, 0), &rules).len(), 1);
+}
+
+#[test]
+fn ended_fires_after_a_sleep_that_ends_soon_after_the_event() {
+    let rules = [ended("e", json!({}))];
+    let mut state = State::new(ClockConfig::default(), at(2026, 3, 6, 10, 20, 0));
+    send(&mut state, vec![standup()]);
+    run(&mut state, at(2026, 3, 6, 10, 20, 30), &rules);
+    assert_eq!(run(&mut state, at(2026, 3, 6, 10, 34, 0), &rules).len(), 1);
+}
+
+#[test]
+fn ended_follows_the_title_glob() {
+    let rules = [ended("e", json!({ "title": "retro*" }))];
+    let mut state = State::new(ClockConfig::default(), at(2026, 3, 6, 10, 20, 0));
+    let retro = occurrence("retro", "Retro", at(2026, 3, 6, 10, 0, 0), 30);
+    send(&mut state, vec![standup(), retro]);
+    let fired = run(&mut state, at(2026, 3, 6, 10, 30, 0), &rules);
+    assert_eq!(fired.len(), 1);
+    assert_eq!(fired[0].payload["title"], json!("Retro"));
+}
+
+#[test]
+fn starting_and_ended_rules_on_one_feed_each_fire_at_their_own_time() {
+    let rules = [ended("e", json!({})), starting("s", json!({}))];
+    let start = at(2026, 3, 6, 9, 50, 0);
+    let mut state = State::new(ClockConfig::default(), start);
+    send(&mut state, vec![standup()]);
+    let fired = walk(&mut state, start, at(2026, 3, 6, 10, 40, 0), &rules);
+    let kinds: Vec<&str> = fired.iter().map(|f| f.kind.as_str()).collect();
+    assert_eq!(kinds, vec!["clock.event-starting", "clock.event-ended"]);
+}
+
+#[test]
+fn a_multi_day_event_ends_once() {
+    let rules = [ended("e", json!({})), starting("s", json!({}))];
+    let start = at(2026, 3, 6, 9, 50, 0);
+    let mut state = State::new(ClockConfig::default(), start);
+    // Three days long, ending at 10:00 today. Its start is long past.
+    let trip = occurrence("trip", "Trip", at(2026, 3, 3, 10, 0, 0), 3 * 24 * 60);
+    send(&mut state, vec![trip]);
+    let fired = walk(&mut state, start, at(2026, 3, 6, 11, 30, 0), &rules);
+    assert_eq!(fired.len(), 1);
+    assert_eq!(fired[0].kind, "clock.event-ended");
 }
