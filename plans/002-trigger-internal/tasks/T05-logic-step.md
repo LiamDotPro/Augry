@@ -2,7 +2,7 @@
 id: T05
 epic: 002-trigger-internal
 title: Add the pure step function
-status: todo
+status: done
 depends_on: [T04]
 size: M
 model: haiku
@@ -398,3 +398,5 @@ pub mod rule;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy baseline 7 before, 7 after. triggers::internal 24 passed, workspace tests pass, fmt --check and no-default-features check pass.
+- 2026-10-12 checker: pass

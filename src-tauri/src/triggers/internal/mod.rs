@@ -3,6 +3,7 @@
 //! finished module doc and `README.md` come with the last ones.
 
 mod kinds;
+pub mod logic;
 pub mod rule;
 
 pub use kinds::KINDS;
