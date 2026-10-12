@@ -2,7 +2,7 @@
 id: T34
 epic: 002-trigger-internal
 title: Design sections 2 and 14, layout and testing
-status: todo
+status: done
 depends_on: [T33]
 size: S
 model: haiku
@@ -109,3 +109,5 @@ Manual check for the internal source: in a process definition add a `tg.command-
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed
+- 2026-10-13 checker: pass

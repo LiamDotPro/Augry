@@ -65,6 +65,9 @@ terminal-grid/
         mod.rs              # PtyManager, Session, spawn/write/resize/close
         shell.rs            # shell discovery and integration script generation
         reader.rs           # reader thread, chunk coalescing, event emission
+        marks.rs            # Scanner: OSC 133 marks, bell and printable lines from a shell's bytes (pure, tested)
+        tap.rs              # CommandClock and Tap: marks to InternalSignals for the tg source
+        shell/live.rs       # pty tests that start the real zsh and bash (unix only)
       git/
         mod.rs              # GitInfo model, GitService (cache + refresh)
         cli.rs              # subprocess wrapper with CREATE_NO_WINDOW
@@ -82,6 +85,8 @@ terminal-grid/
         variables.rs        # ${home}, ${downloads}, ${notes.root}, ${screenshots}, ${repo.root}
         rules.rs            # definitions + armed list + open repositories -> the rules the hub runs
         status.rs           # the triggers_status answer and the trigger://fired payload
+        feeds.rs            # publish() and the small builders the feed points call (9.2)
+        internal/           # the tg source: mod.rs, kinds.rs, rule.rs, logic.rs, README.md (9.2)
     crates/                 # trigger crates, one per integration, all built from plans/_templates/trigger-crate
       trigger-core/         # the contract (Source, Rule, Event, KindInfo) and the test kit
       trigger-hub/          # registry, rule checks, cool down, one stream of Fired events
@@ -89,6 +94,8 @@ terminal-grid/
     resources/
       shell-integration.ps1 # bundled, copied to app data dir on first run
       shell-integration.sh
+      bashrc                # wrapper for bash --rcfile, installed beside the scripts
+      zsh/                  # .zshenv .zprofile .zshrc .zlogin, the ZDOTDIR wrapper (4.5)
 ```
 
 Cargo.toml dependencies:
@@ -799,12 +806,18 @@ Unit tests for process triggers, all run by `cargo test --workspace` offline and
 - `trigger-fs`: `rule.rs` parsing and `logic.rs` (globs and default ignores, settle and debounce, rename pairing, download finished) as pure tests over observed signals. No timers and no disk.
 - Each source crate's `tests/readme.rs` fails when the Kinds table in its README is stale. Refresh it with `cargo run -p trigger-<name> --example readme`.
 - The app side (`src-tauri/src/triggers/`): definition parsing, variable expansion with string level tests for `${screenshots}` on every OS, the rule planner, the status and `trigger://fired` JSON, and `TriggerService::refresh` applying only when the rules change, using a hub with no sources.
+- The internal source (`src-tauri/src/triggers/internal/`): `rule.rs` parsing per kind, `logic::step` over every kind (agent glob, exit code and duration filters, the 200 character cut, note glob, `repo`), `InternalSource` start, publish and drop, `sources()` and `publish_internal` with a `tg.bell` rule, and a unit test that fails while the Kinds table in its `README.md` is stale.
+- `pty::marks` and `pty::tap`: the scanner over escape sequences however the chunks are cut, bell versus the end of an OSC string, exit codes, line stripping, and the command clock (start at the first Enter after a prompt, end at the next command end).
+- Shell integration, in `src-tauri/src/pty/shell/live.rs` (unix only): the real zsh and the real bash are started under a pty with the app's real launch arguments and variables, in a fake home. The tests assert that `OSC 133;D` appears, that a variable set in the user's own rc file is visible, that a repeated command is reported each time, and that a failing command and an `echo` give the signals a rule would receive. A shell that is not installed makes its test skip. The PowerShell script cannot run on these machines, so a test only reads it.
+- The feed points: one end to end test in `triggers/feeds.rs` arms a rule for each kind the app feeds from its own code and checks each fires with its payload.
 
 Live tests, which watch the real file system, are `#[ignore]` in `tests/live.rs` of a crate and run with `cargo test -p trigger-fs -- --ignored --test-threads=1`. Each uses its own canonicalised temp directory, waits 400 ms after the watcher starts, and waits for events with a 10 second ceiling rather than a fixed sleep; a negative check first waits for an event on a sentinel file. CI runs them on macOS, Windows and Linux after the other checks.
 
 CI (`.github/workflows/ci.yml`) runs on each of the three systems: `npm test`, `npm run build`, `cargo fmt --check`, `cargo clippy` with `-D warnings` on the three trigger crates, `cargo test --workspace`, `node plans/_tools/check-crates.mjs` (crate isolation, README sections, file sizes) and the live tests.
 
 Manual check for triggers: in Settings switch on "Process triggers (experimental)", put a definition file in the `processes/` folder with a `fs.file-saved` trigger on a folder, tick "Armed", save a file in that folder, and confirm the toast "Trigger fs.file-saved fired for <name>" appears within a few seconds.
+
+Manual check for the internal source: in a process definition add a `tg.command-failed` trigger with no `when`, arm it, open a pane, run `false`, and confirm the same toast appears with the kind `tg.command-failed`. Do the same in a zsh pane and a bash pane.
 
 Unit tests in TypeScript:
 
