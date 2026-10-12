@@ -17,6 +17,8 @@ pub mod simple;
 pub mod text;
 
 #[cfg(test)]
+mod tests;
+#[cfg(test)]
 mod testutil;
 
 use std::collections::BTreeMap;

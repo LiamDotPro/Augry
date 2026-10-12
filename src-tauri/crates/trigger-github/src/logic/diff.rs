@@ -12,10 +12,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use trigger_core::RuleId;
 
-use super::json::Value;
+use super::json::{BodyError, Value};
 use super::payload::Payload;
 use super::text::encode;
 use super::Armed;
+use super::{comments, pulls, runs, simple};
 
 /// The kind ids, so the logic never repeats a string.
 pub mod kind {
@@ -186,6 +187,43 @@ pub fn each_new(
             }
         }
     }
+}
+
+/// Takes one answer of one request into account and returns what fires.
+///
+/// - `key` is `feed_key` of the request: it says which remembered feed this
+///   answer belongs to.
+/// - `rules` are the rules of this repository (any kind; each group picks its
+///   own).
+/// - `me` is the signed in login and `since` the ISO 8601 time the comment
+///   requests were made with (`text::iso` of when the crate started).
+///
+/// The first answer for a `key` only records what exists and fires nothing, so
+/// arming a rule never replays history. Poll `Group::Pulls` before the comment
+/// groups in the same round, so the pull request numbers are current.
+/// A body that is not the expected JSON is an error and changes nothing.
+pub fn diff(
+    group: Group,
+    body: &str,
+    key: &str,
+    state: &mut RepoState,
+    rules: &[&Armed],
+    me: &str,
+    since: &str,
+) -> Result<Vec<Fire>, BodyError> {
+    let RepoState { feeds, prs, .. } = state;
+    let feed = feeds.entry(key.to_string()).or_default();
+    let found = match group {
+        Group::Pulls => pulls::fires(body, feed, prs, rules, me)?,
+        Group::Runs => runs::fires(body, feed, rules)?,
+        Group::Releases => simple::releases(body, feed, rules)?,
+        Group::AssignedIssues => simple::issues(body, feed, rules)?,
+        Group::IssueComments => comments::issue_fires(body, feed, prs, rules, me, since)?,
+        Group::PullComments => comments::pull_fires(body, feed, rules, me, since)?,
+    };
+    let first = !feed.seeded;
+    feed.seeded = true;
+    Ok(if first { Vec::new() } else { found })
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@
 id: T19
 epic: 011-trigger-github
 title: Add diff() with seeding and test whole rounds
-status: todo
+status: done
 depends_on: [T18]
 size: M
 model: haiku
@@ -324,3 +324,5 @@ mod testutil;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (106 lib tests, full crate tests, clippy, fmt check, check-crates all exit 0)
+- 2026-10-12 checker: pass
