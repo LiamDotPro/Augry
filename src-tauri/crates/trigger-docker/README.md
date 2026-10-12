@@ -14,7 +14,11 @@ the markers; `tests/readme.rs` fails while this table is stale.
 <!-- kinds -->
 | Kind | Title | Platforms | Permission | When | Payload |
 | --- | --- | --- | --- | --- | --- |
-| docker.example | Example | macOS, Windows, Linux | none | example* | example |
+| docker.container-started | Container started | macOS, Windows, Linux | none | name, image, label, engine | engine, container_id, name, image, time |
+| docker.container-stopped | Container stopped | macOS, Windows, Linux | none | name, image, label, engine | engine, container_id, name, image, time, exit_code |
+| docker.container-healthy | Container healthy | macOS, Windows, Linux | none | name, image, label, engine | engine, container_id, name, image, time, health |
+| docker.container-unhealthy | Container unhealthy | macOS, Windows, Linux | none | name, image, label, engine | engine, container_id, name, image, time, health |
+| docker.image-built | Image built | macOS, Windows, Linux | none | name, image, label, engine | engine, name, image, time |
 <!-- /kinds -->
 
 ## Rule fields
@@ -24,7 +28,10 @@ error, so a typo shows up in the editor.
 
 | Field | Required | Default | Meaning |
 |---|---|---|---|
-| `example` | yes | | Replace with the real fields |
+| `name` | no | any | Glob on the container name. For `docker.image-built` it is tested against the image reference |
+| `image` | no | any | Glob on the image. `docker.io/library/` and `:latest` are optional, so `alpine` matches `docker.io/library/alpine:latest` |
+| `label` | no | any | `key=value`. The container (or image) must carry that label with exactly that value |
+| `engine` | no | `auto` | `docker`, `podman` or `auto`. Which engine the rule listens to |
 
 ## Payload
 
@@ -50,7 +57,7 @@ What the OS asks the user for, and when. "None" is a fine answer.
 ## Example
 
 ```json
-{ "id": "example", "kind": "docker.example", "when": { "example": "value" } }
+{ "id": "web-up", "kind": "docker.container-started", "when": { "name": "web-*", "engine": "auto" } }
 ```
 
 ## Develop

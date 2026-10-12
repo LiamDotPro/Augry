@@ -2,7 +2,7 @@
 id: T02
 epic: 010-trigger-docker
 title: Add the five kinds, rule parsing and the logic skeleton
-status: todo
+status: done
 depends_on: [T01]
 size: M
 model: haiku
@@ -511,3 +511,5 @@ pub fn availability() -> Availability {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (check-crates exits 0 with warnings: README Payload and Platforms still template text, which this card leaves; lib.rs and os.rs template warnings are expected until slice C)
+- 2026-10-12 checker: pass
