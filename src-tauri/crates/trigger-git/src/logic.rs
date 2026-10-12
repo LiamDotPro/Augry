@@ -108,5 +108,65 @@ impl Change {
     }
 }
 
+/// Absent text becomes an empty string, so every payload field is always
+/// there and `${trigger.branch}` never has to cope with a missing key.
+fn text(value: &Option<String>) -> Value {
+    Value::from(value.clone().unwrap_or_default())
+}
+
+impl Change {
+    /// The event payload: the fields listed for this kind in `KINDS`, and no
+    /// others. `repo` is the rule's repository path.
+    pub fn payload(&self, repo: &str) -> Payload {
+        let mut out = Payload::new();
+        let mut put = |key: &str, value: Value| {
+            out.insert(key.to_string(), value);
+        };
+        put("repo", Value::from(repo));
+        match self {
+            Change::RebaseStopped { branch, commit } => {
+                put("branch", text(branch));
+                put("commit", text(commit));
+            }
+            Change::MergeConflict { branch, files } => {
+                put("branch", text(branch));
+                put("files", Value::from(*files));
+            }
+            Change::BranchSwitched { from, to, commit } => {
+                put("branch", Value::from(to.as_str()));
+                put("from", Value::from(from.as_str()));
+                put("to", Value::from(to.as_str()));
+                put("commit", text(commit));
+            }
+            Change::DetachedHead { from, commit } => {
+                put("branch", Value::from(from.as_str()));
+                put("commit", text(commit));
+            }
+            Change::Pulled {
+                branch,
+                commit,
+                message,
+            }
+            | Change::Commit {
+                branch,
+                commit,
+                message,
+            } => {
+                put("branch", text(branch));
+                put("commit", text(commit));
+                put("message", text(message));
+            }
+            Change::TagCreated { branch, tag } => {
+                put("branch", text(branch));
+                put("tag", Value::from(tag.as_str()));
+            }
+            Change::StashCreated { branch } => {
+                put("branch", text(branch));
+            }
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests;
