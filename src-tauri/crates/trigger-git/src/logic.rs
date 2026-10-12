@@ -274,3 +274,8 @@ pub fn observe(prev: Option<&RepoSnapshot>, next: &RepoSnapshot) -> Vec<Change> 
 
 #[cfg(test)]
 mod tests;
+
+pub mod repo;
+
+#[cfg(test)]
+pub mod fake;
