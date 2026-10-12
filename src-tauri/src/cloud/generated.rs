@@ -629,6 +629,228 @@ pub mod types {
                 })
         }
     }
+    /**
+    The format of a definition with schemaVersion 1, as the desktop app reads
+    and runs it. No route uses this schema and the server does not enforce
+    it: it checks only ProcessDefinition. It is here so the app, the
+    templates and their tests share one description.
+
+    A run opens one pane per lane, in the repository the run starts from.
+    Inside a lane the stages run in order, and inside a stage the steps run
+    in order. Apps ignore fields they do not know, so new optional fields do
+    not need a new schemaVersion; a change an older app would run wrongly
+    does. Never put secrets or paths that exist on one machine only in a
+    definition: refer to them by name, for example ${env:GITHUB_TOKEN} or
+    ${repo.root}, and let the app fill them in.
+    */
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct ProcessDefinitionV1 {
+        ///One or two sentences on what the process is for.
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        pub description: ::std::option::Option<::std::string::String>,
+        pub lanes: ::std::vec::Vec<ProcessLane>,
+        pub name: ProcessDefinitionV1Name,
+        ///Tools the lanes need, checked before a run, for example claude, codex or gh.
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub requires: ::std::vec::Vec<::std::string::String>,
+        #[serde(rename = "schemaVersion")]
+        pub schema_version: ProcessDefinitionV1SchemaVersion,
+    }
+    ///`ProcessDefinitionV1Name`
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ProcessDefinitionV1Name(::std::string::String);
+    impl ::std::ops::Deref for ProcessDefinitionV1Name {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ProcessDefinitionV1Name> for ::std::string::String {
+        fn from(value: ProcessDefinitionV1Name) -> Self {
+            value.0
+        }
+    }
+    impl ::std::str::FromStr for ProcessDefinitionV1Name {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 120usize {
+                return Err("longer than 120 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ProcessDefinitionV1Name {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ProcessDefinitionV1Name {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ProcessDefinitionV1Name {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ProcessDefinitionV1SchemaVersion`
+    #[derive(::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct ProcessDefinitionV1SchemaVersion(i64);
+    impl ::std::ops::Deref for ProcessDefinitionV1SchemaVersion {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ProcessDefinitionV1SchemaVersion> for i64 {
+        fn from(value: ProcessDefinitionV1SchemaVersion) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::TryFrom<i64> for ProcessDefinitionV1SchemaVersion {
+        type Error = self::error::ConversionError;
+        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ![1_i64].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ProcessDefinitionV1SchemaVersion {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<i64>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
+        }
+    }
+    ///A track of work that runs in its own pane.
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct ProcessLane {
+        ///Unique within the definition.
+        pub id: ProcessLaneId,
+        pub stages: ::std::vec::Vec<ProcessStage>,
+        pub title: ProcessLaneTitle,
+    }
+    ///Unique within the definition.
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ProcessLaneId(::std::string::String);
+    impl ::std::ops::Deref for ProcessLaneId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ProcessLaneId> for ::std::string::String {
+        fn from(value: ProcessLaneId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::str::FromStr for ProcessLaneId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ProcessLaneId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ProcessLaneId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ProcessLaneId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ProcessLaneTitle`
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ProcessLaneTitle(::std::string::String);
+    impl ::std::ops::Deref for ProcessLaneTitle {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ProcessLaneTitle> for ::std::string::String {
+        fn from(value: ProcessLaneTitle) -> Self {
+            value.0
+        }
+    }
+    impl ::std::str::FromStr for ProcessLaneTitle {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ProcessLaneTitle {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ProcessLaneTitle {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ProcessLaneTitle {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`ProcessPage`
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
@@ -640,6 +862,237 @@ pub mod types {
         #[serde(rename = "lastSeq")]
         pub last_seq: i64,
         pub processes: ::std::vec::Vec<Process>,
+    }
+    ///`ProcessStage`
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct ProcessStage {
+        ///Unique within the lane.
+        pub id: ProcessStageId,
+        pub steps: ::std::vec::Vec<ProcessStep>,
+        pub title: ProcessStageTitle,
+    }
+    ///Unique within the lane.
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ProcessStageId(::std::string::String);
+    impl ::std::ops::Deref for ProcessStageId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ProcessStageId> for ::std::string::String {
+        fn from(value: ProcessStageId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::str::FromStr for ProcessStageId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ProcessStageId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ProcessStageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ProcessStageId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ProcessStageTitle`
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ProcessStageTitle(::std::string::String);
+    impl ::std::ops::Deref for ProcessStageTitle {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ProcessStageTitle> for ::std::string::String {
+        fn from(value: ProcessStageTitle) -> Self {
+            value.0
+        }
+    }
+    impl ::std::str::FromStr for ProcessStageTitle {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ProcessStageTitle {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ProcessStageTitle {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ProcessStageTitle {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    /**
+    One thing to do in the lane's pane. An agent step starts the agent (when
+    it is not already running) and sends it the prompt. A shell step types
+    the command at the shell prompt.
+    */
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct ProcessStep {
+        ///For agent steps, the agent CLI to use, for example claude or codex. When it is missing the app uses the user's default agent.
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        pub agent: ::std::option::Option<::std::string::String>,
+        ///For shell steps, the command line to run.
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        pub command: ::std::option::Option<::std::string::String>,
+        ///Unique within the stage.
+        pub id: ProcessStepId,
+        pub kind: ProcessStepKind,
+        ///For agent steps, the text sent to the agent.
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        pub prompt: ::std::option::Option<::std::string::String>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        pub title: ::std::option::Option<::std::string::String>,
+    }
+    ///Unique within the stage.
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ProcessStepId(::std::string::String);
+    impl ::std::ops::Deref for ProcessStepId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ProcessStepId> for ::std::string::String {
+        fn from(value: ProcessStepId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::str::FromStr for ProcessStepId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ProcessStepId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ProcessStepId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ProcessStepId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ProcessStepKind`
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ProcessStepKind {
+        #[serde(rename = "agent")]
+        Agent,
+        #[serde(rename = "shell")]
+        Shell,
+    }
+    impl ::std::fmt::Display for ProcessStepKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Agent => f.write_str("agent"),
+                Self::Shell => f.write_str("shell"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ProcessStepKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "agent" => Ok(Self::Agent),
+                "shell" => Ok(Self::Shell),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ProcessStepKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ProcessStepKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
     }
     ///`ProcessVersion`
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]

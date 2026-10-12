@@ -895,6 +895,69 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /**
+         * @description The format of a definition with schemaVersion 1, as the desktop app reads
+         *     and runs it. No route uses this schema and the server does not enforce
+         *     it: it checks only ProcessDefinition. It is here so the app, the
+         *     templates and their tests share one description.
+         *
+         *     A run opens one pane per lane, in the repository the run starts from.
+         *     Inside a lane the stages run in order, and inside a stage the steps run
+         *     in order. Apps ignore fields they do not know, so new optional fields do
+         *     not need a new schemaVersion; a change an older app would run wrongly
+         *     does. Never put secrets or paths that exist on one machine only in a
+         *     definition: refer to them by name, for example ${env:GITHUB_TOKEN} or
+         *     ${repo.root}, and let the app fill them in.
+         */
+        ProcessDefinitionV1: {
+            /** @enum {integer} */
+            schemaVersion: 1;
+            name: string;
+            /** @description One or two sentences on what the process is for. */
+            description?: string;
+            /** @description Tools the lanes need, checked before a run, for example claude, codex or gh. */
+            requires?: string[];
+            lanes: components["schemas"]["ProcessLane"][];
+        } & {
+            [key: string]: unknown;
+        };
+        /** @description A track of work that runs in its own pane. */
+        ProcessLane: {
+            /** @description Unique within the definition. */
+            id: string;
+            title: string;
+            stages: components["schemas"]["ProcessStage"][];
+        } & {
+            [key: string]: unknown;
+        };
+        ProcessStage: {
+            /** @description Unique within the lane. */
+            id: string;
+            title: string;
+            steps: components["schemas"]["ProcessStep"][];
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * @description One thing to do in the lane's pane. An agent step starts the agent (when
+         *     it is not already running) and sends it the prompt. A shell step types
+         *     the command at the shell prompt.
+         */
+        ProcessStep: {
+            /** @description Unique within the stage. */
+            id: string;
+            title?: string;
+            /** @enum {string} */
+            kind: "agent" | "shell";
+            /** @description For agent steps, the agent CLI to use, for example claude or codex. When it is missing the app uses the user's default agent. */
+            agent?: string;
+            /** @description For agent steps, the text sent to the agent. */
+            prompt?: string;
+            /** @description For shell steps, the command line to run. */
+            command?: string;
+        } & {
+            [key: string]: unknown;
+        };
         Process: {
             id: string;
             teamId: string;
