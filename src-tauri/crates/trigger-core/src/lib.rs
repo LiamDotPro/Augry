@@ -1,6 +1,12 @@
 //! The contract between trigger sources and whatever runs them. A source
 //! depends on this crate only. See docs/process-triggers.md Part 2.
 
+use std::collections::BTreeMap;
+use std::sync::mpsc::Sender;
+use std::time::SystemTime;
+
+pub use serde_json::Value;
+
 /// Bit set of the platforms a kind works on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Platforms(u8);
@@ -75,6 +81,69 @@ pub mod ms_since_epoch {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Permission {
+    Accessibility,
+    ScreenRecording,
+    Location,
+    Calendar,
+    Reminders,
+    Folder(&'static str),
+    Microphone,
+    Camera,
+    Notifications,
+}
+
+#[derive(Clone, Copy, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FieldInfo {
+    pub name: &'static str,
+    pub doc: &'static str,
+    pub required: bool,
+}
+
+#[derive(Clone, Copy, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KindInfo {
+    pub id: &'static str,
+    pub title: &'static str,
+    pub summary: &'static str,
+    pub platforms: Platforms,
+    pub permission: Option<Permission>,
+    pub when: &'static [FieldInfo],
+    pub payload: &'static [FieldInfo],
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "state", rename_all = "camelCase")]
+pub enum Availability {
+    Available,
+    Unsupported { reason: String },
+    NeedsPermission { permission: Permission, how: String },
+}
+
+pub type RuleId = String;
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Rule {
+    pub id: RuleId,
+    pub kind: String,
+    pub when: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Event {
+    pub rule: RuleId,
+    pub kind: String,
+    #[serde(with = "ms_since_epoch")]
+    pub at: SystemTime,
+    pub payload: BTreeMap<String, Value>,
+}
+
+pub type Sink = Sender<Event>;
+
 #[cfg(test)]
 mod platforms_tests {
     use super::*;
@@ -127,5 +196,95 @@ mod platforms_tests {
         let json = serde_json::to_string(&before).unwrap();
         assert_eq!(json, r#"{"at":-1500}"#);
         assert_eq!(serde_json::from_str::<Stamp>(&json).unwrap(), before);
+    }
+}
+
+#[cfg(test)]
+mod json_tests {
+    use super::*;
+    use serde_json::json;
+    use std::time::{Duration, UNIX_EPOCH};
+
+    #[test]
+    fn permission_json() {
+        assert_eq!(
+            serde_json::to_value(Permission::Accessibility).unwrap(),
+            json!("accessibility")
+        );
+        assert_eq!(
+            serde_json::to_value(Permission::ScreenRecording).unwrap(),
+            json!("screenRecording")
+        );
+        assert_eq!(
+            serde_json::to_value(Permission::Folder("Downloads")).unwrap(),
+            json!({"folder": "Downloads"})
+        );
+    }
+
+    #[test]
+    fn event_at_is_a_number_of_milliseconds() {
+        let event = Event {
+            rule: "r".into(),
+            kind: "k".into(),
+            at: UNIX_EPOCH + Duration::from_millis(1_760_000_000_123),
+            payload: BTreeMap::new(),
+        };
+        let v = serde_json::to_value(&event).unwrap();
+        assert!(v["at"].is_number());
+        assert_eq!(
+            v,
+            json!({"rule": "r", "kind": "k", "at": 1_760_000_000_123i64, "payload": {}})
+        );
+    }
+
+    #[test]
+    fn kind_info_json() {
+        let kind = KindInfo {
+            id: "fs.x",
+            title: "T",
+            summary: "s",
+            platforms: Platforms::MACOS.or(Platforms::LINUX),
+            permission: Some(Permission::Folder("Downloads")),
+            when: &[FieldInfo {
+                name: "path",
+                doc: "d",
+                required: true,
+            }],
+            payload: &[],
+        };
+        assert_eq!(
+            serde_json::to_value(kind).unwrap(),
+            json!({
+                "id": "fs.x", "title": "T", "summary": "s",
+                "platforms": ["macos", "linux"],
+                "permission": {"folder": "Downloads"},
+                "when": [{"name": "path", "doc": "d", "required": true}],
+                "payload": []
+            })
+        );
+    }
+
+    #[test]
+    fn availability_json() {
+        assert_eq!(
+            serde_json::to_value(Availability::Available).unwrap(),
+            json!({"state": "available"})
+        );
+        assert_eq!(
+            serde_json::to_value(Availability::NeedsPermission {
+                permission: Permission::Folder("Downloads"),
+                how: "x".into()
+            })
+            .unwrap(),
+            json!({"state": "needsPermission", "permission": {"folder": "Downloads"}, "how": "x"})
+        );
+    }
+
+    #[test]
+    fn rule_reads_from_json() {
+        let rule: Rule =
+            serde_json::from_value(json!({"id": "a", "kind": "fs.x", "when": {"path": "/tmp"}}))
+                .unwrap();
+        assert_eq!(rule.when["path"], json!("/tmp"));
     }
 }
