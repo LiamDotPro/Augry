@@ -56,9 +56,13 @@ is text or a number. A comment body is cut to 200 characters.
 
 | Platform | How it is detected | Limits |
 |---|---|---|
-| macOS | | |
-| Windows | | |
-| Linux | | |
+| macOS | `gh` on the PATH, else in `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin` or `~/.local/bin`. A desktop app starts with a short PATH, which is why Homebrew's folder is listed | No login shell is asked for its PATH. The login itself (keychain) does not need the shell's PATH |
+| Windows | `gh.exe` on the PATH, else in `C:\Program Files\GitHub CLI` | `gh` runs without a console window |
+| Linux | The same folders as macOS | |
+
+`gh` is looked up once per run of the app and remembered. Installing it
+while the app runs is noticed after a restart. Availability only says whether
+`gh` was found; whether it is signed in is checked when the first rule starts.
 
 ## Permissions
 

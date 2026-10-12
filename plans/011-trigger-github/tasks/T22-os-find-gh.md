@@ -2,7 +2,7 @@
 id: T22
 epic: 011-trigger-github
 title: Find gh once and report availability
-status: todo
+status: done
 depends_on: [T21]
 size: S
 model: haiku
@@ -245,3 +245,5 @@ while the app runs is noticed after a restart. Availability only says whether
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

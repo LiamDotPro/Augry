@@ -6,16 +6,48 @@
 #![allow(dead_code)]
 
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::mpsc;
+use std::sync::{mpsc, OnceLock};
 use std::time::{Duration, Instant};
 
 use trigger_core::Availability;
 
+use crate::logic::cli::{candidate_dirs, exe_name};
+
+/// Why the source is unavailable when `gh` is not installed.
+pub const NOT_FOUND: &str = "GitHub CLI not found. Install it from https://cli.github.com";
+
+static GH: OnceLock<Option<PathBuf>> = OnceLock::new();
+
+/// Where `gh` is: the first `gh` file in the folders of `candidate_dirs`. It
+/// is looked up once and remembered, found or not, so it costs nothing after
+/// the first call. Installing `gh` while the app runs is noticed on restart.
+pub fn find_gh() -> Option<&'static Path> {
+    GH.get_or_init(|| {
+        let path_var = std::env::var_os("PATH");
+        let home =
+            std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from);
+        let dirs = candidate_dirs(path_var.as_deref(), home.as_deref(), cfg!(windows));
+        first_file(&dirs, exe_name(cfg!(windows)))
+    })
+    .as_deref()
+}
+
+/// The first of `dirs` that holds a file called `name`.
+fn first_file(dirs: &[PathBuf], name: &str) -> Option<PathBuf> {
+    dirs.iter().map(|dir| dir.join(name)).find(|p| p.is_file())
+}
+
+/// Whether `gh` was found. It starts no child process, because the catalogue
+/// command calls it on the UI thread. Whether `gh` is signed in is checked
+/// when the source starts.
 pub fn availability() -> Availability {
-    Availability::Unsupported {
-        reason: "not implemented yet".into(),
+    match find_gh() {
+        Some(_) => Availability::Available,
+        None => Availability::Unsupported {
+            reason: NOT_FOUND.into(),
+        },
     }
 }
 
@@ -116,5 +148,7 @@ pub(crate) fn spawn_lock() -> std::sync::MutexGuard<'static, ()> {
     LOCK.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+#[cfg(test)]
+mod find_tests;
 #[cfg(test)]
 mod run_tests;
