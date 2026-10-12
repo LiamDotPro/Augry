@@ -158,6 +158,9 @@ impl Poller {
                 continue;
             }
             self.poll(index, now, gh, &mut out);
+            if self.stopped {
+                break;
+            }
         }
         out
     }
@@ -201,32 +204,98 @@ impl Poller {
         match verdict {
             Verdict::Fine => {
                 job.not_found = false;
-                job.reported = false;
-                if let GhResponse::Ok { etag, body, .. } = &response {
-                    let rules: Vec<&Armed> = job.rules.iter().map(|&r| &self.rules[r]).collect();
-                    let repo = self.state.repo(&job.repo);
-                    if let Ok(fires) =
-                        diff(job.group, body, &job.key, repo, &rules, me, &self.since)
-                    {
-                        out.fires.extend(fires);
-                        if let Some(etag) = etag {
-                            repo.set_etag(&job.path, etag);
+                match &response {
+                    GhResponse::Ok { etag, body, .. } => {
+                        let rules: Vec<&Armed> =
+                            job.rules.iter().map(|&r| &self.rules[r]).collect();
+                        let repo = self.state.repo(&job.repo);
+                        match diff(job.group, body, &job.key, repo, &rules, me, &self.since) {
+                            Ok(fires) => {
+                                job.reported = false;
+                                out.fires.extend(fires);
+                                if let Some(etag) = etag {
+                                    repo.set_etag(&job.path, etag);
+                                }
+                            }
+                            // The etag is not kept, so the next poll asks again
+                            // from scratch instead of getting a 304.
+                            Err(_) => report(
+                                job,
+                                &self.rules,
+                                out,
+                                "GitHub sent an answer this crate cannot read",
+                            ),
                         }
                     }
+                    _ => job.reported = false,
                 }
-                job.due = now.saturating_add(self.backoff.effective_interval_s(
-                    now,
-                    job.interval_s,
-                    job.hint_s,
-                    job.not_found,
-                ));
+                job.due = next_due(&self.backoff, now, job);
             }
-            _ => job.due = now,
+            Verdict::RateLimited { wait_s } => {
+                let text = format!("GitHub rate limit reached, waiting {wait_s} seconds");
+                out.notes.push(Note {
+                    rules: rule_ids(&self.rules, &job.rules),
+                    text,
+                });
+                job.due = now;
+            }
+            // Quiet: the ladder in `Backoff` decides when to try again.
+            Verdict::Transport { .. } => job.due = now,
+            Verdict::NotFound => {
+                job.not_found = true;
+                report(
+                    job,
+                    &self.rules,
+                    out,
+                    "GitHub answered 404: the repository is missing or this login cannot see it",
+                );
+                job.due = next_due(&self.backoff, now, job);
+            }
+            Verdict::Denied(status) => {
+                let text =
+                    format!("GitHub answered {status}: this login may not read the repository");
+                report(job, &self.rules, out, &text);
+                job.due = next_due(&self.backoff, now, job);
+            }
+            Verdict::Unauthorized => {
+                self.stopped = true;
+                let everyone: Vec<usize> = (0..self.rules.len()).collect();
+                out.notes.push(Note {
+                    rules: rule_ids(&self.rules, &everyone),
+                    text: "gh is not signed in any more, polling stopped. Run gh auth login in a terminal"
+                        .to_string(),
+                });
+            }
         }
     }
+}
+
+/// When a job is next due after an answer that was not a wait: its interval,
+/// stretched by whatever `Backoff` says about the rate limit and 404s.
+fn next_due(backoff: &Backoff, now: u64, job: &Job) -> u64 {
+    now.saturating_add(backoff.effective_interval_s(now, job.interval_s, job.hint_s, job.not_found))
+}
+
+fn rule_ids(rules: &[Armed], which: &[usize]) -> Vec<RuleId> {
+    which.iter().map(|&i| rules[i].id.clone()).collect()
+}
+
+/// Adds a note about a problem with one job, unless the last answer for it
+/// already had one.
+fn report(job: &mut Job, rules: &[Armed], out: &mut Outcome, text: &str) {
+    if job.reported {
+        return;
+    }
+    job.reported = true;
+    out.notes.push(Note {
+        rules: rule_ids(rules, &job.rules),
+        text: text.to_string(),
+    });
 }
 
 #[cfg(test)]
 mod plan_tests;
 #[cfg(test)]
 mod tick_tests;
+#[cfg(test)]
+mod verdict_tests;

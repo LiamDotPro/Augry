@@ -2,7 +2,7 @@
 id: T26
 epic: 011-trigger-github
 title: Make tick obey rate limits, 404, 401 and errors
-status: todo
+status: done
 depends_on: [T25]
 size: M
 model: haiku
@@ -679,12 +679,12 @@ fn a_pull_request_rule_fires_through_the_whole_path() {
 
 ## Acceptance
 
-- [ ] `cd src-tauri && cargo test -p trigger-github --lib logic::poll` passes with 28 tests (13 new in this card)
-- [ ] `cd src-tauri && cargo test -p trigger-github` passes (the lib reports 163 tests on macOS and Linux)
-- [ ] `cd src-tauri && cargo clippy -p trigger-github --all-targets -- -D warnings` exits 0
-- [ ] `cd src-tauri && cargo fmt -p trigger-github --check` exits 0
-- [ ] `node plans/_tools/check-crates.mjs` exits 0 (a warning that `lib.rs` still has template code is expected until a later card)
-- [ ] `git status --porcelain -uall | grep -v "plans/011-trigger-github/tasks/"` lists only paths under `files:`
+- [x] `cd src-tauri && cargo test -p trigger-github --lib logic::poll` passes with 28 tests (13 new in this card)
+- [x] `cd src-tauri && cargo test -p trigger-github` passes (the lib reports 163 tests on macOS and Linux)
+- [x] `cd src-tauri && cargo clippy -p trigger-github --all-targets -- -D warnings` exits 0
+- [x] `cd src-tauri && cargo fmt -p trigger-github --check` exits 0
+- [x] `node plans/_tools/check-crates.mjs` exits 0 (a warning that `lib.rs` still has template code is expected until a later card)
+- [x] `git status --porcelain -uall | grep -v "plans/011-trigger-github/tasks/"` lists only paths under `files:`
 
 ## Out of scope
 
@@ -704,3 +704,5 @@ fn a_pull_request_rule_fires_through_the_whole_path() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
