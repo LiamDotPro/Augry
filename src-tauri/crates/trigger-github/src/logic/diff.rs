@@ -187,3 +187,6 @@ pub fn each_new(
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

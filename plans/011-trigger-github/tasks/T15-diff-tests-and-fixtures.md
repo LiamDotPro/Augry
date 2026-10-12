@@ -2,7 +2,7 @@
 id: T15
 epic: 011-trigger-github
 title: Test diff.rs and add the fixtures and test helpers
-status: todo
+status: done
 depends_on: [T14]
 size: M
 model: haiku
@@ -513,3 +513,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (69 lib tests, full crate tests, clippy and fmt clean, check-crates exit 0)
+- 2026-10-12 checker: pass
