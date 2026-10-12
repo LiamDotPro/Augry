@@ -309,12 +309,21 @@ impl PtyManager {
             let id = id.clone();
             std::thread::spawn(move || {
                 let mut buffer = [0u8; reader::READ_BUFFER];
+                // Cleared if the tap ever panics, so output keeps flowing.
+                let mut tapping = true;
                 loop {
                     match output.read(&mut buffer) {
                         Ok(0) => break,
                         Ok(count) => {
                             pump.push(&buffer[..count]);
-                            publish_signals(&tap_app, &mut tap, &buffer[..count]);
+                            if tapping {
+                                // A bug in the tap must never stop the pane's output.
+                                let published =
+                                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                        publish_signals(&tap_app, &mut tap, &buffer[..count])
+                                    }));
+                                tapping = published.is_ok();
+                            }
                             // Pace a runaway writer rather than dropping its bytes.
                             if pump.should_throttle() {
                                 std::thread::sleep(reader::THROTTLE_SLEEP);

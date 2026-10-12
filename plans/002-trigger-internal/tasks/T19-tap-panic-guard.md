@@ -2,7 +2,7 @@
 id: T19
 epic: 002-trigger-internal
 title: Keep a pane's output flowing if the tap panics
-status: todo
+status: done
 depends_on: [T18]
 size: S
 model: haiku
@@ -95,3 +95,5 @@ panics.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy warnings (grep -c warning, all-targets) before 7, after 7. Grep checks ran with plain grep, no ugrep issue seen.
+- 2026-10-12 checker: pass
