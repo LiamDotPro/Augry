@@ -2,7 +2,7 @@
 id: T03
 epic: 002-trigger-internal
 title: Parse the when object: repo, agent and note glob
-status: todo
+status: done
 depends_on: [T02]
 size: M
 model: haiku
@@ -303,3 +303,5 @@ pub use kinds::KINDS;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7, after 7; cargo test triggers::internal 11 passed)
+- 2026-10-12 checker: pass
