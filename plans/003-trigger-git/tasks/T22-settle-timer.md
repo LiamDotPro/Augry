@@ -2,7 +2,7 @@
 id: T22
 epic: 003-trigger-git
 title: Add the pure settle timer
-status: todo
+status: done
 depends_on: [T19]
 size: S
 model: haiku
@@ -203,3 +203,5 @@ Note on `check-crates.mjs`: it prints warnings, not errors. A warning about `src
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Appended `pub mod settle;` at the very end of logic.rs (after `mod polled_tests;`, per "at the very end"). Cargo.lock unchanged.
+- 2026-10-12 checker: pass

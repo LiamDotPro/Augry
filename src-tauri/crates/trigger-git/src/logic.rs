@@ -284,3 +284,5 @@ pub mod polled;
 
 #[cfg(test)]
 mod polled_tests;
+
+pub mod settle;
