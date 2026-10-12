@@ -2,7 +2,7 @@
 id: T32
 epic: 002-trigger-internal
 title: Design 4.3, 5.2 and 5.3, the marks scanner and tap
-status: todo
+status: done
 depends_on: [T31]
 size: S
 model: haiku
@@ -88,3 +88,6 @@ Codex and others may also ring. The Rust scanner also sees every bell and publis
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed
+- 2026-10-13 architect: added one sentence on T19's catch_unwind guard to the 4.3 paragraph.
+- 2026-10-13 checker: pass

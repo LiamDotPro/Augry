@@ -244,6 +244,10 @@ app.emit_to("main", "terminal://output", OutputEvent { id, data_b64 })
 
 Backpressure: if a single session emits more than 4 MiB in one second (a runaway `cat`), the reader inserts a 20 ms sleep per chunk. This keeps the UI responsive without dropping bytes.
 
+Marks and the tap: after a chunk is queued for the window, the reader thread also gives the same bytes to the session's `tap::Tap` (`pty/tap.rs`), so the screen is never delayed. A `Tap` owns a `marks::Scanner` (`pty/marks.rs`), a pure byte state machine that carries its state across chunks, so a read that ends inside an escape sequence gives the same result as one that does not. The scanner reports `Mark::PromptStart` (`OSC 133;A`), `Mark::CommandEnd { exit }` (`OSC 133;D;<code>`, no code means 0), `Mark::Bell` (a BEL that does not end an OSC string) and, only while `TriggerService::wants_output()` is true, the complete printable lines with CSI, OSC and two byte escapes removed. Nothing is scanned for lines in a grid without an armed `tg.output-matched` rule. The tap turns marks into `InternalSignal`s (`CommandEnded` with a duration, `Bell`, `OutputLine` cut to 200 characters) and the reader thread hands each to `TriggerService::publish_internal` (9.2). The call runs inside `catch_unwind`: if the tap ever panics, that pane stops being tapped and its output keeps flowing. The webview keeps its own OSC parsing; nothing in the frontend changed.
+
+Command timing is measured in Rust by a `CommandClock` shared by the reader thread and `PtyManager::write`. A command starts at the first `write` containing `\r` after a prompt mark (or after the last command end) and ends at the next `CommandEnd`. `write` locks the clock while it holds the sessions lock, so the reader thread locks the clock for one statement at a time and never while it asks for the sessions lock (it needs the working directory of the pane for the signal).
+
 Exit: the waiter thread emits `terminal://exit { id, code }`. The session stays in the map with `child` exited so the frontend can show the exit and offer restart; `close_terminal` removes it.
 
 ### 4.4 Commands
@@ -347,11 +351,11 @@ A minimum running time of 1500 ms filters out `claude --version` style invocatio
 
 ### 5.2 Secondary: shell integration
 
-On `OSC 133;D` the frontend checks the last command (from `OSC 7777`) against the same patterns. If it matches and the process watcher has not already reported `finished` in the last 5 s, treat it as finished. Covers the case where the agent exits so quickly between ticks that the watcher misses it.
+On `OSC 133;D` the frontend checks the last command (from `OSC 7777`) against the same patterns. If it matches and the process watcher has not already reported `finished` in the last 5 s, treat it as finished. Covers the case where the agent exits so quickly between ticks that the watcher misses it. The Rust side also reads `OSC 133;D` (4.3), but only to publish `tg.command-failed` and `tg.command-slow` (9.2); agent detection does not use it.
 
 ### 5.3 Tertiary: BEL
 
-`term.onBell` while the pane is not focused → finished. Claude Code emits a bell when `preferredNotifChannel` is set to `terminal_bell`; document this in the README as an optional one liner. Codex and others may also ring.
+`term.onBell` while the pane is not focused → finished. Claude Code emits a bell when `preferredNotifChannel` is set to `terminal_bell`; document this in the README as an optional one liner. Codex and others may also ring. The Rust scanner also sees every bell and publishes `tg.bell` (9.2) for any pane, focused or not.
 
 ### 5.4 Idle fallback for shells without integration
 
