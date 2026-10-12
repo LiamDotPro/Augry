@@ -91,13 +91,13 @@ None. The crate reads the repository folders named in the rules and runs the `gi
 | `src/logic/settle.rs` | Pure: `Settle`, the 300 ms quiet time before a snapshot, with up to 10 retries while `index.lock` or `HEAD.lock` exists |
 | `src/worker.rs` | The `trigger-git` thread: `run` sleeps until the next deadline or message, `spawn` starts it. `src/worker/repo.rs` holds `RepoSlot` (one repository: snapshot, diff, rule filter, polled kinds) and `src/worker/folder.rs` holds `FolderSlot` (one `git.repo-cloned` folder). Both are tested with a fake `Repo` and no threads |
 | `src/os.rs` | The only file besides `git.rs` that talks to the OS: `GitDirs` (where a repository keeps its files and which of them matter), `RepoWatch` (the `notify` watchers), `scan_folder` and `availability()` |
-| `tests/live.rs` | `#[ignore]` tests against the real OS |
+| `tests/live.rs` | `#[ignore]` tests on real temporary repositories: commit, branch switch, detach, tag, merge conflict, pull, fetch, a branch glob and a linked worktree |
 | `tests/readme.rs` | Fails when the Kinds table above is stale |
 
 ```
 cd src-tauri
 cargo test -p trigger-git                       # pure and readme tests, any OS, offline
-cargo test -p trigger-git -- --ignored          # live tests on this machine
+cargo test -p trigger-git -- --ignored --test-threads=1   # live tests on this machine
 cargo clippy -p trigger-git --all-targets -- -D warnings
 ```
 
