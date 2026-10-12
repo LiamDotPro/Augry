@@ -2,7 +2,7 @@
 id: T11
 epic: 011-trigger-github
 title: Add the pure Backoff with R02 rules
-status: todo
+status: done
 depends_on: [T10]
 size: M
 model: haiku
@@ -474,3 +474,5 @@ pub mod response;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (36 lib tests, 16 new backoff tests; clippy, fmt check, check-crates exit 0; scope lists only logic.rs and logic/backoff.rs)
+- 2026-10-12 checker: pass

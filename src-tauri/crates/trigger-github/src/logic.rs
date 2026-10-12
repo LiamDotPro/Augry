@@ -5,6 +5,7 @@
 // Removed in slice C, when the poll loop reads everything in this file.
 #![allow(dead_code)]
 
+pub mod backoff;
 pub mod response;
 
 use trigger_core::RuleId;
