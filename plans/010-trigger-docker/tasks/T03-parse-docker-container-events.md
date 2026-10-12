@@ -2,7 +2,7 @@
 id: T03
 epic: 010-trigger-docker
 title: Parse Docker container events in logic.rs
-status: todo
+status: done
 depends_on: [T02]
 size: M
 model: haiku
@@ -487,3 +487,5 @@ fn a_line_with_a_trailing_newline_parses() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (19 passed in trigger-docker, clippy and fmt clean, check-crates 0 errors with the expected template warnings, logic.rs 220 lines)
+- 2026-10-12 checker: pass
