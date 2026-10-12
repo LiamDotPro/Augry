@@ -33,6 +33,7 @@ import type {
   ReviewStatus,
   TerminalId,
   TerminalInfo,
+  TriggerFiredEvent,
 } from "../ipc/types";
 import type { LayoutMode } from "../ipc/layout";
 import { TASK_REPORT_PROMPT } from "../lib/agentTask";
@@ -49,6 +50,7 @@ import {
   uniqueNotePath,
 } from "../lib/sessionNotes";
 import { cdCommand, clearLineKey } from "../lib/shellCommand";
+import { firedNotice, NOTICE_MS } from "../lib/triggers";
 import { matchesAgentPattern } from "../terminals/osc";
 import { terminalRegistry } from "../terminals/registry";
 import { closeUnownedTerminals } from "./orphans";
@@ -72,6 +74,14 @@ export interface AppActions {
   setHotkeysOpen(open: boolean): void;
   setSettingsOpen(open: boolean): void;
   dismissError(): void;
+  dismissNotice(): void;
+
+  /** Reads the triggers status, which also picks up definition files added since. */
+  loadTriggersStatus(): Promise<void>;
+  /** The "Process triggers (experimental)" switch. Applies at once; no Save needed. */
+  setTriggersEnabled(enabled: boolean): Promise<void>;
+  /** Arms or disarms a local process definition. Applies at once. */
+  armProcess(processId: string, armed: boolean): Promise<void>;
 
   /** Folder picker; the pane goes after the focused one. */
   newTerminal(): Promise<void>;
@@ -318,6 +328,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       subscribe<NotesChangedEvent>(EVENTS.notesChanged, (event) => {
         void handleNotesChanged(event);
       }),
+      subscribe<TriggerFiredEvent>(EVENTS.triggerFired, (event) => {
+        dispatch({ type: "ui/notice", notice: { message: firedNotice(event), at: Date.now() } });
+      }),
     ];
 
     return () => {
@@ -419,6 +432,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, NOTE_TOAST_MS);
     return () => window.clearTimeout(timer);
   }, [state.noteToast]);
+
+  // The trigger notice goes away by itself.
+  useEffect(() => {
+    const notice = state.notice;
+    if (!notice) return;
+    const timer = window.setTimeout(() => {
+      if (stateRef.current.notice === notice) dispatch({ type: "ui/notice", notice: null });
+    }, NOTICE_MS);
+    return () => window.clearTimeout(timer);
+  }, [state.notice]);
 
   // Notes autosave -------------------------------------------------------
 
@@ -627,6 +650,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setHotkeysOpen: (open) => dispatch({ type: "ui/hotkeys", open }),
       setSettingsOpen: (open) => dispatch({ type: "ui/settings", open }),
       dismissError: () => dispatch({ type: "ui/error", message: null }),
+      dismissNotice: () => dispatch({ type: "ui/notice", notice: null }),
+
+      loadTriggersStatus: async () => {
+        try {
+          dispatch({ type: "triggers/status", status: await call("triggers_status", {}) });
+        } catch (error) {
+          fail(error);
+        }
+      },
+
+      setTriggersEnabled: async (enabled) => {
+        try {
+          const config = await call("config_set", { patch: { triggers: { enabled } } });
+          dispatch({ type: "config/set", config });
+          dispatch({ type: "triggers/status", status: await call("triggers_status", {}) });
+        } catch (error) {
+          fail(error);
+        }
+      },
+
+      armProcess: async (processId, armed) => {
+        try {
+          await call("triggers_arm", { processId, armed });
+          dispatch({ type: "config/set", config: await call("config_get", {}) });
+          dispatch({ type: "triggers/status", status: await call("triggers_status", {}) });
+        } catch (error) {
+          fail(error);
+        }
+      },
 
       newTerminal: () => openFrom(null, "pick-folder"),
       newTerminalHere: () => openFrom(null, "same-folder"),

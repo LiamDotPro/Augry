@@ -93,6 +93,20 @@ function Shell() {
           </button>
         </div>
       )}
+
+      {state.notice && (
+        <div className={cx("toast", "toast--notice", state.error && "toast--raised")} role="status">
+          <span>{state.notice.message}</span>
+          <button
+            type="button"
+            className="toast__dismiss"
+            aria-label="Dismiss"
+            onClick={actions.dismissNotice}
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -373,3 +373,15 @@
 .toast__dismiss:hover {
   background: rgb(var(--ink-rgb) / 0.14);
 }
+
+/* Notice toast: the same toast in neutral colours, for things that are not errors. */
+.toast--notice {
+  background: var(--glass-sheet);
+  border-color: var(--edge-strong);
+  color: var(--text-90);
+}
+
+/* Sits above the error toast when both are showing. */
+.toast--raised {
+  bottom: 76px;
+}
