@@ -2,7 +2,7 @@
 id: T21
 epic: 001-trigger-core
 title: Add the fs kinds, rule parsing and logic types
-status: todo
+status: done
 depends_on: [T20]
 size: M
 model: haiku
@@ -589,3 +589,5 @@ fn the_empty_state_machine_fires_nothing() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

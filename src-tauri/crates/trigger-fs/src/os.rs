@@ -3,6 +3,9 @@
 //! `logic.rs`. A platform with more than a few lines gets its own file
 //! (`os/macos.rs`) behind the same two functions.
 
+// Removed in T27, when lib.rs uses everything in this file.
+#![allow(dead_code)]
+
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Sender;
 use std::sync::Arc;

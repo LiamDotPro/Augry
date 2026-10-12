@@ -8,35 +8,134 @@ mod logic;
 mod os;
 mod rule;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
-
 use trigger_core::{
-    Availability, Event, FieldInfo, Handle, KindInfo, Platforms, Rule, RuleError, Sink, Source,
+    Availability, FieldInfo, Handle, KindInfo, Platforms, Rule, RuleError, Sink, Source,
     SourceError,
 };
 
+const WHEN: &[FieldInfo] = &[
+    FieldInfo {
+        name: "path",
+        doc: "Folder to watch, absolute. Everything below it is watched.",
+        required: true,
+    },
+    FieldInfo {
+        name: "glob",
+        doc: "Which files count, matched against the path below the folder. Default **/*",
+        required: false,
+    },
+    FieldInfo {
+        name: "ignore",
+        doc: "Globs to skip, added to the built in ones (.git, node_modules, target, temp and partial download files)",
+        required: false,
+    },
+    FieldInfo {
+        name: "settle_ms",
+        doc: "Milliseconds a file must be quiet before it counts as changed. Default 500",
+        required: false,
+    },
+];
+
+const PAYLOAD: &[FieldInfo] = &[
+    FieldInfo {
+        name: "path",
+        doc: "Absolute path of the file",
+        required: true,
+    },
+    FieldInfo {
+        name: "name",
+        doc: "File name",
+        required: true,
+    },
+    FieldInfo {
+        name: "relative",
+        doc: "Path below the watched folder, with / separators",
+        required: true,
+    },
+    FieldInfo {
+        name: "ext",
+        doc: "Extension without the dot, empty when there is none",
+        required: true,
+    },
+];
+
+const PAYLOAD_RENAMED: &[FieldInfo] = &[
+    FieldInfo {
+        name: "path",
+        doc: "Absolute path of the file after the rename",
+        required: true,
+    },
+    FieldInfo {
+        name: "name",
+        doc: "File name after the rename",
+        required: true,
+    },
+    FieldInfo {
+        name: "relative",
+        doc: "Path below the watched folder, with / separators",
+        required: true,
+    },
+    FieldInfo {
+        name: "ext",
+        doc: "Extension without the dot, empty when there is none",
+        required: true,
+    },
+    FieldInfo {
+        name: "from",
+        doc: "Absolute path before the rename",
+        required: true,
+    },
+];
+
 /// Every kind this crate fires. The ids are a contract with saved process
 /// definitions: add kinds, never rename one.
-pub static KINDS: &[KindInfo] = &[KindInfo {
-    id: "fs.example",
-    title: "Example",
-    summary: "Replace with what makes this kind fire.",
-    platforms: Platforms::ALL,
-    permission: None,
-    when: &[FieldInfo {
-        name: "example",
-        doc: "Replace with the real fields",
-        required: true,
-    }],
-    payload: &[FieldInfo {
-        name: "example",
-        doc: "Replace with the real fields",
-        required: true,
-    }],
-}];
+pub static KINDS: &[KindInfo] = &[
+    KindInfo {
+        id: "fs.file-saved",
+        title: "File saved",
+        summary: "A file that already existed was written to.",
+        platforms: Platforms::ALL,
+        permission: None,
+        when: WHEN,
+        payload: PAYLOAD,
+    },
+    KindInfo {
+        id: "fs.file-created",
+        title: "File created",
+        summary: "A new file appeared.",
+        platforms: Platforms::ALL,
+        permission: None,
+        when: WHEN,
+        payload: PAYLOAD,
+    },
+    KindInfo {
+        id: "fs.file-removed",
+        title: "File removed",
+        summary: "A file was deleted.",
+        platforms: Platforms::ALL,
+        permission: None,
+        when: WHEN,
+        payload: PAYLOAD,
+    },
+    KindInfo {
+        id: "fs.file-renamed",
+        title: "File renamed",
+        summary: "A file was renamed or moved inside the watched folder.",
+        platforms: Platforms::ALL,
+        permission: None,
+        when: WHEN,
+        payload: PAYLOAD_RENAMED,
+    },
+    KindInfo {
+        id: "fs.download-finished",
+        title: "Download finished",
+        summary: "A browser finished a download and the file got its final name.",
+        platforms: Platforms::ALL,
+        permission: None,
+        when: WHEN,
+        payload: PAYLOAD,
+    },
+];
 
 pub struct FsSource;
 
@@ -58,46 +157,22 @@ impl Source for FsSource {
     }
 
     fn start(&self, rules: Vec<Rule>, sink: Sink) -> Result<Handle, SourceError> {
-        let armed = rules
+        let _armed = rules
             .iter()
             .map(|r| {
-                rule::parse(r).map(|when| logic::Armed {
+                rule::parse(r).map(|p| logic::Armed {
                     id: r.id.clone(),
                     kind: r.kind.clone(),
-                    when,
+                    root: p.when.path.clone(),
+                    when: p.when,
+                    glob: p.glob,
+                    ignore: p.ignore,
                 })
             })
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| SourceError::Os(e.to_string()))?;
-
-        let stop = Arc::new(AtomicBool::new(false));
-        let (tx, rx) = mpsc::channel::<logic::Signal>();
-        os::listen(&armed, stop.clone(), tx)?;
-
-        let thread_stop = stop.clone();
-        std::thread::Builder::new()
-            .name("trigger-fs".into())
-            .spawn(move || {
-                let mut state = logic::State::default();
-                while !thread_stop.load(Ordering::Relaxed) {
-                    let Ok(signal) = rx.recv_timeout(Duration::from_millis(250)) else {
-                        continue;
-                    };
-                    for (rule, kind, payload) in logic::step(&mut state, &armed, signal) {
-                        let event = Event {
-                            rule,
-                            kind,
-                            at: SystemTime::now(),
-                            payload,
-                        };
-                        if sink.send(event).is_err() {
-                            return;
-                        }
-                    }
-                }
-            })
-            .map_err(|e| SourceError::Os(e.to_string()))?;
-
-        Ok(Handle::new(move || stop.store(true, Ordering::Relaxed)))
+        // The watcher and the thread are added by the glue card (T27).
+        let _ = sink;
+        Err(SourceError::Unavailable("not implemented yet".into()))
     }
 }

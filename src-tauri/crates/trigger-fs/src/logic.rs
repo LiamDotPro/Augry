@@ -1,71 +1,77 @@
 //! Pure decisions: given what the OS reported, which rules fire and with what
-//! payload. No OS calls, no threads, no clocks: everything it needs comes in
-//! as arguments, so every case is a unit test.
+//! payload. No OS calls, no threads, no clocks: time and "is this a file"
+//! come in as arguments, so every case is a unit test.
+
+// Removed in T27, when lib.rs reads everything in this file.
+#![allow(dead_code)]
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
+use globset::GlobSet;
 use trigger_core::{RuleId, Value};
 
 use crate::rule::When;
 
-/// A rule this crate is watching for.
+/// A rule this crate is watching for. `root` is `when.path` made canonical.
 #[derive(Debug, Clone)]
 pub struct Armed {
     pub id: RuleId,
     pub kind: String,
     pub when: When,
+    pub root: PathBuf,
+    pub glob: GlobSet,
+    pub ignore: GlobSet,
 }
 
-/// What `os.rs` reports, already reduced to what this crate cares about.
-// Template: remove this allow once os.rs sends signals.
-#[allow(dead_code)]
+/// What `os.rs` makes of a `notify` event kind, so this file does not depend
+/// on `notify`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RawKind {
+    Create,
+    Remove,
+    /// Data, metadata or unspecified change.
+    Modify,
+    /// One half of a rename (`Name(From)`, `Name(To)`, `Name(Any)`).
+    Name,
+    /// Both halves of a rename in one event, `paths` is `[from, to]` (Linux).
+    Both,
+    /// The OS lost events: forget what is pending and scan again.
+    Rescan,
+    /// Access events and anything else that never changes a file.
+    Ignore,
+}
+
+/// Time is a number of milliseconds on any clock that only goes forward. The
+/// caller reads the clock; nothing in here does.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Signal {
-    Example { value: String },
+    Raw {
+        at: u64,
+        kind: RawKind,
+        paths: Vec<PathBuf>,
+    },
+    Tick {
+        now: u64,
+    },
 }
 
-/// Anything the logic must remember between signals (debounce, last state).
+/// Everything remembered between signals for one rule.
 #[derive(Debug, Default)]
 pub struct State {}
 
 pub type Payload = BTreeMap<String, Value>;
 
-/// The rules a signal fires: (rule id, kind, payload).
-pub fn step(_state: &mut State, armed: &[Armed], signal: Signal) -> Vec<(RuleId, String, Payload)> {
-    match signal {
-        Signal::Example { value } => armed
-            .iter()
-            .filter(|a| a.when.example == value)
-            .map(|a| {
-                let payload = BTreeMap::from([("example".to_string(), Value::from(value.clone()))]);
-                (a.id.clone(), a.kind.clone(), payload)
-            })
-            .collect(),
-    }
+/// The events a signal fires for this rule: (kind, payload). `is_file` says
+/// whether a path is an existing regular file.
+pub fn step(
+    _state: &mut State,
+    _armed: &Armed,
+    _signal: Signal,
+    _is_file: &dyn Fn(&Path) -> bool,
+) -> Vec<(String, Payload)> {
+    Vec::new()
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn armed(value: &str) -> Armed {
-        Armed {
-            id: "p/t".into(),
-            kind: "fs.example".into(),
-            when: When {
-                example: value.into(),
-            },
-        }
-    }
-
-    #[test]
-    fn fires_for_a_matching_signal_only() {
-        let mut state = State::default();
-        let rules = [armed("a")];
-        assert_eq!(
-            step(&mut state, &rules, Signal::Example { value: "a".into() }).len(),
-            1
-        );
-        assert!(step(&mut state, &rules, Signal::Example { value: "b".into() }).is_empty());
-    }
-}
+mod tests;

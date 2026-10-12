@@ -10,7 +10,11 @@ Source id `fs`. One crate, one source: everything it fires starts with
 <!-- kinds -->
 | Kind | Title | Platforms | Permission | When | Payload |
 | --- | --- | --- | --- | --- | --- |
-| fs.example | Example | macOS, Windows, Linux | none | example* | example |
+| fs.file-saved | File saved | macOS, Windows, Linux | none | path*, glob, ignore, settle_ms | path, name, relative, ext |
+| fs.file-created | File created | macOS, Windows, Linux | none | path*, glob, ignore, settle_ms | path, name, relative, ext |
+| fs.file-removed | File removed | macOS, Windows, Linux | none | path*, glob, ignore, settle_ms | path, name, relative, ext |
+| fs.file-renamed | File renamed | macOS, Windows, Linux | none | path*, glob, ignore, settle_ms | path, name, relative, ext, from |
+| fs.download-finished | Download finished | macOS, Windows, Linux | none | path*, glob, ignore, settle_ms | path, name, relative, ext |
 <!-- /kinds -->
 
 ## Rule fields
