@@ -9,8 +9,12 @@
 
 use std::collections::BTreeMap;
 
-use super::backoff::Backoff;
-use super::diff::{feed_key, groups_for, path_for, Group};
+use trigger_core::RuleId;
+
+use super::backoff::{Backoff, Verdict};
+use super::cli::Gh;
+use super::diff::{diff, feed_key, groups_for, path_for, Fire, Group};
+use super::response::GhResponse;
 use super::text::iso;
 use super::{Armed, State};
 
@@ -76,6 +80,21 @@ pub fn plan(rules: &[Armed], me: &str, since: &str) -> Vec<Job> {
     jobs.into_values().collect()
 }
 
+/// A line for the log. Rule ids and plain words only: never a response body,
+/// a header or anything the user has.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Note {
+    pub rules: Vec<RuleId>,
+    pub text: String,
+}
+
+/// What one `tick` produced.
+#[derive(Debug, Default)]
+pub struct Outcome {
+    pub fires: Vec<Fire>,
+    pub notes: Vec<Note>,
+}
+
 pub struct Poller {
     rules: Vec<Armed>,
     /// `text::iso` of the start time. The same value goes into every comment
@@ -116,7 +135,98 @@ impl Poller {
     pub fn is_stopped(&self) -> bool {
         self.stopped
     }
+
+    /// Does whatever is due at time `now` and returns what fired. Called about
+    /// once a second. `cancelled` is asked before every request, so a stop
+    /// request is noticed between requests.
+    ///
+    /// Requests run one after another in the order of `plan`. When GitHub says
+    /// to wait, nothing is asked until the wait is over.
+    pub fn tick(&mut self, now: u64, gh: &dyn Gh, cancelled: &dyn Fn() -> bool) -> Outcome {
+        let mut out = Outcome::default();
+        if self.stopped || !self.backoff.may_poll(now) {
+            return out;
+        }
+        if self.me.is_none() && !self.learn_who_you_are(now, gh) {
+            return out;
+        }
+        for index in 0..self.jobs.len() {
+            if cancelled() || !self.backoff.may_poll(now) {
+                break;
+            }
+            if self.jobs[index].due > now {
+                continue;
+            }
+            self.poll(index, now, gh, &mut out);
+        }
+        out
+    }
+
+    /// Reads the login once and plans the jobs. When `gh` cannot say, tries
+    /// again after `LOGIN_RETRY_S`.
+    fn learn_who_you_are(&mut self, now: u64, gh: &dyn Gh) -> bool {
+        if now < self.login_retry_at {
+            return false;
+        }
+        match gh.login() {
+            Some(me) => {
+                self.jobs = plan(&self.rules, &me, &self.since);
+                self.me = Some(me);
+                true
+            }
+            None => {
+                self.login_retry_at = now.saturating_add(LOGIN_RETRY_S);
+                false
+            }
+        }
+    }
+
+    /// Makes one request, takes the answer into the backoff and the memory,
+    /// and schedules the next one.
+    fn poll(&mut self, index: usize, now: u64, gh: &dyn Gh, out: &mut Outcome) {
+        let Some(me) = self.me.as_deref() else {
+            return;
+        };
+        let job = &mut self.jobs[index];
+        let etag = self
+            .state
+            .repo(&job.repo)
+            .etag(&job.path)
+            .map(str::to_string);
+        let response = gh.get(&job.path, etag.as_deref());
+        let verdict = self.backoff.record(now, &response);
+        if let Some(hint) = response.poll_interval_s() {
+            job.hint_s = Some(hint);
+        }
+        match verdict {
+            Verdict::Fine => {
+                job.not_found = false;
+                job.reported = false;
+                if let GhResponse::Ok { etag, body, .. } = &response {
+                    let rules: Vec<&Armed> = job.rules.iter().map(|&r| &self.rules[r]).collect();
+                    let repo = self.state.repo(&job.repo);
+                    if let Ok(fires) =
+                        diff(job.group, body, &job.key, repo, &rules, me, &self.since)
+                    {
+                        out.fires.extend(fires);
+                        if let Some(etag) = etag {
+                            repo.set_etag(&job.path, etag);
+                        }
+                    }
+                }
+                job.due = now.saturating_add(self.backoff.effective_interval_s(
+                    now,
+                    job.interval_s,
+                    job.hint_s,
+                    job.not_found,
+                ));
+            }
+            _ => job.due = now,
+        }
+    }
 }
 
 #[cfg(test)]
 mod plan_tests;
+#[cfg(test)]
+mod tick_tests;
