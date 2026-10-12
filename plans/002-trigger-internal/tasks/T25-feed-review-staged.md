@@ -2,7 +2,7 @@
 id: T25
 epic: 002-trigger-internal
 title: Publish tg.review-staged from review_stage
-status: todo
+status: done
 depends_on: [T20]
 size: S
 model: haiku
@@ -86,3 +86,5 @@ and replace it with. `refresh_labels` has just read the repository, so `repo_roo
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy baseline 7, after 7. Tests: git::review 6 passed, workspace all ok. fmt --check 0, no-default-features check 0, feeds::publish count 1. git status: review.rs and this card only.
+- 2026-10-13 checker: pass
