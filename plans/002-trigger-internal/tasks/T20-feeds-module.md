@@ -2,7 +2,7 @@
 id: T20
 epic: 002-trigger-internal
 title: Add the feeds module for the app's own signals
-status: todo
+status: done
 depends_on: [T09]
 size: M
 model: haiku
@@ -196,3 +196,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7, after 7; feeds tests 5 passed)
+- 2026-10-12 checker: pass
