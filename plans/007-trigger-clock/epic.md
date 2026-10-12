@@ -1,7 +1,7 @@
 ---
 id: 007-trigger-clock
 title: trigger-clock
-status: building
+status: done
 depends_on: [001-trigger-core]
 ---
 

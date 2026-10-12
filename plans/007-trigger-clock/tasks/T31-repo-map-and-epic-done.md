@@ -2,7 +2,7 @@
 id: T31
 epic: 007-trigger-clock
 title: Add trigger-clock to the repo map and mark 007 done
-status: todo
+status: done
 depends_on: [T30]
 size: S
 model: haiku
@@ -75,3 +75,5 @@ If the file already has a row starting `| 007`, set its Status cell to `done` in
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
