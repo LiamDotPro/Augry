@@ -2,7 +2,7 @@
 id: T20
 epic: 010-trigger-docker
 title: Find the engine binary and report availability
-status: todo
+status: done
 depends_on: [T14]
 size: M
 model: haiku
@@ -291,3 +291,5 @@ fn availability_is_one_of_the_two_answers_it_can_give() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
