@@ -9,6 +9,7 @@ pub mod backoff;
 pub mod diff;
 pub mod json;
 pub mod payload;
+pub mod pulls;
 pub mod response;
 pub mod text;
 

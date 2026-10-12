@@ -2,7 +2,7 @@
 id: T16
 epic: 011-trigger-github
 title: Fire review-requested, merged and dependency PRs
-status: todo
+status: done
 depends_on: [T15]
 size: M
 model: haiku
@@ -373,3 +373,5 @@ pub mod pulls;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (81 lib tests, full crate tests, clippy, fmt --check, check-crates all exit 0)
+- 2026-10-12 checker: pass
