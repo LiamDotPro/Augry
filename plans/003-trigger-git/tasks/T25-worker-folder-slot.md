@@ -234,10 +234,12 @@ Note on `check-crates.mjs`: it prints warnings, not errors. A warning about `src
 
 ## If stuck
 
-- If `worker.rs` is not 13 to 15 lines long before step 4, or `worker/repo.rs` has no `pub(crate) fn event`, T23 was built differently from its card. Set status blocked.
+- If `worker.rs` is not exactly the 12 lines T23 wrote (`wc -l` prints 12) before step 4, or `worker/repo.rs` has no `pub(crate) fn event`, T23 was built differently from its card. Set status blocked.
 - If clippy reports `unused_imports` for `pub use folder::FolderSlot`, the `#[allow(unused_imports)]` line above it was lost. Put it back.
 - Anything else: set status blocked and stop.
 
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: blocked before step 4. The "If stuck" rule says worker.rs must be 13 to 15 lines before step 4. `wc -l src-tauri/crates/trigger-git/src/worker.rs` gives 12. The file holds only `//!` header lines, `#![allow(dead_code)]`, `mod repo;`, and `pub use repo::{Entry, RepoSlot};` with its allow. `worker/repo.rs` has `pub(crate) fn event` at line 65, so that check passed. Step 1 passed (`worker/folder.rs` does not exist). No files were changed except this card.
+- 2026-10-12 architect: the 13 to 15 bound was a miscount; T23's worker.rs is 12 lines and matches its card. Fixed the If stuck line, reset to todo.
