@@ -2,7 +2,7 @@
 id: T12
 epic: 002-trigger-internal
 title: Count commands by history number in shell-integration.sh
-status: todo
+status: done
 depends_on: [T11]
 size: S
 model: haiku
@@ -123,3 +123,5 @@ fn bash_reports_a_repeated_command_each_time() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7 warnings, after 7; HISTCMD count 2; __tg_last_cmd count 0; 6 live tests ok, workspace tests ok, fmt --check ok, no-default-features check ok)
+- 2026-10-12 checker: pass

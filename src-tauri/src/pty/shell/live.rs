@@ -203,3 +203,29 @@ fn bash_works_without_a_bashrc() {
         "no OSC 133;D;1 in {out:?}"
     );
 }
+
+/// Runs `true` three times and `false` once in the named shell, with an old command
+/// already in its history file.
+fn check_repeats(name: &str, history_file: &str, history_text: &str) {
+    let Some(shell) = find_shell(name) else {
+        eprintln!("skipping: {name} is not installed");
+        return;
+    };
+    let sandbox = Sandbox::new();
+    sandbox.write_home(history_file, history_text);
+    let out = run(&shell, &sandbox, "true\ntrue\ntrue\nfalse\nexit\n");
+    assert_eq!(out.matches("\x1b]133;D;0\x07").count(), 3, "{out:?}");
+    assert_eq!(out.matches("\x1b]133;D;1\x07").count(), 1, "{out:?}");
+    // The history file's old command was not run in this shell.
+    assert_eq!(out.matches("\x1b]133;D;").count(), 4, "{out:?}");
+}
+
+#[test]
+fn zsh_reports_a_repeated_command_each_time() {
+    check_repeats("zsh", ".zsh_history", ": 1700000000:0;echo old\n");
+}
+
+#[test]
+fn bash_reports_a_repeated_command_each_time() {
+    check_repeats("bash", ".bash_history", "echo old\n");
+}
