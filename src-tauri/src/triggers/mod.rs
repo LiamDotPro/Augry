@@ -4,3 +4,4 @@
 //! rest of the module; each adds its own `pub mod` line.
 
 pub mod store;
+pub mod variables;
