@@ -1,0 +1,181 @@
+---
+id: T09
+epic: 007-trigger-clock
+title: Write the clock README for the rule and logic work
+status: todo
+depends_on: [T08]
+size: S
+model: haiku
+files:
+  - src-tauri/crates/trigger-clock/README.md
+---
+
+## Goal
+
+The README has all eight sections filled in for what the crate does after slice A: kinds, rule fields, payload, platforms, permissions, examples, files and the known limits (DST, lateness, restart).
+
+## Read first
+
+- `plans/_templates/trigger-crate/README.md` the section list
+- `src-tauri/crates/trigger-fs/README.md` how a finished README reads
+- `plans/007-trigger-clock/epic.md` Decisions 3, 5, 8, 10 and 11
+- `plans/007-trigger-clock/research/R01-cron.md` the DST evidence the Known limits repeat
+
+## Steps
+
+1. Replace the whole of `src-tauri/crates/trigger-clock/README.md` with this. The table between the `<!-- kinds -->` markers is the output of the readme example; step 2 checks it.
+
+```markdown
+# trigger-clock
+
+Fires on a schedule, an interval, the first use of the day, and around calendar events.
+
+Source id `clock`. One crate, one source: everything it fires starts with
+`clock.`.
+
+## Kinds
+
+Generated from `KINDS` in `src/lib.rs`. Refresh with
+`cargo run -p trigger-clock --example readme` and paste the output between
+the markers; `tests/readme.rs` fails while this table is stale.
+
+<!-- kinds -->
+| Kind | Title | Platforms | Permission | When | Payload |
+| --- | --- | --- | --- | --- | --- |
+| clock.schedule | Schedule | macOS, Windows, Linux | none | cron*, catch_up | due, caught_up |
+| clock.interval | Interval | macOS, Windows, Linux | none | every_s*, catch_up | due, caught_up |
+| clock.daily-first-use | First use of the day | macOS, Windows, Linux | none | none | date |
+| clock.event-starting | Event starting | macOS, Windows, Linux | none | feed*, title, minutes_before | title, start, end, feed |
+| clock.event-ended | Event ended | macOS, Windows, Linux | none | feed*, title | title, start, end, feed |
+<!-- /kinds -->
+
+## Rule fields
+
+The `when` object of a trigger, parsed by `src/rule.rs`. Unknown fields are an
+error, so a typo shows up in the editor. A field a kind does not use is an
+error too.
+
+| Field | Used by | Required | Default | Meaning |
+|---|---|---|---|---|
+| `cron` | `clock.schedule` | yes | | Five field cron expression in local time: minute, hour, day of month, month, day of week. Six fields (with seconds) are refused |
+| `every_s` | `clock.interval` | yes | | Seconds between firings, at least 10 |
+| `catch_up` | `clock.schedule`, `clock.interval` | no | `false` | After the machine slept, fire once for the latest missed time. Without it, missed times are skipped |
+| `feed` | `clock.event-starting`, `clock.event-ended` | yes | | An `https://` or `webcal://` URL, or an absolute path to an `.ics` file |
+| `title` | `clock.event-starting`, `clock.event-ended` | no | every event | Glob matched against the event title, case insensitive; `*` also matches `/` |
+| `minutes_before` | `clock.event-starting` | no | `5` | Minutes before the start that the rule fires |
+
+`clock.daily-first-use` takes no fields.
+
+## Payload
+
+What an event carries, available to steps as `${trigger.<field>}`. Never an
+event description or its attendees.
+
+| Field | Kinds | Meaning |
+|---|---|---|
+| `due` | `clock.schedule`, `clock.interval` | The time the rule was due, milliseconds since 1970 |
+| `caught_up` | `clock.schedule`, `clock.interval` | `true` when the firing stands for times missed while the machine slept |
+| `date` | `clock.daily-first-use` | The local date, `YYYY-MM-DD` |
+| `title` | event kinds | The event title |
+| `start` | event kinds | When the event starts, milliseconds since 1970 |
+| `end` | event kinds | When the event ends, milliseconds since 1970 |
+| `feed` | event kinds | The feed the event came from, as written in the rule |
+
+## Platforms
+
+| Platform | How it is detected | Limits |
+|---|---|---|
+| macOS | The wall clock is read at least every 30 seconds; the local zone comes from `chrono::Local` | Same on every platform |
+| Windows | Same | Same |
+| Linux | Same | Same |
+
+A gap of more than 90 seconds between two readings means the machine slept.
+Waits do not count time spent asleep on any of the three systems, so the crate
+never trusts the length of a wait, only the wall clock.
+
+## Permissions
+
+None. Reading a calendar file or feed needs no permission from the OS.
+
+## Example
+
+```json
+{ "id": "morning", "kind": "clock.schedule", "when": { "cron": "0 9 * * 1-5", "catch_up": true } }
+```
+
+```json
+{ "id": "poll", "kind": "clock.interval", "when": { "every_s": 300 } }
+```
+
+```json
+{ "id": "hello", "kind": "clock.daily-first-use", "when": {} }
+```
+
+## Develop
+
+| File | What it holds |
+|---|---|
+| `src/lib.rs` | `KINDS`, `ClockSource` and the thread that joins the wall clock to the logic. Glue only |
+| `src/rule.rs` | The typed `When`, `Parsed` and `parse`, with the per kind checks. Pure, unit tested |
+| `src/logic.rs` | Pure: `State`, `Fire`, `next_due`, `step` and `wait`. Takes `now` as an argument and never sleeps |
+| `src/logic/tests.rs` | Unit tests for normal ticks, jumps, catch up, backwards jumps and daily first use |
+| `src/logic/dst_tests.rs` | Unit tests for the daylight saving cases, in the America/New_York zone |
+| `src/os.rs` | The only file that talks to the OS: `availability()` |
+| `tests/live.rs` | `#[ignore]` tests against the real clock |
+| `tests/readme.rs` | Fails when the Kinds table above is stale |
+
+```
+cd src-tauri
+cargo test -p trigger-clock                       # pure and readme tests, any OS, offline
+cargo test -p trigger-clock -- --ignored          # live tests on this machine
+cargo clippy -p trigger-clock --all-targets -- -D warnings
+```
+
+## Known limits
+
+- Cron runs in local time, at each instant the cron library returns. A time
+  that spring forward skips (such as `30 2 * * *`) runs at the first valid
+  minute after the gap (03:00). A fixed time inside the repeated autumn hour
+  (`30 1 * * *`) runs once. An hourly pattern (`0 * * * *`) runs twice in the
+  repeated hour, once for each 01:00.
+- A firing can be up to 30 seconds late, and later still right after the
+  machine wakes: the first check after waking is when missed times are found.
+- A process frozen for more than 90 seconds looks the same as a sleep.
+- If the wall clock is set backwards, nothing fires for that check and every
+  schedule is planned again from the new time, so a time can fire twice.
+- `clock.daily-first-use` remembers the last day only in memory. After the app
+  restarts it fires again on the same day, a minute after it starts.
+- Not finished yet: the threads that run the logic, so `start` still returns
+  unavailable, and the calendar feed code behind the two event kinds.
+```
+
+2. Run `cd src-tauri && cargo run -q -p trigger-clock --example readme` and compare its output with the table between the markers. They must be identical. If they differ, replace the table with the command output, keeping both marker lines.
+
+3. Later slices change this file: slice B adds the `feed.rs` row and slice C removes the "Not finished yet" bullet. Do not anticipate them.
+
+## Acceptance
+
+- [ ] `cd src-tauri && cargo test -p trigger-clock --test readme` passes (1 test)
+- [ ] `cd src-tauri && cargo test -p trigger-clock` passes: 38 tests in the library, 1 in `readme`, 1 ignored in `live`
+- [ ] `grep -c "^## " src-tauri/crates/trigger-clock/README.md` prints `8`
+- [ ] `grep -c "Replace with" src-tauri/crates/trigger-clock/README.md` prints `0`
+- [ ] `cd src-tauri && cargo clippy -p trigger-clock --all-targets -- -D warnings` exits 0
+- [ ] `cd src-tauri && cargo fmt -p trigger-clock --check` exits 0
+- [ ] `node plans/_tools/check-crates.mjs` exits 0. One warning is expected and does not fail the check: `trigger-clock: src/lib.rs still has template code` (the "not implemented yet" in `start`, replaced by slice C). `trigger-clock` has no README warning.
+- [ ] `git status --porcelain` lists only paths under `files:`
+
+## Out of scope
+
+- Editing code.
+- Describing the feed fetcher or the two threads in more detail than the README says.
+- Registering the crate in the app or editing `plans/_context/repo-map.md`: slice D.
+
+## If stuck
+
+- If the readme test fails with "Kinds table is stale", redo step 2.
+- If `check-crates` reports an error about a missing README section, check that the eight `## ` headings are spelt exactly as in the pasted text.
+- Anything else: set `status: blocked`, add a Log line saying what you saw, and stop.
+
+## Log
+
+<!-- one line per attempt: date, model, result, short note -->
