@@ -2,7 +2,7 @@
 id: T31
 epic: 002-trigger-internal
 title: Design 4.5, how each shell loads the script
-status: todo
+status: done
 depends_on: [T30]
 size: S
 model: haiku
@@ -73,3 +73,5 @@ cmd.exe gets no integration; the process tree watcher still works there, cwd sta
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed
+- 2026-10-13 checker: pass
