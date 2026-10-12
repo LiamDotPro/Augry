@@ -76,6 +76,16 @@ terminal-grid/
         paths.rs            # root sandboxing and validation
       state/
         mod.rs              # Config + Session persistence (app config dir)
+      triggers/
+        mod.rs              # TriggerService: the hub, refresh(), the forward thread, the four triggers_* commands
+        store.rs            # local process definitions, one JSON file each in <app config dir>/processes/
+        variables.rs        # ${home}, ${downloads}, ${notes.root}, ${screenshots}, ${repo.root}
+        rules.rs            # definitions + armed list + open repositories -> the rules the hub runs
+        status.rs           # the triggers_status answer and the trigger://fired payload
+    crates/                 # trigger crates, one per integration, all built from plans/_templates/trigger-crate
+      trigger-core/         # the contract (Source, Rule, Event, KindInfo) and the test kit
+      trigger-hub/          # registry, rule checks, cool down, one stream of Fired events
+      trigger-fs/           # the reference source: fs.file-saved, fs.file-created, fs.file-removed, fs.file-renamed, fs.download-finished
     resources/
       shell-integration.ps1 # bundled, copied to app data dir on first run
       shell-integration.sh
@@ -103,6 +113,33 @@ tauri-build = { version = "2", features = [] }
 ```
 
 Windows only dependency for process creation flags is already in std (`std::os::windows::process::CommandExt`).
+
+`src-tauri` is a Cargo workspace. The app crate `terminal-grid` is the root package; every folder under `crates/` is a member. Shared dependency versions live in `[workspace.dependencies]` and the crates use them with `{ workspace = true }`:
+
+```toml
+[workspace]
+members = ["crates/*"]
+default-members = [".", "crates/*"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+notify = "8.2"
+uuid = { version = "1", features = ["v4"] }
+globset = "0.4.20"
+
+[features]
+default = ["trigger-fs"]
+trigger-fs = ["dep:trigger-fs"]
+
+[dependencies]
+trigger-core = { path = "crates/trigger-core" }
+trigger-hub = { path = "crates/trigger-hub" }
+trigger-fs = { path = "crates/trigger-fs", optional = true }
+```
+
+A trigger crate depends on `trigger-core` and on outside crates only, never on another trigger crate, on `tauri` or on the app. `node plans/_tools/check-crates.mjs` checks this. The app wires each source in through one line in `sources()` in `src-tauri/src/triggers/mod.rs`, behind its own cargo feature. The rules for crates are in `docs/process-triggers.md` Part 2.
 
 ---
 
