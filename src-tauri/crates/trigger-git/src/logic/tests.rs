@@ -264,3 +264,144 @@ fn nothing_else_fires_while_a_rebase_runs() {
     // Even a first sight of a rebase with a tag only reports the stop.
     assert_eq!(kinds(&step(&prev, &later)), vec!["git.rebase-stopped"]);
 }
+
+/// `prev` on main at one commit, `next` on main at another with `subject` as
+/// the newest reflog entry.
+fn moved(subject: Option<&str>) -> (RepoSnapshot, RepoSnapshot) {
+    let prev = on("main", "aaaaaaa1");
+    let mut next = on("main", "bbbbbbb2");
+    next.reflog_subject = subject.map(String::from);
+    (prev, next)
+}
+
+#[test]
+fn a_new_commit_fires_commit_with_its_message() {
+    for subject in [
+        "commit: add the thing",
+        "commit (amend): add the thing",
+        "commit (merge): Merge branch x",
+        "commit (initial): first",
+        "cherry-pick: add the thing",
+    ] {
+        let (prev, next) = moved(Some(subject));
+        assert_eq!(
+            step(&prev, &next),
+            vec![Change::Commit {
+                branch: Some("main".into()),
+                commit: Some("bbbbbbb".into()),
+                message: Some("message of bbbbbbb2".into())
+            }],
+            "{subject}"
+        );
+    }
+}
+
+#[test]
+fn the_first_commit_on_an_unborn_branch_fires_commit() {
+    let mut prev = on("main", "x");
+    prev.head = None;
+    prev.short = None;
+    let (_, next) = moved(Some("commit (initial): first"));
+    assert_eq!(kinds(&step(&prev, &next)), vec!["git.commit"]);
+}
+
+#[test]
+fn a_pull_or_merge_fires_pulled() {
+    for subject in [
+        "pull: Fast-forward",
+        "pull: Merge made by the 'ort' strategy.",
+        "pull --rebase (finish): returning to refs/heads/main",
+        "merge origin/main: Fast-forward",
+    ] {
+        let (prev, next) = moved(Some(subject));
+        assert_eq!(kinds(&step(&prev, &next)), vec!["git.pulled"], "{subject}");
+    }
+}
+
+#[test]
+fn a_reset_or_a_finished_rebase_fires_nothing() {
+    for subject in [
+        Some("reset: moving to HEAD~1"),
+        Some("rebase (finish): returning to refs/heads/main"),
+        Some("checkout: moving from a to main"),
+        Some(""),
+        None,
+    ] {
+        let (prev, next) = moved(subject);
+        assert!(step(&prev, &next).is_empty(), "{subject:?}");
+    }
+}
+
+#[test]
+fn a_commit_on_a_detached_head_fires_commit() {
+    let prev = detached("aaaaaaa1");
+    let mut next = detached("bbbbbbb2");
+    next.reflog_subject = Some("commit: wip".into());
+    assert_eq!(kinds(&step(&prev, &next)), vec!["git.commit"]);
+}
+
+#[test]
+fn switching_branch_fires_only_the_switch() {
+    let prev = on("main", "aaaaaaa1");
+    // The new branch is at another commit and the reflog says checkout.
+    let mut next = on("feature", "bbbbbbb2");
+    next.reflog_subject = Some("checkout: moving from main to feature".into());
+    assert_eq!(
+        step(&prev, &next),
+        vec![Change::BranchSwitched {
+            from: "main".into(),
+            to: "feature".into(),
+            commit: Some("bbbbbbb".into())
+        }]
+    );
+    // A subject starting with commit or pull cannot turn a switch into more.
+    next.reflog_subject = Some("pull: Fast-forward".into());
+    assert_eq!(kinds(&step(&prev, &next)), vec!["git.branch-switched"]);
+}
+
+#[test]
+fn a_new_branch_made_at_the_same_commit_is_a_switch() {
+    let prev = on("main", "aaaaaaa1");
+    let next = on("topic", "aaaaaaa1");
+    assert_eq!(kinds(&step(&prev, &next)), vec!["git.branch-switched"]);
+}
+
+#[test]
+fn leaving_a_branch_for_a_commit_fires_detached_head() {
+    let prev = on("main", "aaaaaaa1");
+    let next = detached("bbbbbbb2");
+    assert_eq!(
+        step(&prev, &next),
+        vec![Change::DetachedHead {
+            from: "main".into(),
+            commit: Some("bbbbbbb".into())
+        }]
+    );
+}
+
+#[test]
+fn getting_back_onto_a_branch_from_a_detached_head_fires_nothing() {
+    let prev = detached("aaaaaaa1");
+    let next = on("main", "bbbbbbb2");
+    assert!(step(&prev, &next).is_empty());
+}
+
+#[test]
+fn a_detach_during_a_merge_is_not_a_detached_head() {
+    let prev = on("main", "aaaaaaa1");
+    let mut next = detached("aaaaaaa1");
+    next.merge_head = Some("ccccccc3".into());
+    assert!(step(&prev, &next).is_empty());
+}
+
+#[test]
+fn a_conflict_and_a_switch_in_one_window_come_in_order() {
+    let prev = on("main", "aaaaaaa1");
+    let mut next = on("feature", "bbbbbbb2");
+    next.merge_head = Some("ccccccc3".into());
+    next.unmerged = 1;
+    assert_eq!(
+        kinds(&step(&prev, &next)),
+        vec!["git.merge-conflict", "git.branch-switched"]
+    );
+}

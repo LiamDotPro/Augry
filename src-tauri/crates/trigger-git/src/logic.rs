@@ -194,7 +194,46 @@ pub fn step(prev: &RepoSnapshot, next: &RepoSnapshot) -> Vec<Change> {
         });
     }
 
-    // T07 adds the branch switch, detached head, pull and commit here.
+    // A switch needs a branch on both sides. A new branch made by
+    // `checkout -b` is a switch too.
+    if let (Some(from), Some(to)) = (&prev.branch, &next.branch) {
+        if from != to {
+            out.push(Change::BranchSwitched {
+                from: from.clone(),
+                to: to.clone(),
+                commit: next.short.clone(),
+            });
+        }
+    }
+
+    // Leaving a branch for a bare commit. A merge in progress is not that.
+    if let (Some(from), None) = (&prev.branch, &next.branch) {
+        if next.merge_head.is_none() {
+            out.push(Change::DetachedHead {
+                from: from.clone(),
+                commit: next.short.clone(),
+            });
+        }
+    }
+
+    // HEAD moved with the branch unchanged: the reflog subject says why. A
+    // reset or the end of a rebase has another subject and fires nothing.
+    if prev.branch == next.branch && next.head.is_some() && prev.head != next.head {
+        let subject = next.reflog_subject.as_deref().unwrap_or("");
+        if subject.starts_with("pull") || subject.starts_with("merge") {
+            out.push(Change::Pulled {
+                branch: next.branch.clone(),
+                commit: next.short.clone(),
+                message: next.message.clone(),
+            });
+        } else if subject.starts_with("commit") || subject.starts_with("cherry-pick") {
+            out.push(Change::Commit {
+                branch: next.branch.clone(),
+                commit: next.short.clone(),
+                message: next.message.clone(),
+            });
+        }
+    }
 
     // T08 adds the new tag and the new stash here.
 

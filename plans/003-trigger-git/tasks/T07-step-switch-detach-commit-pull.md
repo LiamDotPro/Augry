@@ -2,7 +2,7 @@
 id: T07
 epic: 003-trigger-git
 title: Add branch switch, detached head, commit and pull to step
-status: todo
+status: done
 depends_on: [T06]
 size: M
 model: haiku
@@ -243,3 +243,5 @@ Note on `check-crates.mjs`: `check-crates.mjs` prints warnings, not errors, abou
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (trigger-git 29 lib tests, readme 1, live 1 ignored; clippy, fmt, check-crates exit 0)
+- 2026-10-12 checker: pass
