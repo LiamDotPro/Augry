@@ -1,0 +1,23 @@
+[package]
+name = "trigger-fs"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Fires when files change under a watched folder."
+
+# A trigger crate depends on trigger-core and on outside crates only. Never on
+# another trigger crate and never on the app. plans/_tools/check-crates.mjs
+# enforces this.
+[dependencies]
+trigger-core = { path = "../trigger-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+globset = { workspace = true }
+notify = { workspace = true }
+
+# Platform only dependencies go in blocks like this one, so the crate still
+# builds everywhere.
+# [target.'cfg(target_os = "macos")'.dependencies]
+
+[dev-dependencies]
+uuid = { workspace = true }

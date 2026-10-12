@@ -2,7 +2,7 @@
 id: T20
 epic: 001-trigger-core
 title: Scaffold the trigger-fs crate from the template
-status: todo
+status: done
 depends_on: [T08]
 size: S
 model: haiku
@@ -99,3 +99,5 @@ uuid = { workspace = true }
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (scaffolded trigger-fs, added globset/notify and uuid dev-dep, refreshed Kinds table; check-crates exit 0 with expected template-text and trigger-hub size warnings; no template edits needed)
+- 2026-10-12 checker: pass
