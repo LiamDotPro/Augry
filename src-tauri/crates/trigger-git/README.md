@@ -14,7 +14,17 @@ the markers; `tests/readme.rs` fails while this table is stale.
 <!-- kinds -->
 | Kind | Title | Platforms | Permission | When | Payload |
 | --- | --- | --- | --- | --- | --- |
-| git.example | Example | macOS, Windows, Linux | none | example* | example |
+| git.commit | Commit made | macOS, Windows, Linux | none | repo*, branch | repo, branch, commit, message |
+| git.branch-switched | Branch switched | macOS, Windows, Linux | none | repo*, branch | repo, branch, commit, from, to |
+| git.pulled | Pulled | macOS, Windows, Linux | none | repo*, branch | repo, branch, commit, message |
+| git.merge-conflict | Merge conflict | macOS, Windows, Linux | none | repo*, branch | repo, branch, files |
+| git.rebase-stopped | Rebase stopped | macOS, Windows, Linux | none | repo*, branch | repo, branch, commit |
+| git.tag-created | Tag created | macOS, Windows, Linux | none | repo*, branch | repo, branch, tag |
+| git.stash-created | Stash created | macOS, Windows, Linux | none | repo*, branch | repo, branch |
+| git.detached-head | HEAD detached | macOS, Windows, Linux | none | repo*, branch | repo, branch, commit |
+| git.behind-remote | Behind remote | macOS, Windows, Linux | none | repo*, branch, interval_s, fetch | repo, branch, behind |
+| git.uncommitted-older-than | Uncommitted work is old | macOS, Windows, Linux | none | repo*, branch, interval_s, older_than_min | repo, branch, minutes |
+| git.repo-cloned | Repository cloned | macOS, Windows, Linux | none | folder*, interval_s | path |
 <!-- /kinds -->
 
 ## Rule fields

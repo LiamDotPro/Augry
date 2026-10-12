@@ -2,7 +2,7 @@
 id: T02
 epic: 003-trigger-git
 title: Add the eleven git kinds, a stub source and When
-status: todo
+status: done
 depends_on: [T01]
 size: M
 model: haiku
@@ -407,3 +407,5 @@ Note on `check-crates.mjs`: `check-crates.mjs` prints warnings, not errors, abou
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (cargo test: 2 lib, 1 readme, 1 ignored; clippy and fmt --check exit 0; check-crates 0 errors, 3 expected template warnings; readme count 11)
+- 2026-10-12 checker: pass
