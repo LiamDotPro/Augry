@@ -2,7 +2,7 @@
 id: T01
 epic: 007-trigger-clock
 title: Scaffold the trigger-clock crate and add its dependencies
-status: todo
+status: done
 depends_on: [001-trigger-core/T41]
 size: S
 model: haiku
@@ -100,3 +100,5 @@ chrono-tz = { workspace = true }
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

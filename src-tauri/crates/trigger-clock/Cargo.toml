@@ -1,0 +1,24 @@
+[package]
+name = "trigger-clock"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Fires on a schedule, an interval, the first use of the day, and around calendar events."
+
+# A trigger crate depends on trigger-core and on outside crates only. Never on
+# another trigger crate and never on the app. plans/_tools/check-crates.mjs
+# enforces this.
+[dependencies]
+trigger-core = { path = "../trigger-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+globset = { workspace = true }
+croner = { workspace = true }
+chrono = { workspace = true }
+
+# Platform only dependencies go in blocks like this one, so the crate still
+# builds everywhere.
+# [target.'cfg(target_os = "macos")'.dependencies]
+
+[dev-dependencies]
+chrono-tz = { workspace = true }
