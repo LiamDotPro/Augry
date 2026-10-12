@@ -2,7 +2,7 @@
 id: T04
 epic: 007-trigger-clock
 title: Add the clock logic types, next_due and due_slots
-status: todo
+status: done
 depends_on: [T03]
 size: M
 model: haiku
@@ -299,3 +299,5 @@ fn due_slots_lists_everything_up_to_now_and_the_next_one() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
