@@ -246,7 +246,7 @@
       <ol class="feed" id="feed"></ol>
     </section>
     <section class="pane" aria-labelledby="repos-h">
-      <header><h2 id="repos-h">Repo</h2></header>
+      <header><h2 id="repos-h">Checkouts</h2></header>
       <div id="repos"></div>
     </section>
   </aside>
@@ -349,7 +349,7 @@ function renderEpics() {
       ? `${c.done} of ${e.cards.length} done` + (c.blocked ? `, ${c.blocked} blocked` : '')
       : `No cards yet, ${e.status}`;
     return `<button class="epic" aria-pressed="${e.id === selected}" data-epic="${esc(e.id)}">
-      <div class="row"><span class="id">${esc(e.id.slice(0, 3))}</span><span class="repo">${esc(e.status)}</span></div>
+      <div class="row"><span class="id">${esc(e.id.slice(0, 3))}</span><span class="repo" title="${e.worktree ? 'built in the worktree on branch ' + esc(e.worktree) : ''}">${esc(e.status)}${e.worktree ? ' · ' + esc(e.worktree) : ''}</span></div>
       <div class="name" title="${esc(e.title)}">${esc(e.title)}</div>
       <div class="bar" role="img" aria-label="${esc(label)}">
         <span class="done" style="width:${pct('done')}%"></span><span class="work" style="width:${pct('in-progress')}%"></span><span class="blocked" style="width:${pct('blocked')}%"></span>

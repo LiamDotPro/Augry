@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "plans-dashboard",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["plans/_tools/dashboard.mjs", "--port", "4317"],
+      "port": 4317
+    }
+  ]
+}
