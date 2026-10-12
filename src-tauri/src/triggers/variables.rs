@@ -117,6 +117,44 @@ pub fn linux_location(pictures: Option<PathBuf>) -> Option<PathBuf> {
     }
 }
 
+/// `owner/name` of a GitHub remote URL, None for any other host or shape.
+/// Reads https, http, ssh and git URLs and the scp form
+/// `git@github.com:owner/name.git`. A user name, password or token in the URL
+/// is dropped and never returned.
+pub fn github_slug(url: &str) -> Option<String> {
+    let url = url.trim();
+    let (host, path) = match url.split_once("://") {
+        Some((scheme, rest)) => {
+            let scheme = scheme.to_ascii_lowercase();
+            if !matches!(scheme.as_str(), "https" | "http" | "ssh" | "git") {
+                return None;
+            }
+            let (authority, path) = rest.split_once('/')?;
+            let host = authority.rsplit('@').next()?;
+            (host.split(':').next()?, path)
+        }
+        None => {
+            let (authority, path) = url.split_once(':')?;
+            (authority.rsplit('@').next()?, path)
+        }
+    };
+    if !host.eq_ignore_ascii_case("github.com") {
+        return None;
+    }
+    let path = path.trim_end_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path);
+    let (owner, name) = path.split_once('/')?;
+    let word = |part: &str| {
+        !part.is_empty()
+            && part != "."
+            && part != ".."
+            && part
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    };
+    (word(owner) && word(name)).then(|| format!("{owner}/{name}"))
+}
+
 /// Everything a variable can stand for. Built fresh for each refresh.
 pub struct Context {
     pub home: PathBuf,
@@ -518,5 +556,64 @@ mod expand_tests {
     fn an_unclosed_brace_is_left_alone() {
         let input = when(json!({ "glob": "a${b" }));
         assert_eq!(only(expand(&input, &ctx(&[])))["glob"], json!("a${b"));
+    }
+}
+
+#[cfg(test)]
+mod slug_tests {
+    use super::*;
+
+    #[test]
+    fn github_urls_give_owner_and_name() {
+        for url in [
+            "https://github.com/cli/cli",
+            "https://github.com/cli/cli.git",
+            "https://github.com/cli/cli/",
+            "http://github.com/cli/cli.git",
+            "https://GitHub.com/cli/cli.git",
+            "https://user:ghp_secret@github.com/cli/cli.git",
+            "git@github.com:cli/cli.git",
+            "git@github.com:cli/cli",
+            "ssh://git@github.com/cli/cli.git",
+            "ssh://git@github.com:22/cli/cli.git",
+            "git://github.com/cli/cli.git",
+            "  https://github.com/cli/cli.git\n",
+        ] {
+            assert_eq!(github_slug(url), Some("cli/cli".into()), "{url}");
+        }
+        assert_eq!(
+            github_slug("git@github.com:my-org/my_repo.js.git"),
+            Some("my-org/my_repo.js".into())
+        );
+    }
+
+    #[test]
+    fn other_hosts_and_shapes_give_nothing() {
+        for url in [
+            "",
+            "https://gitlab.com/cli/cli.git",
+            "git@gitlab.com:cli/cli.git",
+            "https://github.com.evil.example/cli/cli.git",
+            "https://evil.example/github.com/cli/cli.git",
+            "https://github.com/cli",
+            "https://github.com/cli/",
+            "https://github.com/cli/cli/pulls",
+            "https://github.com/cli/cli extra",
+            "https://github.com/../cli",
+            "ftp://github.com/cli/cli.git",
+            "file:///srv/git/cli.git",
+            "/home/me/code/cli",
+            "C:\\code\\cli",
+            "../cli",
+        ] {
+            assert_eq!(github_slug(url), None, "{url}");
+        }
+    }
+
+    #[test]
+    fn a_token_in_the_url_never_reaches_the_answer() {
+        let slug = github_slug("https://x-access-token:ghs_abc123@github.com/o/n.git").unwrap();
+        assert_eq!(slug, "o/n");
+        assert!(!slug.contains("ghs_"));
     }
 }

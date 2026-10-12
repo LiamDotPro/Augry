@@ -2,7 +2,7 @@
 id: T30
 epic: 011-trigger-github
 title: Add github_slug to variables.rs
-status: todo
+status: done
 depends_on: [T29]
 size: S
 model: haiku
@@ -165,3 +165,5 @@ mod slug_tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (baseline `variables` 13 passed; after 16 passed, slug_tests 3 passed; fmt --check 0; clippy variables.rs 0)
+- 2026-10-12 checker: pass
