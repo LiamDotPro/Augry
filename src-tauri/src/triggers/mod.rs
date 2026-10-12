@@ -168,7 +168,7 @@ pub fn refresh_now(state: &crate::AppState) -> TriggersStatus {
     } else {
         Vec::new()
     };
-    let ctx = Context::detect(state.notes.root(), roots);
+    let ctx = Context::detect(state.notes.root(), roots, Vec::new());
     state.triggers.refresh(&config, &ctx)
 }
 
@@ -259,6 +259,7 @@ mod tests {
             downloads: None,
             notes_root: PathBuf::from("/notes"),
             repo_roots: Vec::new(),
+            repo_remotes: Vec::new(),
             screenshots: || None,
         }
     }

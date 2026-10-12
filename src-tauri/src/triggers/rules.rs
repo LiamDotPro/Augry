@@ -101,6 +101,7 @@ mod tests {
             downloads: None,
             notes_root: PathBuf::from("/notes"),
             repo_roots: roots.iter().map(|r| r.to_string()).collect(),
+            repo_remotes: Vec::new(),
             screenshots: || None,
         }
     }
@@ -144,6 +145,22 @@ mod tests {
         assert_eq!(ids, ["tidy/saved#1", "tidy/saved#2"]);
         assert_eq!(plan.rules[0].kind, "fs.file-saved");
         assert_eq!(plan.rules[0].when["path"], serde_json::json!("/r/a/docs"));
+    }
+
+    #[test]
+    fn a_github_rule_gets_one_rule_per_remote() {
+        let def = parse(
+            "gh",
+            r#"{"schemaVersion":1,"name":"Watch CI","triggers":[
+                {"id":"ci","kind":"github.ci-failed","when":{"repo":"${repo.remote}"}}
+            ]}"#,
+        );
+        let mut context = ctx(&[]);
+        context.repo_remotes = vec!["o/b".into(), "o/a".into()];
+        let plan = plan(&[def], &config(true, &["gh"]), &context);
+        let ids: Vec<&str> = plan.rules.iter().map(|r| r.id.as_str()).collect();
+        assert_eq!(ids, ["gh/ci#1", "gh/ci#2"]);
+        assert_eq!(plan.rules[0].when["repo"], serde_json::json!("o/a"));
     }
 
     #[test]

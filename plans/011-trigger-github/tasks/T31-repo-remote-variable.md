@@ -2,7 +2,7 @@
 id: T31
 epic: 011-trigger-github
 title: Resolve the repo.remote variable in expand
-status: todo
+status: done
 depends_on: [T30]
 size: M
 model: haiku
@@ -418,3 +418,5 @@ and replace it with
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Baseline clippy warnings 7, after 7. Step 2 Edit 2 find text had a trailing blank line that is not in variables.rs (line 164 is followed by a doc comment), so per the If stuck rule I inserted the repo_remotes field right after the repo_roots line without the extra blank line. Other find texts matched exactly. cargo fmt --check exit 0; repo_remote 3 passed; a_github_rule_gets_one_rule_per_remote 1 passed; triggers 48 passed.
+- 2026-10-12 checker: pass
