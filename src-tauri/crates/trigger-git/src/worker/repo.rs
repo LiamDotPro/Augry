@@ -3,11 +3,11 @@
 //! outside (`now`, the `Repo`), so it is tested with a fake and without
 //! threads.
 
-use std::time::{Instant, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
 use trigger_core::Event;
 
-use crate::logic::polled::{BehindWatch, UncommittedWatch};
+use crate::logic::polled::{behind_payload, uncommitted_payload, BehindWatch, UncommittedWatch};
 use crate::logic::repo::Repo;
 use crate::logic::settle::Settle;
 use crate::logic::{observe, Payload, RepoSnapshot};
@@ -19,6 +19,18 @@ pub enum Watch {
     Snapshot,
     Behind(BehindWatch),
     Uncommitted(UncommittedWatch),
+}
+
+impl Watch {
+    /// Forgets what was seen. Used while the branch glob does not match, so
+    /// the first poll after the branch matches again is a fresh baseline.
+    fn reset(&mut self) {
+        match self {
+            Watch::Snapshot => {}
+            Watch::Behind(w) => *w = BehindWatch::new(),
+            Watch::Uncommitted(w) => *w = UncommittedWatch::new(),
+        }
+    }
 }
 
 /// One rule on a repository.
@@ -98,7 +110,12 @@ impl RepoSlot {
 
     /// When `tick` next has something to do. None when nothing is waiting.
     pub fn deadline(&self) -> Option<Instant> {
-        self.settle.deadline()
+        let polls = self
+            .entries
+            .iter()
+            .filter(|e| !matches!(e.watch, Watch::Snapshot))
+            .map(|e| e.next_poll);
+        self.settle.deadline().into_iter().chain(polls).min()
     }
 
     /// Does whatever is due at `now` and returns the events it fires.
@@ -106,6 +123,41 @@ impl RepoSlot {
         let mut out = Vec::new();
         if self.settle.due(now, || (self.locked)()) {
             out.extend(self.settled());
+        }
+        out.extend(self.poll(now));
+        out
+    }
+
+    /// Runs every polled rule that is due. The branch is the one in the last
+    /// snapshot, so a branch switch seen a moment ago already counts. A rule
+    /// whose glob does not match the branch is reset and not asked.
+    fn poll(&mut self, now: Instant) -> Vec<Event> {
+        let branch = self.prev.as_ref().and_then(|s| s.branch.clone());
+        let mut out = Vec::new();
+        for entry in &mut self.entries {
+            if matches!(entry.watch, Watch::Snapshot) || entry.next_poll > now {
+                continue;
+            }
+            entry.next_poll = now + Duration::from_secs(entry.parsed.when.interval_s);
+            if !entry.parsed.branch_matches(branch.as_deref()) {
+                entry.watch.reset();
+                continue;
+            }
+            let payload = match &mut entry.watch {
+                Watch::Snapshot => None,
+                Watch::Behind(watch) => watch
+                    .observe(self.repo.behind(entry.parsed.when.fetch))
+                    .map(|n| behind_payload(&self.path, branch.as_deref(), n)),
+                Watch::Uncommitted(watch) => watch
+                    .observe(
+                        self.repo.oldest_change_secs(),
+                        entry.parsed.when.older_than_min,
+                    )
+                    .map(|m| uncommitted_payload(&self.path, branch.as_deref(), m)),
+            };
+            if let Some(payload) = payload {
+                out.push(event(&entry.id, &entry.kind, payload));
+            }
         }
         out
     }
