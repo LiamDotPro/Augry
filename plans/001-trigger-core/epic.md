@@ -101,7 +101,7 @@ types there are the contract; this file writes them out in full.
     `src-tauri/src/triggers/variables.rs`: `${home}`, `${downloads}`,
     `${notes.root}`, `${screenshots}` (per platform, R05) and `${repo.root}`,
     which expands to one rule per distinct repository root among the open
-    panes (`GitInfo.root`), with the rule id suffixed `#<n>`. A rule whose
+    panes (`GitInfo.repo_root`), with the rule id suffixed `#<n>`. A rule whose
     variable has no value on this machine is skipped with a reason.
     `${screenshots}` follows R05 with no new dependency (`dirs` 7 and
     `std::process::Command`): macOS reads `defaults read
