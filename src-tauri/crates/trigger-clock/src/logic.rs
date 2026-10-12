@@ -62,6 +62,11 @@ pub struct Occurrence {
     pub end: SystemTime,
 }
 
+/// Which occurrence of which event a rule has fired: the rule, the event's
+/// UID and its start in milliseconds (an override that moves an occurrence
+/// has a new start, so it counts as a new occurrence).
+pub type EventKey = (RuleId, String, u64);
+
 /// Everything `step` remembers between calls.
 #[derive(Debug)]
 pub struct State {
@@ -77,9 +82,12 @@ pub struct State {
     /// entry is planned on the next step; an entry of `None` means the rule
     /// will never be due again.
     pub cursors: BTreeMap<RuleId, Option<SystemTime>>,
-    /// Occurrences per feed, as last sent by the feed thread. The event kinds
-    /// read this; nothing fills it yet.
+    /// Occurrences per feed, as last sent by the feed thread, keyed by the
+    /// `feed` field exactly as the rule wrote it. The event kinds read this.
     pub feeds: BTreeMap<String, Vec<Occurrence>>,
+    /// Event occurrences already fired, each with the time after which it can
+    /// no longer be due and is forgotten.
+    pub fired_events: BTreeMap<EventKey, SystemTime>,
 }
 
 impl State {
@@ -93,6 +101,7 @@ impl State {
             last_daily: None,
             cursors: BTreeMap::new(),
             feeds: BTreeMap::new(),
+            fired_events: BTreeMap::new(),
         }
     }
 
@@ -262,6 +271,7 @@ pub fn step<Tz: TimeZone>(
     }
     fire_due(state, tz, now, jumped, rules, &mut out);
     fire_daily(state, tz, now, rules, &mut out);
+    events::fire_events(state, now, rules, &mut out);
     state.prev_wall = now;
     out
 }
@@ -280,5 +290,10 @@ pub fn wait(state: &State, now: SystemTime) -> Duration {
 
 #[cfg(test)]
 mod dst_tests;
+mod events;
+
+#[cfg(test)]
+mod event_tests;
+
 #[cfg(test)]
 mod tests;

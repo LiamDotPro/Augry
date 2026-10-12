@@ -2,7 +2,7 @@
 id: T16
 epic: 007-trigger-clock
 title: Fire clock.event-starting from step
-status: todo
+status: done
 depends_on: [T09]
 size: M
 model: haiku
@@ -410,3 +410,5 @@ fn the_memory_of_fired_events_is_forgotten_once_they_cannot_be_due() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
