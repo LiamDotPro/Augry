@@ -225,6 +225,11 @@
   box-shadow: var(--cloud-focus-ring);
 }
 
+/* The field draws its own ring; the app-wide outline would double it. */
+.cloud-field__input:focus-visible {
+  outline: none;
+}
+
 .cloud-field__input--error,
 .cloud-field__input--error:focus {
   border: 1.5px solid var(--cloud-error);
