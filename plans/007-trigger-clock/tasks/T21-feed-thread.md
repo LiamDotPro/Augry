@@ -2,7 +2,7 @@
 id: T21
 epic: 007-trigger-clock
 title: Start the feed thread and send events to the clock thread
-status: todo
+status: done
 depends_on: [T20]
 size: M
 model: haiku
@@ -700,3 +700,5 @@ fn rules_without_a_feed_start_no_feed_thread() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
