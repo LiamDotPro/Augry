@@ -2,7 +2,7 @@
 id: T28
 epic: 011-trigger-github
 title: Add the live tests against the real GitHub
-status: todo
+status: done
 depends_on: [T27]
 size: S
 model: haiku
@@ -128,3 +128,5 @@ fn the_first_poll_of_the_real_api_seeds_and_fires_nothing() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (live tests: gh found, 2 passed in 10.4s)
+- 2026-10-12 checker: pass
