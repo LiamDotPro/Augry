@@ -2,7 +2,7 @@
 id: T12
 epic: 010-trigger-docker
 title: Add the Supervisor thread and its replay tests
-status: todo
+status: done
 depends_on: [T11]
 size: M
 model: haiku
@@ -496,3 +496,5 @@ mod loop_tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
