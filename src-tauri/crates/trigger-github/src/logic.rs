@@ -1,9 +1,6 @@
 //! Pure decisions: given what `gh` answered, which rules fire and with what
 //! payload. No child processes, no threads, no clocks: everything it needs
-//! comes in as arguments, so every case is a unit test. Slice B fills it in.
-
-// Removed in slice C, when the poll loop reads everything in this file.
-#![allow(dead_code)]
+//! comes in as arguments, so every case is a unit test.
 
 pub mod backoff;
 pub mod cli;

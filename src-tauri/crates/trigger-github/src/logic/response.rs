@@ -5,8 +5,8 @@
 //! stderr text is not a contract. The exit code only matters when there is no
 //! status line at all.
 
-/// `gh` exits 4 when there is no login. Slice C turns this message into
-/// "unavailable, run gh auth login".
+/// `gh` exits 4 when there is no login. `Backoff` turns this message into
+/// `Verdict::Unauthorized`, which stops the poller.
 pub const NOT_LOGGED_IN: &str = "gh is not logged in";
 
 #[derive(Debug, Clone, PartialEq)]

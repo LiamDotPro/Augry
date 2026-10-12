@@ -2,7 +2,7 @@
 id: T29
 epic: 011-trigger-github
 title: Remove the temporary allows and finish the README
-status: todo
+status: done
 depends_on: [T28]
 size: S
 model: haiku
@@ -238,3 +238,5 @@ Replace it with:
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

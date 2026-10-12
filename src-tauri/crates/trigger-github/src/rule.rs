@@ -1,8 +1,5 @@
 //! The `when` object of a rule, typed. Pure.
 
-// Removed in slice C, when the poll loop reads everything in this file.
-#![allow(dead_code)]
-
 use globset::{GlobBuilder, GlobMatcher};
 use serde::Deserialize;
 use trigger_core::{Rule, RuleError};

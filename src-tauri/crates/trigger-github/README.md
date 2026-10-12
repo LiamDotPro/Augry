@@ -86,20 +86,58 @@ login in a terminal".
 
 | File | What it holds |
 |---|---|
-| `src/lib.rs` | `KINDS`, `GithubSource` and the thread that joins the OS layer to the logic. Glue only |
+| `src/lib.rs` | `KINDS`, `GithubSource` and `start` (parse the rules, check `gh`, start the thread). Glue only |
+| `src/run.rs` | The thread `trigger-github`: wakes every second, runs `Poller::tick`, sends the events. Glue only |
 | `src/rule.rs` | The typed `When` and `parse`. Pure, unit tested |
-| `src/logic.rs` | Pure: which rules a `Signal` fires, with what payload, and any debounce state. Unit tested |
-| `src/os.rs` | The only file that talks to the OS: `availability()` and `listen()`, per platform behind `cfg` |
-| `tests/live.rs` | `#[ignore]` tests against the real OS |
+| `src/logic.rs` and `src/logic/` | Pure, unit tested. `poll.rs` plans the requests and runs a tick (`Poller`), `diff.rs` with `pulls.rs`, `runs.rs`, `simple.rs` and `comments.rs` decide which rules fire, `backoff.rs` is the rate limit rules, `response.rs` reads `gh api -i` output, `cli.rs` has the `Gh` trait, the arguments and where to look for `gh`, `payload.rs`, `json.rs` and `text.rs` are helpers. `fake_gh.rs` and `testutil.rs` are for tests only |
+| `src/os.rs` | The only file that starts processes: `find_gh`, `availability`, `run` (with a timeout), `GhCli` and `auth_ok` |
+| `tests/fixtures/` | Trimmed GitHub answers in the shapes research note R01 captured. Tests pick items out by `id` |
+| `tests/live.rs` | `#[ignore]` tests against the real GitHub through your own `gh`, read only. They skip with a message when `gh` is missing or not signed in |
 | `tests/readme.rs` | Fails when the Kinds table above is stale |
+| `tests/source.rs` | The public face: source id, kinds, `check` and `start` on bad rules |
+
+How a poll works: `start` checks that `gh` exists and is signed in, then the
+thread wakes every second and calls `Poller::tick`. The first tick reads your
+login (`gh api user`) and plans one request per repository and group (pull
+requests, workflow runs, releases, issues assigned to you, and the two comment
+lists), however many rules read it. Requests run one at a time, each with the
+last `ETag`; a 304 costs nothing against the rate limit. The first answer to a
+request only records what exists, so arming a rule never replays history.
 
 ```
 cd src-tauri
 cargo test -p trigger-github                       # pure and readme tests, any OS, offline
-cargo test -p trigger-github -- --ignored          # live tests on this machine
+cargo test -p trigger-github -- --ignored --nocapture   # live tests: real GitHub, read only
 cargo clippy -p trigger-github --all-targets -- -D warnings
 ```
 
 ## Known limits
 
-What does not work, on which platform, and why.
+- Nothing fires for what happened before a rule was armed or while the app was
+  closed. The first answer to each request only records what exists, and a
+  comment written before the app started never fires.
+- Only the first page of each list is read: 100 pull requests, workflow runs,
+  issues or comments, 10 releases. On a very busy repository, more than 100
+  pull requests or runs changing within one interval can be missed.
+- An issue that is unassigned and assigned again does not fire again. A pull
+  request that stops asking for your review and asks again does fire again.
+- `github.pr-commented` only sees comments on pull requests among the 100 most
+  recently updated, and never your own comments.
+- Only `github.com`. GitHub Enterprise hosts are not supported. A repository in
+  an organisation with single sign on answers 403 until you run
+  `gh auth refresh`; that is written to the log once.
+- `gh` is looked up once per run of the app: install it, then restart. It must
+  be a version that has `gh auth status --json` (tried with 2.83.2).
+- If `gh` loses its login while the app runs, polling for this source stops and
+  one line is written to the log. The source starts again, and then says "Run
+  gh auth login in a terminal", the next time the app applies the rules.
+- GitHub allows 5000 requests an hour. A rate limit makes the whole crate wait
+  (60 seconds, doubling up to 15 minutes, or what GitHub asks for), and an
+  offline machine retries the same way, quietly. An interval is never below 60
+  seconds, a repository that answers 404 is asked five times less often, and
+  with under 100 requests left every interval is four times longer.
+- Problems are written as one line on stderr with rule ids and plain words
+  only, never an answer from GitHub. There is no way yet to show them in
+  Settings.
+- Only macOS was tried when this crate was written. The Windows and Linux
+  folders `gh` is looked for in are the ones its installers use.

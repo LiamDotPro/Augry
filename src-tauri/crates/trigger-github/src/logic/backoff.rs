@@ -59,6 +59,7 @@ impl Backoff {
     }
 
     /// When the wait ends, if one is running.
+    #[cfg(test)]
     pub fn waiting_until(&self, now: u64) -> Option<u64> {
         (now < self.wait_until).then_some(self.wait_until)
     }

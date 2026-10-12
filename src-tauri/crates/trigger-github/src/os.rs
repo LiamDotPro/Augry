@@ -2,9 +2,6 @@
 //! What to run and how to read the answer is decided in `logic/cli.rs` and
 //! `logic/response.rs`; this file only starts children.
 
-// Removed in the last card of slice C, when the poll loop uses everything here.
-#![allow(dead_code)]
-
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
