@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use internal::{InternalSignal, InternalSource};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use trigger_core::{Rule, RuleError, RuleId, Source};
@@ -30,12 +31,11 @@ pub const EVENT_FIRED: &str = "trigger://fired";
 const GIT_MAX_AGE: Duration = Duration::from_secs(15);
 
 /// The sources this build runs. A new source crate adds one line here, behind
-/// its own cargo feature.
+/// its own cargo feature. The internal source is always on: it is not a crate.
 #[allow(clippy::vec_init_then_push)]
-fn sources() -> Vec<Box<dyn Source>> {
-    // With every source feature off the list stays empty, and `mut` is unused.
-    #[allow(unused_mut)]
+fn sources(internal: &InternalSource) -> Vec<Box<dyn Source>> {
     let mut list: Vec<Box<dyn Source>> = Vec::new();
+    list.push(Box::new(internal.clone()));
     #[cfg(feature = "trigger-fs")]
     list.push(Box::new(trigger_fs::FsSource));
     list
@@ -43,6 +43,8 @@ fn sources() -> Vec<Box<dyn Source>> {
 
 pub struct TriggerService {
     hub: Hub,
+    /// The `tg` source. The hub runs one clone; this one is how the app feeds it.
+    internal: InternalSource,
     /// `<app config dir>/processes`.
     dir: PathBuf,
     /// Process id to display name, shared with the forward thread.
@@ -63,12 +65,15 @@ struct Inner {
 
 impl TriggerService {
     pub fn new(dir: PathBuf) -> TriggerService {
-        TriggerService::with_hub(dir, Hub::new(sources()))
+        let internal = InternalSource::default();
+        let hub = Hub::new(sources(&internal));
+        TriggerService::with_hub(dir, hub, internal)
     }
 
-    fn with_hub(dir: PathBuf, hub: Hub) -> TriggerService {
+    fn with_hub(dir: PathBuf, hub: Hub, internal: InternalSource) -> TriggerService {
         TriggerService {
             hub,
+            internal,
             dir,
             names: Arc::new(Mutex::new(BTreeMap::new())),
             inner: Mutex::new(Inner::default()),
@@ -77,6 +82,19 @@ impl TriggerService {
 
     pub fn catalogue(&self) -> Vec<SourceInfo> {
         self.hub.catalogue()
+    }
+
+    /// Hands a signal from inside the app to the `tg` source, which fires the
+    /// armed rules it matches. Cheap when no rule is armed. Call it after the
+    /// work it reports has succeeded.
+    pub fn publish_internal(&self, signal: InternalSignal) {
+        self.internal.publish(&signal);
+    }
+
+    /// True while a `tg.output-matched` rule is armed, so the terminal reader
+    /// only assembles lines when someone is listening.
+    pub fn wants_output(&self) -> bool {
+        self.internal.wants_output()
     }
 
     pub fn check(&self, rule: &Rule) -> std::result::Result<(), RuleError> {
@@ -276,7 +294,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("tidy.json"), DEFINITION).unwrap();
         (
-            TriggerService::with_hub(dir.clone(), Hub::new(Vec::new())),
+            TriggerService::with_hub(dir.clone(), Hub::new(Vec::new()), InternalSource::default()),
             dir,
         )
     }
@@ -348,6 +366,34 @@ mod tests {
         assert_eq!(payload.process_name, "Tidy");
         assert_eq!(payload.rule_id, "tidy/saved");
         assert_eq!(payload.coalesced, 0);
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn a_published_signal_fires_an_armed_tg_rule() {
+        let dir = std::env::temp_dir().join(format!("tg-triggers-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("ring.json"),
+            r#"{"schemaVersion":1,"name":"Ring","triggers":[
+                {"id":"bell","kind":"tg.bell","when":{}}]}"#,
+        )
+        .unwrap();
+        let service = TriggerService::new(dir.clone());
+        let status = service.refresh(&config(&["ring"]), &ctx());
+        assert!(matches!(
+            status.processes[0].rules[0].state,
+            status::RuleStatusState::Active
+        ));
+        let (tx, rx) = channel();
+        service.start_forwarding(move |payload| {
+            let _ = tx.send(payload);
+        });
+        service.publish_internal(InternalSignal::Bell { pane: "p1".into() });
+        let payload = rx.recv_timeout(Duration::from_secs(5)).expect("a payload");
+        assert_eq!(payload.process_id, "ring");
+        assert_eq!(payload.rule_id, "ring/bell");
+        assert!(!service.wants_output());
         cleanup(&dir);
     }
 
