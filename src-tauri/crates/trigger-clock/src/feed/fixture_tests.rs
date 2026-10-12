@@ -3,7 +3,7 @@
 
 use super::*;
 use chrono::DateTime;
-use chrono_tz::Europe::London;
+use chrono_tz::{Asia::Tokyo, Europe::London};
 
 fn t(iso: &str) -> SystemTime {
     DateTime::parse_from_rfc3339(iso).unwrap().into()
@@ -106,4 +106,100 @@ fn the_window_keeps_events_that_overlap_it_and_drops_the_rest() {
     assert_eq!(count("2026-10-15T14:00:01Z", "2026-10-15T14:30:00Z"), 0);
     assert_eq!(count("2026-10-15T12:00:00Z", "2026-10-15T13:00:00Z"), 1);
     assert_eq!(count("2026-10-15T12:00:00Z", "2026-10-15T12:59:59Z"), 0);
+}
+
+const UTC_DAILY: &str = include_str!("../../tests/fixtures/utc_recurring.ics");
+const FLOATING: &str = include_str!("../../tests/fixtures/floating.ics");
+const OUTLOOK: &str = include_str!("../../tests/fixtures/outlook_gmt.ics");
+const TWO_OLD: &str = include_str!("../../tests/fixtures/two_old_series.ics");
+
+#[test]
+fn a_recurring_event_written_in_utc_is_not_read_as_local_time() {
+    // calcard reads DTSTART:...Z of a recurring event as local time unless
+    // `normalise` rewrites it. The default zone must not change the answer.
+    let expected = vec![span(
+        "2026-10-13T09:00:00+00:00",
+        "2026-10-13T09:30:00+00:00",
+    )];
+    let from = t("2026-10-13T00:00:00Z");
+    let to = t("2026-10-13T23:00:00Z");
+    let in_london = expand(UTC_DAILY, CalTz::from(London), from, to);
+    assert_eq!(spans(&in_london), expected);
+    let in_tokyo = expand(UTC_DAILY, CalTz::from(Tokyo), from, to);
+    assert_eq!(spans(&in_tokyo), expected);
+    // The excluded date is excluded too.
+    let from = t("2026-10-14T00:00:00Z");
+    let to = t("2026-10-14T23:00:00Z");
+    assert!(expand(UTC_DAILY, CalTz::from(London), from, to)
+        .occurrences
+        .is_empty());
+}
+
+#[test]
+fn a_floating_event_takes_the_default_zone() {
+    let from = t("2026-10-15T00:00:00Z");
+    let to = t("2026-10-15T23:00:00Z");
+    let in_london = expand(FLOATING, CalTz::from(London), from, to);
+    assert_eq!(
+        spans(&in_london),
+        vec![span(
+            "2026-10-15T09:00:00+00:00",
+            "2026-10-15T10:00:00+00:00"
+        )]
+    );
+    let in_tokyo = expand(FLOATING, CalTz::from(Tokyo), from, to);
+    assert_eq!(
+        spans(&in_tokyo),
+        vec![span(
+            "2026-10-15T01:00:00+00:00",
+            "2026-10-15T02:00:00+00:00"
+        )]
+    );
+}
+
+#[test]
+fn an_outlook_windows_zone_name_is_understood() {
+    let x = london(OUTLOOK, "2026-10-15T00:00:00Z", "2026-10-15T23:00:00Z");
+    assert_eq!(
+        spans(&x),
+        vec![span(
+            "2026-10-15T13:00:00+00:00",
+            "2026-10-15T14:00:00+00:00"
+        )]
+    );
+    assert_eq!(x.occurrences[0].title, "Outlook weekly");
+}
+
+#[test]
+fn every_uid_gets_its_own_limit_so_a_second_old_series_is_not_starved() {
+    // Both series start in 1990, about 13 800 days before the window. A limit
+    // shared between them (20 000) would run out inside the second one.
+    let x = london(TWO_OLD, "2026-10-14T00:00:00Z", "2026-10-15T23:00:00Z");
+    let titles: Vec<&str> = x.occurrences.iter().map(|o| o.title.as_str()).collect();
+    assert_eq!(titles, vec!["Old A", "Old B", "Old A", "Old B"]);
+    assert!(x.problems.is_empty());
+    // Sorted by start across the two series.
+    let starts: Vec<_> = x.occurrences.iter().map(|o| o.start).collect();
+    assert!(starts.windows(2).all(|w| w[0] <= w[1]));
+}
+
+#[test]
+fn text_that_is_not_a_calendar_gives_no_occurrences_and_no_panic() {
+    let from = t("2026-10-15T00:00:00Z");
+    let to = t("2026-10-16T00:00:00Z");
+    for text in ["", "<html>login</html>", "BEGIN:VCALENDAR\nEND:VCALENDAR\n"] {
+        let x = expand(text, CalTz::from(London), from, to);
+        assert!(x.occurrences.is_empty());
+    }
+}
+
+#[test]
+fn a_broken_event_is_reported_without_its_content() {
+    let broken = "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:x\nDTSTART:soon\nSUMMARY:Secret title\nEND:VEVENT\nEND:VCALENDAR\n";
+    let from = t("2026-10-15T00:00:00Z");
+    let to = t("2026-10-16T00:00:00Z");
+    let x = expand(broken, CalTz::from(London), from, to);
+    assert!(x.occurrences.is_empty());
+    assert_eq!(x.problems.len(), 1);
+    assert!(!x.problems[0].contains("Secret"));
 }
