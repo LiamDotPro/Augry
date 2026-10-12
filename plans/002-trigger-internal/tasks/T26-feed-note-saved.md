@@ -2,7 +2,7 @@
 id: T26
 epic: 002-trigger-internal
 title: Publish tg.note-saved from notes_write
-status: todo
+status: done
 depends_on: [T20]
 size: S
 model: haiku
@@ -75,3 +75,5 @@ and replace it with. How it works: the `?` after `write` returns early on a conf
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed (clippy baseline 7, after 7; closure compiled without a type annotation)
+- 2026-10-13 checker: pass
