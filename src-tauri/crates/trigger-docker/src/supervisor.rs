@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use std::io;
-use std::sync::Arc;
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use crate::logic::Engine;
@@ -40,6 +40,43 @@ pub trait EngineProcess: Send + Sync {
     fn engine(&self) -> Engine;
     /// Starts a new child.
     fn spawn(&self) -> io::Result<Box<dyn Lines>>;
+}
+
+/// Locks a mutex even if another thread panicked while holding it. The data
+/// here is a flag or a handle, so it is never half written.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// A flag that says "stop now" and wakes anyone sleeping on it. Shared by the
+/// caller and the supervisor thread.
+#[derive(Default)]
+pub struct Stop {
+    stopped: Mutex<bool>,
+    changed: Condvar,
+}
+
+impl Stop {
+    pub fn is_stopped(&self) -> bool {
+        *lock(&self.stopped)
+    }
+
+    /// Sets the flag and wakes every `wait`.
+    pub fn stop(&self) {
+        *lock(&self.stopped) = true;
+        self.changed.notify_all();
+    }
+
+    /// Sleeps for `delay`, or less if `stop` is called meanwhile. Returns true
+    /// if the flag is set.
+    pub fn wait(&self, delay: Duration) -> bool {
+        let guard = lock(&self.stopped);
+        let (guard, _) = self
+            .changed
+            .wait_timeout_while(guard, delay, |stopped| !*stopped)
+            .unwrap_or_else(PoisonError::into_inner);
+        *guard
+    }
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@
 id: T11
 epic: 010-trigger-docker
 title: Add the Stop flag that wakes a sleeping supervisor
-status: todo
+status: done
 depends_on: [T10]
 size: S
 model: haiku
@@ -178,3 +178,5 @@ fn wait_returns_at_once_when_already_stopped() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
