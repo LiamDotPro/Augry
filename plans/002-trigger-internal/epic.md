@@ -1,7 +1,7 @@
 ---
 id: 002-trigger-internal
 title: Triggers from inside Terminal Grid
-status: carding
+status: building
 depends_on: [001-trigger-core]
 ---
 
