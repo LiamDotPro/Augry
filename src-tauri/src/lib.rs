@@ -12,6 +12,7 @@ pub mod pty;
 pub mod state;
 #[cfg(target_os = "macos")]
 mod traffic_lights;
+pub mod triggers;
 
 pub use error::AppError;
 
