@@ -3,5 +3,6 @@
 //! plans/001-trigger-core/epic.md Decisions 10 to 16. Later cards add the
 //! rest of the module; each adds its own `pub mod` line.
 
+pub mod rules;
 pub mod store;
 pub mod variables;

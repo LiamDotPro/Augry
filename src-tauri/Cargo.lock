@@ -4500,6 +4500,9 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "trash",
+ "trigger-core",
+ "trigger-fs",
+ "trigger-hub",
  "uuid",
  "window-vibrancy",
 ]
