@@ -2,7 +2,7 @@
 id: T30
 epic: 002-trigger-internal
 title: Design 4.5, intro and PowerShell exit code
-status: todo
+status: done
 depends_on: [T17, T29]
 size: S
 model: haiku
@@ -102,3 +102,5 @@ The frontend registers OSC handlers on xterm's parser:
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed. Four edits to docs/technical-design.md applied in order; lint-cards 0 error(s). Note: src-tauri/src/triggers/feeds.rs shows as modified in git status, not touched by this card.
+- 2026-10-13 checker: pass

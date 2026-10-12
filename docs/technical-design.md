@@ -261,7 +261,7 @@ Exit: the waiter thread emits `terminal://exit { id, code }`. The session stays 
 
 ### 4.5 Shell integration
 
-The app writes `shell-integration.ps1` (and `.sh`) into `app_data_dir()` on startup and launches the shell with it. PowerShell launch:
+The app writes `shell-integration.ps1` and `shell-integration.sh` into `app_data_dir()` on startup, together with the wrapper files `bashrc` and `zsh/.zshenv`, `zsh/.zprofile`, `zsh/.zshrc`, `zsh/.zlogin`, and launches the shell with them. The scripts are copied from the bundled `resources/` folder. The wrapper files are compiled into the binary with `include_str!` and written by the same `install_scripts` function, because Tauri's `resources/*` glob skips folders. Each file is removed before it is rewritten. The `Shell` struct that `resolve` returns has `program`, `kind`, `args` and `env`; `env` holds the variables the integration needs, and `PtyManager::spawn` sets them on the child. PowerShell launch:
 
 ```
 pwsh.exe -NoLogo -NoExit -Command ". '<app_data>\shell-integration.ps1'"
@@ -272,9 +272,18 @@ The script dot sources the user's `$PROFILE` first if it exists, then wraps `pro
 ```powershell
 $global:__tg_original_prompt = $function:prompt
 $global:__tg_last_history_id = -1
+$global:__tg_last_error = $null
 
 function global:prompt {
-    $exit = if ($?) { 0 } else { 1 }
+    # Read $? and $LASTEXITCODE first: any other statement changes them.
+    $ok = $?
+    $native = $global:LASTEXITCODE
+    # A failed native command sets $LASTEXITCODE and adds no error record. A
+    # failed cmdlet adds one, and then a stale $LASTEXITCODE must not be reported.
+    $lastError = if ($global:Error.Count -gt 0) { $global:Error[0] } else { $null }
+    $newError = -not [object]::ReferenceEquals($lastError, $global:__tg_last_error)
+    $global:__tg_last_error = $lastError
+    $exit = if ($ok) { 0 } elseif (-not $newError -and $native -is [int] -and $native -ne 0) { $native } else { 1 }
     $esc = [char]27; $bel = [char]7
     # Command finished (OSC 133;D) with exit code and last command text (custom OSC 7777)
     $h = Get-History -Count 1
@@ -294,6 +303,8 @@ function global:prompt {
     return $out
 }
 ```
+
+The exit code in `OSC 133;D` is the native command's `$LASTEXITCODE` when the last command was a native program that failed, and 1 for any other failure, so a trigger rule with `exit_code = 2` can match on PowerShell. This was never run on macOS or Linux; the Rust test `powershell_script_reports_the_native_exit_code` only reads the script.
 
 The frontend registers OSC handlers on xterm's parser:
 
