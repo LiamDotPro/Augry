@@ -2,7 +2,7 @@
 id: T28
 epic: 001-trigger-core
 title: Add the five live tests for trigger-fs
-status: todo
+status: done
 depends_on: [T27]
 size: M
 model: haiku
@@ -189,3 +189,5 @@ fn an_atomic_save_fires_one_saved_for_the_target() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (live tests 3 rounds green, 5/5 each round; check-crates exit 0 with accepted warnings only)
+- 2026-10-12 checker: pass
