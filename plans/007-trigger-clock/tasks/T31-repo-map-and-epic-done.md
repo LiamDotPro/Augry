@@ -53,7 +53,7 @@ If the file already has a row starting `| 007`, set its Status cell to `done` in
 
 ## Acceptance
 
-- [ ] `grep -c "trigger-clock" plans/_context/repo-map.md` prints `4` or more
+- [ ] `grep -c "trigger-clock" plans/_context/repo-map.md` prints `3` (the Cargo.toml row, the crate row and the Commands row)
 - [ ] `grep -n "007-trigger-clock" plans/_context/architecture.md` prints one line ending in `| done |`
 - [ ] `grep -n "^status:" plans/007-trigger-clock/epic.md` prints `status: done`
 - [ ] `node plans/_tools/check-crates.mjs` exits 0
