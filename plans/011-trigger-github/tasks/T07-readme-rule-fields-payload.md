@@ -2,7 +2,7 @@
 id: T07
 epic: 011-trigger-github
 title: Write the README Rule fields, Payload and Example sections
-status: todo
+status: done
 depends_on: [T06]
 size: S
 model: haiku
@@ -88,3 +88,5 @@ is text or a number. A comment body is cut to 200 characters.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

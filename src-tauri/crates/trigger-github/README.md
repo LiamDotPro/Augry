@@ -27,20 +27,30 @@ the markers; `tests/readme.rs` fails while this table is stale.
 ## Rule fields
 
 The `when` object of a trigger, parsed by `src/rule.rs`. Unknown fields are an
-error, so a typo shows up in the editor.
+error, so a typo shows up in the editor. A field a kind does not use (for
+example `branch` on `github.issue-assigned`) is accepted and ignored.
 
 | Field | Required | Default | Meaning |
 |---|---|---|---|
-| `example` | yes | | Replace with the real fields |
+| `repo` | yes | | The repository as `owner/name`, such as `cli/cli`. `${repo.remote}` stands for the repository of the pane's `origin` remote and is filled in by the app |
+| `branch` | no | every branch | Glob for the branch. On `github.ci-failed` and `github.ci-passed` it matches the branch the run was on, on `github.pr-merged` the branch the pull request was merged into. Case sensitive, and `*` also matches `/`, so `release/*` matches `release/1/x` |
+| `interval_s` | no | `120` | Seconds between checks of GitHub. Never below `60`: a smaller number is an error |
+| `author` | no | `["dependabot[bot]", "renovate[bot]"]` | A list of logins. On `github.dependency-pr-opened` only pull requests opened by one of them count |
 
 ## Payload
 
-What an event carries, available to steps as `${trigger.<field>}`. Paths, names,
-ids and numbers only. Never file contents or secrets, never more than 4 KiB.
+What an event carries, available to steps as `${trigger.<field>}`. Every value
+is text or a number. A comment body is cut to 200 characters.
 
-| Field | Meaning |
+| Kind | Fields |
 |---|---|
-| `example` | Replace with the real fields |
+| `github.issue-assigned` | `number`, `title`, `url`, `author` (who opened it), `assignees` (comma separated logins) |
+| `github.review-requested` | `number`, `title`, `url`, `author`, `head` (source branch), `base` (target branch) |
+| `github.ci-failed`, `github.ci-passed` | `id`, `name` (workflow), `branch`, `sha`, `conclusion`, `url`, `event`, `actor`, `updated_at` |
+| `github.pr-commented` | `id`, `url`, `author` (who commented), `body`, `created_at` |
+| `github.pr-merged` | `number`, `title`, `url`, `author`, `merged_at`, `base` |
+| `github.release-published` | `tag`, `name`, `prerelease`, `url`, `published_at`, `author` |
+| `github.dependency-pr-opened` | `number`, `title`, `url`, `author` (the bot), `base` |
 
 ## Platforms
 
@@ -57,7 +67,7 @@ What the OS asks the user for, and when. "None" is a fine answer.
 ## Example
 
 ```json
-{ "id": "example", "kind": "github.example", "when": { "example": "value" } }
+{ "id": "main-broke", "kind": "github.ci-failed", "when": { "repo": "cli/cli", "branch": "trunk" } }
 ```
 
 ## Develop
