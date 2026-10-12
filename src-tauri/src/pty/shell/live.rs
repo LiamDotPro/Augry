@@ -166,3 +166,40 @@ fn zsh_follows_a_zdotdir_that_the_users_zshenv_sets() {
         "dots/.zshrc did not run: {out:?}"
     );
 }
+
+#[test]
+fn bash_reports_command_ends_and_runs_the_users_bashrc() {
+    let Some(bash) = find_shell("bash") else {
+        eprintln!("skipping: bash is not installed");
+        return;
+    };
+    let sandbox = Sandbox::new();
+    sandbox.write_home(".bashrc", "export TG_RC_MARKER=from-bashrc\n");
+    let out = run(
+        &bash,
+        &sandbox,
+        "false\nprintf 'rc=%s\\n' \"$TG_RC_MARKER\"\nexit\n",
+    );
+    assert!(
+        out.contains("\x1b]133;D;1\x07"),
+        "no OSC 133;D;1 in {out:?}"
+    );
+    assert!(
+        out.contains("rc=from-bashrc"),
+        "~/.bashrc did not run: {out:?}"
+    );
+}
+
+#[test]
+fn bash_works_without_a_bashrc() {
+    let Some(bash) = find_shell("bash") else {
+        eprintln!("skipping: bash is not installed");
+        return;
+    };
+    let sandbox = Sandbox::new();
+    let out = run(&bash, &sandbox, "false\nexit\n");
+    assert!(
+        out.contains("\x1b]133;D;1\x07"),
+        "no OSC 133;D;1 in {out:?}"
+    );
+}

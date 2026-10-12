@@ -40,10 +40,6 @@ impl ShellKind {
     fn is_powershell(self) -> bool {
         matches!(self, ShellKind::Pwsh | ShellKind::WindowsPowerShell)
     }
-
-    fn is_posix(self) -> bool {
-        matches!(self, ShellKind::Bash | ShellKind::Zsh)
-    }
 }
 
 pub struct Shell {
@@ -83,7 +79,13 @@ fn resolve_in(
         .unwrap_or_else(default_program);
     let kind = ShellKind::from_program(&program);
 
-    let mut args = integration_args(kind, script_dir);
+    // `sh` is classed as bash for the frontend's sake, but it may be dash,
+    // which has no --rcfile, so it starts bare.
+    let mut args = if is_plain_sh(&program) {
+        Vec::new()
+    } else {
+        integration_args(kind, script_dir)
+    };
     args.extend(extra_args.iter().cloned());
 
     Shell {
@@ -110,6 +112,13 @@ fn default_program() -> String {
     std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
 }
 
+fn is_plain_sh(program: &str) -> bool {
+    Path::new(program)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .is_some_and(|stem| stem.eq_ignore_ascii_case("sh"))
+}
+
 fn integration_args(kind: ShellKind, script_dir: &Path) -> Vec<String> {
     if kind.is_powershell() {
         let script = script_dir.join("shell-integration.ps1");
@@ -126,15 +135,13 @@ fn integration_args(kind: ShellKind, script_dir: &Path) -> Vec<String> {
         // exec zsh -i'` lost the script's functions in the `exec`.
         return vec!["-i".to_string()];
     }
-    if kind.is_posix() {
-        let script = script_dir.join("shell-integration.sh");
-        // --rcfile would skip the user's own rc, so source ours afterwards instead.
+    if kind == ShellKind::Bash {
+        // A wrapper rc file runs the user's own ~/.bashrc, then the integration.
+        // `-i` is needed because --rcfile is only read by interactive shells.
         return vec![
-            "-c".to_string(),
-            format!(
-                ". \"{}\"; exec \"$0\" -i",
-                script.display().to_string().replace('"', "\\\"")
-            ),
+            "--rcfile".to_string(),
+            script_dir.join("bashrc").display().to_string(),
+            "-i".to_string(),
         ];
     }
     // cmd.exe and anything unrecognised run bare; the process watcher still works.
@@ -175,7 +182,7 @@ fn integration_env(
 
 /// Files the shells read in place of the user's own rc files. They are compiled
 /// in, so installing them does not depend on how the bundle lays out folders.
-const WRAPPERS: [(&str, &str); 4] = [
+const WRAPPERS: [(&str, &str); 5] = [
     ("zsh/.zshenv", include_str!("../../resources/zsh/.zshenv")),
     (
         "zsh/.zprofile",
@@ -183,6 +190,7 @@ const WRAPPERS: [(&str, &str); 4] = [
     ),
     ("zsh/.zshrc", include_str!("../../resources/zsh/.zshrc")),
     ("zsh/.zlogin", include_str!("../../resources/zsh/.zlogin")),
+    ("bashrc", include_str!("../../resources/bashrc")),
 ];
 
 /// Copies the bundled integration scripts into the app data dir on first run.
@@ -338,6 +346,38 @@ mod tests {
             let text = fs::read_to_string(root.join("data/zsh").join(name)).unwrap();
             assert!(text.contains("TG_USER_ZDOTDIR"), "{name}");
         }
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn bash_gets_the_wrapper_rcfile_and_sh_starts_bare() {
+        let args = integration_args(ShellKind::Bash, Path::new("/data/tg"));
+        assert_eq!(args, vec!["--rcfile", "/data/tg/bashrc", "-i"]);
+        let shell = resolve_in(
+            Some("/bin/sh"),
+            &[],
+            Path::new("/data/tg"),
+            None,
+            Path::new("/h"),
+        );
+        assert_eq!(shell.kind, ShellKind::Bash);
+        assert!(shell.args.is_empty());
+        let shell = resolve_in(
+            Some("/bin/bash"),
+            &[],
+            Path::new("/data/tg"),
+            None,
+            Path::new("/h"),
+        );
+        assert_eq!(shell.args.len(), 3);
+    }
+
+    #[test]
+    fn install_writes_the_bash_wrapper() {
+        let root = std::env::temp_dir().join(format!("tg-wrappers-{}", uuid::Uuid::new_v4()));
+        install_scripts(&root, &root.join("data")).unwrap();
+        let text = fs::read_to_string(root.join("data/bashrc")).unwrap();
+        assert!(text.contains("shell-integration.sh"));
         fs::remove_dir_all(&root).unwrap();
     }
 

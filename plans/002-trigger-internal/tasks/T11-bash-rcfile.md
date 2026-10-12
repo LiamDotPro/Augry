@@ -2,7 +2,7 @@
 id: T11
 epic: 002-trigger-internal
 title: Load the bash integration through a wrapper rcfile
-status: todo
+status: done
 depends_on: [T10]
 size: S
 model: haiku
@@ -232,3 +232,5 @@ fn bash_works_without_a_bashrc() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7 warnings, after 7)
+- 2026-10-12 checker: pass
