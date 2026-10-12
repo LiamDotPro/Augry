@@ -2,7 +2,7 @@
 id: T36
 epic: 001-trigger-core
 title: Add the trigger commands, refresh calls, IPC types and docs
-status: todo
+status: done
 depends_on: [T35]
 size: M
 model: haiku
@@ -418,3 +418,5 @@ Turning triggers on or off is a `config_set` patch: `{ triggers: { enabled } }`.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy baseline for terminal-grid was 7 warnings, still 7 after. Note: in step 2 the `check` signature in triggers/mod.rs already read `std::result::Result<(), RuleError>`, so that edit was a no-op; the end state matches the card.
+- 2026-10-12 checker: pass

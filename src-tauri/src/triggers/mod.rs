@@ -13,10 +13,12 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tauri::{AppHandle, Emitter, Manager};
+use serde::Serialize;
+use tauri::{AppHandle, Emitter, Manager, State};
 use trigger_core::{Rule, RuleError, RuleId, Source};
 use trigger_hub::{Hub, RuleState, SourceInfo};
 
+use crate::error::{AppError, Result};
 use crate::state::TriggersConfig;
 use status::{FiredPayload, TriggersStatus};
 use variables::Context;
@@ -108,6 +110,11 @@ impl TriggerService {
         status::build_status(config.enabled, &plan, &inner.states)
     }
 
+    /// True when a definition file with this id exists.
+    pub fn has_definition(&self, id: &str) -> bool {
+        store::load(&self.dir).iter().any(|def| def.id == id)
+    }
+
     /// Starts the thread that turns each fired trigger into a payload for
     /// `emit` and one log line. It ends when the hub is dropped.
     pub fn start_forwarding(&self, emit: impl Fn(FiredPayload) + Send + 'static) {
@@ -173,6 +180,66 @@ pub fn refresh_app(app: &AppHandle) {
         let state = app.state::<crate::AppState>();
         refresh_now(&state);
     });
+}
+
+// Commands ----------------------------------------------------------------
+
+/// The answer of `triggers_check`: `{ ok: true }` or `{ ok: false, reason }`.
+#[derive(Debug, Serialize)]
+pub struct CheckResult {
+    pub ok: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+#[tauri::command]
+pub fn triggers_catalogue(state: State<'_, crate::AppState>) -> Vec<SourceInfo> {
+    state.triggers.catalogue()
+}
+
+#[tauri::command]
+pub fn triggers_check(state: State<'_, crate::AppState>, rule: Rule) -> CheckResult {
+    match state.triggers.check(&rule) {
+        Ok(()) => CheckResult {
+            ok: true,
+            reason: None,
+        },
+        Err(error) => CheckResult {
+            ok: false,
+            reason: Some(error.to_string()),
+        },
+    }
+}
+
+/// Recomputes first, so a definition file added since the last refresh shows up.
+#[tauri::command]
+pub async fn triggers_status(app: AppHandle) -> Result<TriggersStatus> {
+    crate::blocking(move || {
+        let state = app.state::<crate::AppState>();
+        refresh_now(&state)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn triggers_arm(app: AppHandle, process_id: String, armed: bool) -> Result<()> {
+    crate::blocking(move || {
+        let state = app.state::<crate::AppState>();
+        if armed && !state.triggers.has_definition(&process_id) {
+            return Err(AppError::NotFound {
+                message: "there is no process definition with that id".into(),
+            });
+        }
+        state.state.update_config(|config| {
+            config.triggers.armed.retain(|id| id != &process_id);
+            if armed {
+                config.triggers.armed.push(process_id.clone());
+            }
+        })?;
+        refresh_now(&state);
+        Ok(())
+    })
+    .await?
 }
 
 #[cfg(test)]
@@ -281,5 +348,33 @@ mod tests {
         assert_eq!(payload.rule_id, "tidy/saved");
         assert_eq!(payload.coalesced, 0);
         cleanup(&dir);
+    }
+
+    #[test]
+    fn has_definition_looks_for_the_file() {
+        let (service, dir) = service();
+        assert!(service.has_definition("tidy"));
+        assert!(!service.has_definition("nope"));
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn check_results_have_the_shape_the_frontend_reads() {
+        let ok = CheckResult {
+            ok: true,
+            reason: None,
+        };
+        assert_eq!(
+            serde_json::to_value(ok).unwrap(),
+            serde_json::json!({ "ok": true })
+        );
+        let bad = CheckResult {
+            ok: false,
+            reason: Some("unknown kind x.y".into()),
+        };
+        assert_eq!(
+            serde_json::to_value(bad).unwrap(),
+            serde_json::json!({ "ok": false, "reason": "unknown kind x.y" })
+        );
     }
 }

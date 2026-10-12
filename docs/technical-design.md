@@ -556,8 +556,20 @@ Events (Rust → frontend), all emitted to the `main` window:
 | `terminal://stats` | `{ id, cpuPercent, memBytes }` sampled on the AgentWatcher tick for the session process tree; the pane header renders it next to the agent badge |
 | `terminal://task` | `{ id, task: string \| null, updatedAtMs }` when a session's `TERMINAL_GRID_TASK_FILE` changes (section 5.5) |
 | `notes://changed` | `{ relPath, kind }` |
+| `trigger://fired` | `{ processId, processName, ruleId, kind, at, payload, coalesced }` a process trigger fired. `at` is epoch ms, `payload` holds the source's fields (for `trigger-fs`: path, name, relative, ext), `coalesced` counts events the 2 s cool down dropped since the last one for this rule |
 
-Frontend → Rust commands are listed in sections 4.4, 7 (review commands in 7.5), 8, 9. All commands return `Result<T, AppError>` where `AppError` serializes to `{ code: string, message: string, ...extra }`. Codes: `NotFound`, `SpawnFailed`, `Io`, `OutsideRoot`, `Conflict`, `InvalidName`, `GitTimeout`, `GitNotInstalled`.
+Frontend → Rust commands are listed in sections 4.4, 7 (review commands in 7.5), 8, 9 and the process trigger commands below. All commands return `Result<T, AppError>` where `AppError` serializes to `{ code: string, message: string, ...extra }`. Codes: `NotFound`, `SpawnFailed`, `Io`, `OutsideRoot`, `Conflict`, `InvalidName`, `GitTimeout`, `GitNotInstalled`.
+
+Process trigger commands (`src-tauri/src/triggers/`):
+
+| Command | In | Out |
+|---|---|---|
+| `triggers_catalogue` | `{}` | `SourceInfo[]`: every source with its kinds and availability |
+| `triggers_check` | `{ rule: { id, kind, when } }` | `{ ok: true }` or `{ ok: false, reason }`; the rule is checked as given, variables are not expanded |
+| `triggers_status` | `{}` | `{ enabled, processes: { id, name, armed, problem?, rules: { id, kind, state, reason? }[] }[] }`; recomputes first. `state` is `active`, `rejected`, `sourceFailed` or `skipped` |
+| `triggers_arm` | `{ processId, armed }` | `void`; `NotFound` when arming an id that has no definition file |
+
+Turning triggers on or off is a `config_set` patch: `{ triggers: { enabled } }`.
 
 Field naming: Rust structs use `#[serde(rename_all = "camelCase")]` so the frontend sees camelCase throughout. Command argument names are camelCase on the JS side and Tauri maps them to snake_case Rust parameters.
 

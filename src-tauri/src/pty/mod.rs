@@ -517,6 +517,7 @@ pub async fn create_terminal(
         let config = state.state.config();
         let info = state.pty.spawn(&app, id, cwd, cols, rows, &config)?;
         state.agent.wake();
+        crate::triggers::refresh_app(&app);
         Ok(info)
     })
     .await?
@@ -556,8 +557,14 @@ pub fn resize_terminal(
 }
 
 #[tauri::command]
-pub fn close_terminal(state: State<'_, crate::AppState>, id: TerminalId) -> Result<()> {
-    state.pty.close(&id)
+pub fn close_terminal(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+    id: TerminalId,
+) -> Result<()> {
+    state.pty.close(&id)?;
+    crate::triggers::refresh_app(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -609,6 +616,7 @@ pub fn report_cwd(
             cwd: cwd.clone(),
         },
     );
+    crate::triggers::refresh_app(&app);
 
     let app_handle = app.clone();
     let inner_id = id;

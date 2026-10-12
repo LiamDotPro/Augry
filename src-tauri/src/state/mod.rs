@@ -307,13 +307,18 @@ pub fn config_get(state: State<'_, crate::AppState>) -> Config {
 }
 
 #[tauri::command]
-pub fn config_set(state: State<'_, crate::AppState>, patch: ConfigPatch) -> Result<Config> {
+pub fn config_set(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+    patch: ConfigPatch,
+) -> Result<Config> {
     let notes_root = patch.notes_root.clone().flatten();
     let config = state.state.set_config(patch)?;
     if let Some(root) = notes_root {
         // Keep the notes service in step with the setting it was saved from.
         state.notes.set_root(root)?;
     }
+    crate::triggers::refresh_app(&app);
     Ok(config)
 }
 

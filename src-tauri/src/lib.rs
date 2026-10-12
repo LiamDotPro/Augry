@@ -160,6 +160,11 @@ pub fn run() {
             state::config_set,
             state::session_get,
             state::session_set,
+            // triggers
+            triggers::triggers_catalogue,
+            triggers::triggers_check,
+            triggers::triggers_status,
+            triggers::triggers_arm,
             // window
             glass::set_window_glass,
         ])
