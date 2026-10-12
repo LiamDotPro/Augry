@@ -51,7 +51,7 @@ CI lints `trigger-git` with `-D warnings` like the other trigger crates, and run
 - [ ] `grep -c "\-p trigger-git --all-targets" .github/workflows/ci.yml` prints `1`
 - [ ] `grep -c "cargo test -p trigger-git -- --ignored --test-threads=1" .github/workflows/ci.yml` prints `1`
 - [ ] `node -e "const y=require('js-yaml');const d=y.load(require('fs').readFileSync('.github/workflows/ci.yml','utf8'));const s=Object.values(d.jobs).flatMap(j=>j.steps.map(x=>x.name));if(!s.includes('Live git tests'))process.exit(1)"` exits 0 (if `js-yaml` is not installed, rely on the two greps)
-- [ ] `grep -c "trigger-git" plans/_context/repo-map.md` prints at least `5`
+- [ ] `grep -c "trigger-git" plans/_context/repo-map.md` prints `4` (the three rows from T31 plus the ci.yml row)
 - [ ] `grep -c "CI lints only" plans/_context/repo-map.md` prints `0`
 - [ ] `cd src-tauri && cargo clippy -p trigger-core -p trigger-hub -p trigger-fs -p trigger-git --all-targets -- -D warnings` exits 0
 - [ ] `git status --porcelain` lists only paths under `files:` (and the cards)
