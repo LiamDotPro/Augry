@@ -98,3 +98,46 @@ fn a_connection_that_is_refused_is_an_error() {
     let url = format!("http://127.0.0.1:{port}/cal.ics");
     assert!(UreqFetcher::new().fetch(&url, None, None).is_err());
 }
+
+fn temp_path() -> std::path::PathBuf {
+    std::env::temp_dir().join(format!("trigger-clock-{}.ics", uuid::Uuid::new_v4()))
+}
+
+#[test]
+fn a_feed_file_is_read_as_text() {
+    let path = temp_path();
+    std::fs::write(&path, "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n").unwrap();
+    let text = read_feed_file(&path);
+    std::fs::remove_file(&path).unwrap();
+    assert_eq!(text.unwrap(), "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n");
+}
+
+#[test]
+fn a_missing_or_binary_feed_file_is_an_error_without_the_path() {
+    let missing = temp_path();
+    let err = read_feed_file(&missing).unwrap_err();
+    assert!(err.starts_with("could not open the feed file"));
+    assert!(!err.contains("trigger-clock-"));
+    let binary = temp_path();
+    std::fs::write(&binary, [0xff, 0xfe, 0x00, 0x80]).unwrap();
+    let result = read_feed_file(&binary);
+    std::fs::remove_file(&binary).unwrap();
+    assert!(result.is_err());
+}
+
+#[test]
+fn zone_names_parse_and_unknown_names_are_floating() {
+    assert_eq!(
+        zone_from_name("Europe/London"),
+        CalTz::from(chrono_tz::Europe::London)
+    );
+    assert_eq!(zone_from_name("UTC"), CalTz::UTC);
+    assert_eq!(zone_from_name("Not/AZone"), CalTz::Floating);
+    assert_eq!(zone_from_name(""), CalTz::Floating);
+}
+
+#[test]
+fn the_local_zone_can_be_asked_for_on_any_machine() {
+    // The answer depends on the machine, so only check that it does not panic.
+    let _ = local_zone();
+}

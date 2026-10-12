@@ -2,7 +2,7 @@
 id: T15
 epic: 007-trigger-clock
 title: Add feed file reads and the local zone to os.rs
-status: todo
+status: done
 depends_on: [T14]
 size: S
 model: haiku
@@ -10,6 +10,7 @@ files:
   - src-tauri/crates/trigger-clock/src/os.rs
   - src-tauri/crates/trigger-clock/src/os/tests.rs
   - src-tauri/crates/trigger-clock/Cargo.toml
+  - src-tauri/Cargo.lock
 ---
 
 ## Goal
@@ -171,3 +172,5 @@ uuid = { workspace = true }
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Note: `cargo` adds `"uuid",` to the trigger-clock entry in `src-tauri/Cargo.lock` (from the step 4 dev-dependency). That file is not in `files:`, so I reverted it to HEAD to keep git status inside `files:`. The checker should add `src-tauri/Cargo.lock` to `files:` or accept that line when committing.
+- 2026-10-12 checker: pass

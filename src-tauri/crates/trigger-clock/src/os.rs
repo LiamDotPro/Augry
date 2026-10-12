@@ -3,7 +3,11 @@
 //! itself needs no OS calls (it reads the wall clock through `trigger_core`'s
 //! `Clock`). Everything decided about feeds is pure and lives in `feed.rs`.
 
+use std::io::Read;
+use std::path::Path;
 use std::time::Duration;
+
+use calcard::common::timezone::Tz as CalTz;
 
 use trigger_core::Availability;
 use ureq::http::header::{ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED};
@@ -108,6 +112,35 @@ impl Fetcher for UreqFetcher {
             last_modified,
         })
     }
+}
+
+/// Reads a feed from a file, refusing one over `MAX_FEED_BYTES`. The error
+/// never includes the path.
+pub fn read_feed_file(path: &Path) -> Result<String, String> {
+    let file = std::fs::File::open(path)
+        .map_err(|e| format!("could not open the feed file: {}", e.kind()))?;
+    let mut text = String::new();
+    file.take(MAX_FEED_BYTES + 1)
+        .read_to_string(&mut text)
+        .map_err(|e| format!("could not read the feed file: {}", e.kind()))?;
+    if text.len() as u64 > MAX_FEED_BYTES {
+        return Err("the feed is too large".to_string());
+    }
+    Ok(text)
+}
+
+/// The zone for an IANA name such as `Europe/London`, or floating when the
+/// name is not one `chrono-tz` knows. Floating makes times written without a
+/// zone mean the same wall clock time wherever they are read.
+pub fn zone_from_name(name: &str) -> CalTz {
+    name.parse::<chrono_tz::Tz>()
+        .map_or(CalTz::Floating, CalTz::from)
+}
+
+/// The machine's time zone, used for times in a feed written without one.
+/// Floating when the OS does not say.
+pub fn local_zone() -> CalTz {
+    iana_time_zone::get_timezone().map_or(CalTz::Floating, |name| zone_from_name(&name))
 }
 
 #[cfg(test)]

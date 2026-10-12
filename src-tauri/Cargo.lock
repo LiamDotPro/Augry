@@ -5086,6 +5086,7 @@ dependencies = [
  "serde_json",
  "trigger-core",
  "ureq",
+ "uuid",
 ]
 
 [[package]]
