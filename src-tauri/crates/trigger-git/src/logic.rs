@@ -168,5 +168,47 @@ impl Change {
     }
 }
 
+/// The changes between two snapshots, in the order they are reported:
+/// rebase stopped, merge conflict, branch switched, detached head, pulled or
+/// commit, tag created, stash created. Each kind at most once.
+pub fn step(prev: &RepoSnapshot, next: &RepoSnapshot) -> Vec<Change> {
+    let mut out = Vec::new();
+
+    // HEAD is detached and moves on every step of a rebase, so while one is
+    // running only its start can be reported.
+    if next.rebase {
+        if !prev.rebase {
+            out.push(Change::RebaseStopped {
+                branch: prev.branch.clone(),
+                commit: next.short.clone(),
+            });
+        }
+        return out;
+    }
+
+    // A merge with no conflicting files (`merge --no-commit`) fires nothing.
+    if prev.merge_head.is_none() && next.merge_head.is_some() && next.unmerged > 0 {
+        out.push(Change::MergeConflict {
+            branch: next.branch.clone(),
+            files: next.unmerged,
+        });
+    }
+
+    // T07 adds the branch switch, detached head, pull and commit here.
+
+    // T08 adds the new tag and the new stash here.
+
+    out
+}
+
+/// Like `step`, for the glue that may not have a previous snapshot yet. The
+/// first snapshot is a baseline: it never fires anything.
+pub fn observe(prev: Option<&RepoSnapshot>, next: &RepoSnapshot) -> Vec<Change> {
+    match prev {
+        Some(prev) => step(prev, next),
+        None => Vec::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests;

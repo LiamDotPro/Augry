@@ -164,3 +164,103 @@ fn payload_values() {
     assert_eq!(p["files"], 3);
     assert_eq!(p["branch"], "");
 }
+
+/// A snapshot on `branch` at `head`, with a short sha made from the head.
+fn on(branch: &str, head: &str) -> RepoSnapshot {
+    RepoSnapshot {
+        head: Some(head.into()),
+        branch: Some(branch.into()),
+        short: Some(head.chars().take(7).collect()),
+        message: Some(format!("message of {head}")),
+        ..RepoSnapshot::default()
+    }
+}
+
+/// A snapshot with HEAD detached at `head`.
+fn detached(head: &str) -> RepoSnapshot {
+    RepoSnapshot {
+        branch: None,
+        ..on("x", head)
+    }
+}
+
+fn kinds(changes: &[Change]) -> Vec<&'static str> {
+    changes.iter().map(Change::kind).collect()
+}
+
+#[test]
+fn the_first_snapshot_fires_nothing() {
+    let mut first = on("main", "aaaaaaa1");
+    first.merge_head = Some("bbbbbbb2".into());
+    first.unmerged = 2;
+    first.rebase = true;
+    assert!(observe(None, &first).is_empty());
+    assert_eq!(observe(Some(&on("main", "a")), &first).len(), 1);
+}
+
+#[test]
+fn an_unchanged_repository_fires_nothing() {
+    let snap = on("main", "aaaaaaa1");
+    assert!(step(&snap, &snap.clone()).is_empty());
+}
+
+#[test]
+fn a_merge_conflict_reports_the_unmerged_count() {
+    let prev = on("main", "aaaaaaa1");
+    let mut next = prev.clone();
+    next.merge_head = Some("bbbbbbb2".into());
+    next.unmerged = 3;
+    assert_eq!(
+        step(&prev, &next),
+        vec![Change::MergeConflict {
+            branch: Some("main".into()),
+            files: 3
+        }]
+    );
+}
+
+#[test]
+fn a_merge_without_conflicts_or_one_already_running_fires_nothing() {
+    let prev = on("main", "aaaaaaa1");
+    let mut no_conflict = prev.clone();
+    no_conflict.merge_head = Some("bbbbbbb2".into());
+    no_conflict.unmerged = 0;
+    assert!(step(&prev, &no_conflict).is_empty());
+
+    let mut running = prev.clone();
+    running.merge_head = Some("bbbbbbb2".into());
+    running.unmerged = 3;
+    let mut still = running.clone();
+    still.unmerged = 2;
+    assert!(step(&running, &still).is_empty());
+}
+
+#[test]
+fn a_rebase_stop_fires_once_and_names_the_branch_it_left() {
+    let prev = on("feature", "aaaaaaa1");
+    let mut next = detached("ccccccc3");
+    next.rebase = true;
+    assert_eq!(
+        step(&prev, &next),
+        vec![Change::RebaseStopped {
+            branch: Some("feature".into()),
+            commit: Some("ccccccc".into())
+        }]
+    );
+}
+
+#[test]
+fn nothing_else_fires_while_a_rebase_runs() {
+    let prev = on("feature", "aaaaaaa1");
+    let mut stopped = detached("ccccccc3");
+    stopped.rebase = true;
+    // Still rebasing, HEAD moved, a tag appeared, a conflict file is listed.
+    let mut later = detached("ddddddd4");
+    later.rebase = true;
+    later.merge_head = Some("eeeeeee5".into());
+    later.unmerged = 1;
+    later.refs.insert("refs/tags/v1".into(), "f".into());
+    assert!(step(&stopped, &later).is_empty());
+    // Even a first sight of a rebase with a tag only reports the stop.
+    assert_eq!(kinds(&step(&prev, &later)), vec!["git.rebase-stopped"]);
+}
