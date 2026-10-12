@@ -2,7 +2,7 @@
 id: T21
 epic: 011-trigger-github
 title: Add the child process runner with a timeout
-status: todo
+status: done
 depends_on: [T20]
 size: M
 model: haiku
@@ -264,3 +264,5 @@ fn a_signal_gives_no_exit_code() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
