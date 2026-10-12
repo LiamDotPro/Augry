@@ -4,11 +4,14 @@
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 
 use super::*;
+use crate::pty::tap::{CommandClock, Tap};
+use crate::triggers::internal::InternalSignal;
 
 /// A fake home and an app data folder with a space in its name, like the
 /// "Application Support" folder on macOS. Removed when dropped.
@@ -228,4 +231,47 @@ fn zsh_reports_a_repeated_command_each_time() {
 #[test]
 fn bash_reports_a_repeated_command_each_time() {
     check_repeats("bash", ".bash_history", "echo old\n");
+}
+
+/// Feeds what the real shell printed to a `Tap` in odd sized chunks, the way
+/// pty reads split it, and checks the signals the triggers would get.
+fn check_signals(name: &str) {
+    let Some(shell) = find_shell(name) else {
+        eprintln!("skipping: {name} is not installed");
+        return;
+    };
+    let sandbox = Sandbox::new();
+    let out = run(&shell, &sandbox, "false\necho needle-line\nexit\n");
+
+    let clock = Arc::new(Mutex::new(CommandClock::default()));
+    let mut tap = Tap::new("p1".to_string(), clock);
+    let mut signals = Vec::new();
+    for chunk in out.as_bytes().chunks(7) {
+        signals.extend(tap.process(chunk, true, Instant::now(), |_| "/work".to_string()));
+    }
+    assert!(
+        signals
+            .iter()
+            .any(|s| matches!(s, InternalSignal::CommandEnded { exit_code: 1, .. })),
+        "no failed command in {signals:?} from {out:?}"
+    );
+    assert!(
+        signals
+            .iter()
+            .any(|s| matches!(s, InternalSignal::OutputLine { line, .. } if line == "needle-line")),
+        "no output line in {signals:?} from {out:?}"
+    );
+    assert!(!signals
+        .iter()
+        .any(|s| matches!(s, InternalSignal::Bell { .. })));
+}
+
+#[test]
+fn zsh_output_becomes_trigger_signals() {
+    check_signals("zsh");
+}
+
+#[test]
+fn bash_output_becomes_trigger_signals() {
+    check_signals("bash");
 }

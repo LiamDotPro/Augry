@@ -2,7 +2,7 @@
 id: T17
 epic: 002-trigger-internal
 title: Prove real zsh and bash output becomes trigger signals
-status: todo
+status: done
 depends_on: [T16, T12]
 size: S
 model: haiku
@@ -131,3 +131,5 @@ fn bash_output_becomes_trigger_signals() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7, after 7; live.rs file changed on disk mid-run, my edits were intact)
+- 2026-10-12 checker: pass
