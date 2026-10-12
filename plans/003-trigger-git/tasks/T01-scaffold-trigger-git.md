@@ -2,7 +2,7 @@
 id: T01
 epic: 003-trigger-git
 title: Scaffold the trigger-git crate from the template
-status: todo
+status: done
 depends_on: []
 size: S
 model: haiku
@@ -91,3 +91,5 @@ uuid = { workspace = true }
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

@@ -4910,6 +4910,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "trigger-git"
+version = "0.1.0"
+dependencies = [
+ "globset",
+ "notify",
+ "serde",
+ "serde_json",
+ "trigger-core",
+ "uuid",
+]
+
+[[package]]
 name = "trigger-hub"
 version = "0.1.0"
 dependencies = [
