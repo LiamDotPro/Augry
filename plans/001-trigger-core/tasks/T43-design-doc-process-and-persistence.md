@@ -2,7 +2,7 @@
 id: T43
 epic: 001-trigger-core
 title: Document triggers in design sections 3 and 9
-status: todo
+status: done
 depends_on: [T42]
 size: S
 model: haiku
@@ -99,3 +99,6 @@ Strings in `when` may use `${home}`, `${downloads}`, `${notes.root}`, `${screens
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 architect: named the trigger-fs-watch thread in the section 3 bullet, from the checker's note
+- 2026-10-12 checker: pass

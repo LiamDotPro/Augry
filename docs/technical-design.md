@@ -176,6 +176,7 @@ pub struct AppState {
     pub agent: AgentWatcher,      // handle to the polling thread + shared status map
     pub notes: NotesService,      // Arc<RwLock<NotesConfig>>
     pub config: Arc<RwLock<Config>>,
+    pub triggers: TriggerService, // the trigger hub and the rules worked out from process definitions
 }
 ```
 
@@ -185,6 +186,9 @@ Threads:
 - One waiter thread per session (`child.wait()`), emits exit.
 - One AgentWatcher thread (1 s tick).
 - One optional `notify` watcher thread for the notes root.
+- One `trigger-hub` thread: drains events from the trigger sources, applies the two second cool down per rule, and publishes `Fired`.
+- One `trigger-forward` thread: turns each `Fired` into the `trigger://fired` event and one log line (ids and the kind only, never the payload).
+- One thread per running trigger source (for `trigger-fs`, named `trigger-fs` and `trigger-fs-watch`, which owns the `notify` watcher). `TriggerService::refresh()` starts and stops them whenever the rules change; it is cheap when nothing changed, so it runs after every pane change and config save.
 - Git commands run on Tauri's async command pool (`#[tauri::command] async fn`) so they never block the main thread.
 
 ---
@@ -553,7 +557,8 @@ Two files in `app.path().app_config_dir()` (`%APPDATA%\com.liamread.terminalgrid
   "fontFamily": null,
   "fontSize": 14,
   "scrollback": 10000,
-  "restoreSessionOnLaunch": true
+  "restoreSessionOnLaunch": true,
+  "triggers": { "enabled": false, "armed": [] }
 }
 ```
 
@@ -576,6 +581,26 @@ Two files in `app.path().app_config_dir()` (`%APPDATA%\com.liamread.terminalgrid
 On launch, if `restoreSessionOnLaunch` is true, the frontend calls `create_terminal` for each saved entry in order (cwd only; shells are not resumed, that is not possible with ConPTY). If a saved cwd no longer exists, the terminal starts in the user's home and the header shows a notice.
 
 Commands: `config_get`, `config_set { patch }`, `session_get`, `session_set { session }`.
+
+### 9.1 Process definitions and arming
+
+`config.json` has a `triggers` block: `enabled` is the master switch (off by default) and `armed` lists the ids of the process definitions the user has armed. It is local only and never goes in `session.json` or to the cloud.
+
+Local process definitions are JSON files in `processes/` inside the same folder, one per process; the file name without `.json` is the process id. The folder is created on first use. Only the fields triggers need are read, the rest of the file is left alone:
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "Keep the docs tidy",
+  "triggers": [
+    { "id": "saved", "kind": "fs.file-saved", "when": { "path": "${notes.root}", "glob": "**/*.md" } }
+  ]
+}
+```
+
+A file is usable when it is a JSON object with `schemaVersion` 1 and a non empty `name`, and `triggers`, when present, is an array of `{ id, kind, when }` with unique ids. A file that is not usable is still listed by `triggers_status`, with a `problem` text, and has no rules. Files over 1 MB are not read.
+
+Strings in `when` may use `${home}`, `${downloads}`, `${notes.root}`, `${screenshots}` and `${repo.root}`. `${repo.root}` makes one rule per distinct repository root among the open panes. A rule whose variable has no value on this machine is `skipped` with a reason. Rule ids are `<processId>/<triggerId>`, with `#<n>` added (n from 1) when `${repo.root}` produced several.
 
 ---
 
