@@ -1,6 +1,6 @@
-import { useMemo, type KeyboardEvent } from "react";
+import { useEffect, useMemo, type KeyboardEvent } from "react";
 import type { BlockMark } from "../../process/layout";
-import { recordOf, versionsUi } from "../../process/state";
+import { recordOf, teamOf, versionsUi } from "../../process/state";
 import type { Process } from "../../process/types";
 import { agoWords } from "../../process/runs";
 import { changeSentence, latest, summarizeChanges, versionDiff, versionOf, versionTags, working } from "../../process/versions";
@@ -10,21 +10,31 @@ import { EditBar } from "./ProcessBar";
 import { Missing } from "./ProcessEditor";
 import { ProcessIcon } from "./ProcessIcon";
 import { ProcessLanes } from "./ProcessLanes";
-import { useProcess } from "./store";
+import { SAVE_OFFLINE, useProcess } from "./store";
 import { useKeptScroll } from "./useKeptScroll";
 
 /**
  * Versions (board 09): opened from the version chip in the bar. The draft,
  * numbered versions with the runs that used them, and a compare of any
  * version with the current one, as JSON or lanes. Restore saves the old
- * content as a new version, so history only grows.
+ * content as a new version, so history only grows. A team process's history
+ * comes from the team (its versions are fetched when this opens), and saving
+ * or restoring writes the team's next version.
  */
 export function VersionsView({ processId }: { processId: string }) {
-  const { state, dispatch, now } = useProcess();
+  const { state, dispatch, now, team, saveProcess, runProcess, restoreProcess, offline } = useProcess();
   const record = recordOf(state, processId);
   const ui = versionsUi(state, processId);
   const listScroll = useKeptScroll<HTMLDivElement>(`versions-list-${processId}`);
   const diffScroll = useKeptScroll<HTMLDivElement>(`versions-diff-${processId}`);
+  const inTeam = teamOf(state, processId) !== null;
+  const cantSave = offline(processId);
+
+  // Team versions live on the server; fetch them each time Versions opens.
+  const loadVersions = team?.loadVersions;
+  useEffect(() => {
+    if (inTeam) loadVersions?.(processId);
+  }, [inTeam, processId, loadVersions]);
 
   const current = record ? latest(record) : null;
   const draft = record?.draft ?? null;
@@ -54,7 +64,7 @@ export function VersionsView({ processId }: { processId: string }) {
   const process = working(record);
   const nextNumber = current.version + 1;
   const sentence = changeSentence(draftChanges);
-  const save = () => dispatch({ type: "save", processId, message: ui.message || sentence, now: Date.now() });
+  const save = () => !cantSave && saveProcess(processId, ui.message || sentence);
   const set = (patch: Partial<typeof ui>) => dispatch({ type: "versions-ui", processId, patch });
   const canRestore = !!from && (from.version !== current.version || !!draft);
 
@@ -74,7 +84,7 @@ export function VersionsView({ processId }: { processId: string }) {
           version={current.version}
           changes={draftChanges.length}
           versionsOpen
-          onRun={() => dispatch({ type: "run", processId, now: Date.now() })}
+          onRun={() => runProcess(processId)}
         />
       </div>
 
@@ -82,7 +92,7 @@ export function VersionsView({ processId }: { processId: string }) {
         <div className="process-glass__head">
           <ProcessIcon name="history" size={18} className="process-versions__icon" />
           <h2 className="process-glass__title">Versions</h2>
-          <span className="process-versions__id">{processId}</span>
+          <span className="process-versions__id">{inTeam ? process.id : processId}</span>
         </div>
         {draft && (
           <div className="process-draft">
@@ -94,16 +104,25 @@ export function VersionsView({ processId }: { processId: string }) {
               <span className="process-draft__auto">autosaved</span>
             </div>
             <div className="process-draft__text">{sentence}</div>
-            <input
-              className="process-input process-input--small"
-              placeholder={sentence}
-              aria-label="Version message"
-              value={ui.message}
-              onChange={(e) => set({ message: e.target.value })}
-              onKeyDown={(e) => e.key === "Enter" && save()}
-            />
+            {/* Team versions keep no message, so there is nothing to type. */}
+            {!inTeam && (
+              <input
+                className="process-input process-input--small"
+                placeholder={sentence}
+                aria-label="Version message"
+                value={ui.message}
+                onChange={(e) => set({ message: e.target.value })}
+                onKeyDown={(e) => e.key === "Enter" && save()}
+              />
+            )}
             <div className="process-draft__buttons">
-              <button type="button" className="process-btn process-btn--small process-btn--warn" onClick={save}>
+              <button
+                type="button"
+                className="process-btn process-btn--small process-btn--warn"
+                disabled={cantSave}
+                title={cantSave ? SAVE_OFFLINE : undefined}
+                onClick={save}
+              >
                 Save as v{nextNumber}
                 <kbd className="process-kbd process-kbd--bare">Ctrl+S</kbd>
               </button>
@@ -124,7 +143,7 @@ export function VersionsView({ processId }: { processId: string }) {
                   <span className="process-version__msg">{v.message}</span>
                   <span className="process-version__meta">
                     <span>
-                      {v.by} · {agoWords(v.at, now)}
+                      {v.byId && team ? team.nameOf(v.byId) : v.by} · {agoWords(v.at, now)}
                     </span>
                     <span className="process-mono">{v.hash}</span>
                     {tags.map((t) => (
@@ -160,9 +179,9 @@ export function VersionsView({ processId }: { processId: string }) {
           <button
             type="button"
             className="process-btn process-btn--small process-btn--solid"
-            disabled={!canRestore}
-            title={draft ? "Restoring drops the draft" : undefined}
-            onClick={() => from && dispatch({ type: "restore", processId, version: from.version, now: Date.now() })}
+            disabled={!canRestore || cantSave}
+            title={cantSave ? SAVE_OFFLINE : draft ? "Restoring drops the draft" : undefined}
+            onClick={() => from && restoreProcess(processId, from.version)}
           >
             Restore v{from?.version} as v{nextNumber}
           </button>
@@ -183,7 +202,7 @@ export function VersionsView({ processId }: { processId: string }) {
           <div className="process-code process-compare__code">
             <div className="process-code__head">
               <ProcessIcon name="braces" size={16} stroke={1.6} className="process-code__headicon" />
-              <span className="process-code__file">.augry/processes/{processId}.json</span>
+              <span className="process-code__file">.augry/processes/{inTeam ? process.id : processId}.json</span>
               <span className="process-code__ver">
                 v{from?.version} → {to.label}
               </span>

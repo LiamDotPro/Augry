@@ -1,1 +1,433 @@
 /* Process tab with a team selected (Process Tab board 11): home-team, share-to-team, share-blocked, team-conflict, team-offline, team-connections, team-connection-setup. Shared pieces are in cloud.css. */
+
+/* home-team ------------------------------------------------------------- */
+
+/* The status line's dot: who saved the latest version. */
+.process-dot.process-dot--team { background: var(--team-dot); }
+
+.process-runs__where {
+  font-size: 12px;
+  color: var(--text-55);
+}
+
+/* team-offline: Run stays in place but can't be pressed; the tooltip says why.
+   This file loads before process.css, hence the doubled class. */
+.process-btn.process-btn--offline,
+.process-btn.process-btn--offline:hover:not(:disabled) {
+  background: rgb(var(--ink-rgb) / 0.04);
+  border-color: rgb(var(--ink-rgb) / 0.1);
+  box-shadow: none;
+  color: var(--text-40);
+  cursor: default;
+}
+
+.team-offline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgb(var(--ink-rgb) / 0.04);
+  border: 1px solid rgb(var(--ink-rgb) / 0.12);
+}
+
+.team-offline .cloud-dot--ring {
+  width: 9px;
+  height: 9px;
+  border-color: rgb(var(--text-rgb) / 0.6);
+}
+
+.team-offline__text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-85);
+}
+
+.team-offline__switch {
+  font-size: 12.5px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.team-offline__switch:hover { text-decoration: underline; }
+
+/* Duplicate and Delete in a team card's ⋯ menu while offline. */
+.process-menu__item:disabled,
+.process-menu__item:disabled:hover {
+  opacity: 0.45;
+  background: none;
+  cursor: default;
+}
+
+.team-note { padding: 8px 8px 8px 14px; }
+.team-note__text { flex: 1; }
+
+/* Dialogs: share-to-team, share-blocked, team-conflict ------------------- */
+
+.team-dialog__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px 24px 18px;
+}
+
+.team-dialog__head > .cloud-team-tile {
+  border-radius: 11px;
+  font-size: 17px;
+}
+
+.team-dialog__tile {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+}
+
+.team-dialog__tile--warn {
+  background: rgb(var(--warn-rgb) / 0.14);
+  color: var(--cloud-warn-text);
+}
+
+.team-dialog__tile--accent {
+  background: rgb(var(--accent-rgb) / 0.12);
+  color: var(--accent);
+}
+
+.team-dialog__titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team-dialog__title {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.team-dialog__text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgb(var(--text-rgb) / 0.62);
+  text-wrap: pretty;
+}
+
+.team-dialog__body {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 24px 22px;
+}
+
+.team-dialog__foot { padding: 14px 24px; }
+
+.team-dialog__foot .cloud-btn {
+  height: 34px;
+  border-radius: 9px;
+  font-size: 12.5px;
+}
+
+.team-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.team-dialog__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-78);
+}
+
+.team-dialog__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgb(var(--ink-rgb) / 0.03);
+  border: 1px solid rgb(var(--ink-rgb) / 0.08);
+}
+
+.team-dialog__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgb(var(--text-rgb) / 0.86);
+}
+
+.team-dialog__tick {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ok);
+}
+
+.team-dialog__rule {
+  height: 1px;
+  background: rgb(var(--ink-rgb) / 0.08);
+}
+
+.team-dialog__note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-70);
+  text-wrap: pretty;
+}
+
+.team-dialog__note--quiet { color: rgb(var(--text-rgb) / 0.6); }
+
+.team-dialog__code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-85);
+}
+
+/* The "Share to" team picker: a native select under the design's look. */
+.team-picker {
+  position: relative;
+  height: 38px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 9px;
+  background: rgb(var(--ink-rgb) / 0.05);
+  border: 1px solid rgb(var(--ink-rgb) / 0.12);
+}
+
+.team-picker:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--cloud-focus-ring);
+}
+
+.team-picker__select {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  appearance: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.team-picker__select option {
+  background: var(--cloud-dialog-bg);
+  color: var(--text);
+}
+
+.team-picker__caret {
+  pointer-events: none;
+  font-size: 9px;
+  color: var(--text-55);
+}
+
+/* "Connections it uses" */
+.team-conns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team-conn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: rgb(var(--ink-rgb) / 0.03);
+  border: 1px solid rgb(var(--ink-rgb) / 0.08);
+}
+
+.team-conn--missing {
+  flex-direction: column;
+  align-items: stretch;
+  background: rgb(var(--accent-rgb) / 0.05);
+  border-color: rgb(var(--accent-rgb) / 0.3);
+}
+
+.team-conn__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.team-conn__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.team-conn__has {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--cloud-ok-text);
+}
+
+.team-conn__has .team-dialog__tick { margin-top: 0; }
+
+.team-conn__missing {
+  font-size: 12px;
+  color: var(--cloud-warn-text);
+}
+
+.team-conn__share {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.team-conn__note {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: rgb(var(--text-rgb) / 0.6);
+  text-wrap: pretty;
+}
+
+/* A 16px tick box: cyan with a dark check when on. */
+.team-check {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  margin: 0;
+  display: grid;
+  place-content: center;
+  appearance: none;
+  border-radius: 4px;
+  border: 1px solid rgb(var(--ink-rgb) / 0.3);
+  background: transparent;
+  cursor: pointer;
+}
+
+.team-check:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.team-check:checked::after {
+  content: "✓";
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--cloud-avatar-ring);
+}
+
+.team-check:focus-visible { box-shadow: var(--cloud-focus-ring); outline: none; }
+
+/* share-blocked: where the token is. */
+.team-found {
+  padding: 12px 14px;
+  border-radius: 9px;
+  background: rgb(0 0 0 / 0.3);
+  border: 1px solid rgb(var(--warn-rgb) / 0.35);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-85);
+  overflow-wrap: anywhere;
+}
+
+.team-found__key { color: var(--cloud-warn-text); }
+.team-found__value { color: var(--text-50); }
+
+/* team-conflict: theirs, yours, where you started. */
+.team-versions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.team-version {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgb(var(--ink-rgb) / 0.03);
+  border: 1px solid rgb(var(--ink-rgb) / 0.08);
+}
+
+.team-version--mine {
+  background: rgb(var(--accent-rgb) / 0.06);
+  border-color: rgb(var(--accent-rgb) / 0.35);
+}
+
+.team-version__n {
+  width: 44px;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-70);
+}
+
+.team-version--mine .team-version__n { color: var(--process-accent-text); }
+
+.team-version__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.team-version__who {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.team-version__what {
+  font-size: 11.5px;
+  color: var(--text-55);
+}
+
+.team-version__when {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-50);
+}
+
+/* team-connection-setup: who the connection is shared with. */
+.team-shared {
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.team-shared__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.team-shared__title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.team-shared__text {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-68);
+  text-wrap: pretty;
+}

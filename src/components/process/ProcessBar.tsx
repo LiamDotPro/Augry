@@ -1,10 +1,11 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { agoShort, clock } from "../../process/runs";
+import { spaceRecords } from "../../process/state";
 import type { Run } from "../../process/types";
 import { working } from "../../process/versions";
 import { cx } from "../../lib/cx";
 import { ProcessIcon } from "./ProcessIcon";
-import { useProcess } from "./store";
+import { RUN_OFFLINE, useProcess } from "./store";
 import { useDismiss } from "./useDismiss";
 
 /** A small dropdown under a bar chip. */
@@ -39,7 +40,7 @@ function Crumb({ name, processId }: { name: string; processId: string }) {
       <span className="process-bar__rule" />
       <BarMenu label={`${name}: switch process`} className="process-bar__name" trigger={<>{name}<span className="process-bar__caret" aria-hidden="true">▼</span></>}>
         {(close) =>
-          state.records.map((r) => (
+          spaceRecords(state).map((r) => (
             <button
               key={r.id}
               type="button"
@@ -87,7 +88,8 @@ export function EditBar({
   onJson?(): void;
   onRun(): void;
 }) {
-  const { dispatch } = useProcess();
+  const { dispatch, offline } = useProcess();
+  const cantRun = offline(processId);
   return (
     <div className="process-bar">
       <div className="process-bar__group">
@@ -134,7 +136,13 @@ export function EditBar({
           </button>
         </div>
       )}
-      <button type="button" className="process-btn process-btn--primary process-bar__run" onClick={onRun} title={changes ? "Saves the draft as a new version, then runs it" : "Run this version"}>
+      <button
+        type="button"
+        className={cx("process-btn process-btn--primary process-bar__run", cantRun && "process-btn--offline")}
+        aria-disabled={cantRun || undefined}
+        onClick={() => !cantRun && onRun()}
+        title={cantRun ? RUN_OFFLINE : changes ? "Saves the draft as a new version, then runs it" : "Run this version"}
+      >
         <span className="process-btn__play" aria-hidden="true">▶</span>
         Run
       </button>
@@ -147,7 +155,8 @@ export function EditBar({
  * view only", the run's status, Edit process and Stop run.
  */
 export function RunBar({ run, name }: { run: Run; name: string }) {
-  const { state, dispatch, now } = useProcess();
+  const { state, dispatch, now, runProcess, offline } = useProcess();
+  const cantRun = offline(run.processId);
   const siblings = state.runs.filter((r) => r.processId === run.processId);
   const live = run.status === "running" || run.status === "waiting";
   const sub = `${run.trigger} · ${clock(run.startedAt)}`;
@@ -224,7 +233,13 @@ export function RunBar({ run, name }: { run: Run; name: string }) {
           Stop run
         </button>
       ) : (
-        <button type="button" className="process-btn process-btn--glass" onClick={() => dispatch({ type: "run", processId: run.processId, now: Date.now() })}>
+        <button
+          type="button"
+          className={cx("process-btn process-btn--glass", cantRun && "process-btn--offline")}
+          aria-disabled={cantRun || undefined}
+          title={cantRun ? RUN_OFFLINE : undefined}
+          onClick={() => !cantRun && runProcess(run.processId)}
+        >
           Run again
         </button>
       )}

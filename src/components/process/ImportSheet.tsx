@@ -5,10 +5,11 @@ import { useProcess } from "./store";
 
 /**
  * Import JSON: paste a process file. It is checked against augry/process@1
- * and, if it is usable, starts a new process at version 1.
+ * and, if it is usable, starts a new process at version 1. With a team
+ * selected it becomes the team's.
  */
 export function ImportSheet() {
-  const { dispatch } = useProcess();
+  const { dispatch, team } = useProcess();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const close = () => dispatch({ type: "import-open", open: false });
@@ -18,7 +19,10 @@ export function ImportSheet() {
       setError(result.line ? `Line ${result.line}: ${result.error}` : result.error);
       return;
     }
-    dispatch({ type: "import", process: result.process, now: Date.now() });
+    if (team) {
+      close();
+      void team.create({ ...result.process, from: "import" }, "editor");
+    } else dispatch({ type: "import", process: result.process, now: Date.now() });
   };
 
   return (

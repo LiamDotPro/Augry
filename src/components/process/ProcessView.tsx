@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useReducer, useState } from "react";
-import { initialState, reducer } from "../../process/state";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { initialState, recordOf, reducer, teamOf } from "../../process/state";
 import { ConnectionsView } from "./ConnectionsView";
 import { FolderNotice } from "./FolderNotice";
 import { ImportSheet } from "./ImportSheet";
@@ -7,8 +7,10 @@ import { ProcessEditor } from "./ProcessEditor";
 import { ProcessHome } from "./ProcessHome";
 import { RunSheet } from "./RunSheet";
 import { RunView } from "./RunView";
-import { ProcessContext } from "./store";
+import { ProcessContext, type ProcessStore } from "./store";
+import { TeamDialogs } from "./TeamDialogs";
 import { ScrollMemory } from "./useKeptScroll";
+import { useTeam } from "./useTeam";
 import { VersionsView } from "./VersionsView";
 
 /** How often a simulated run moves on a step. */
@@ -28,13 +30,18 @@ export interface ProcessViewProps {
  * it needs no account. All of the tab's place lives in the reducer
  * here (plus scroll positions in a ref), so switching tabs never resets it.
  *
- * There is no backend for processes yet: the data is mocked in
- * src/process/mock.ts and runs are simulated in memory.
+ * There is no backend for personal processes yet: the data is mocked in
+ * src/process/mock.ts and runs are simulated in memory. With a team selected
+ * in the account chip (board 11) the home shows the team's processes from the
+ * cloud API (useTeam); their runs are simulated here the same way.
  */
 export function ProcessView({ onOpenPane }: ProcessViewProps) {
   const [state, dispatch] = useReducer(reducer, undefined, () => initialState(Date.now()));
   const [now, setNow] = useState(() => Date.now());
   const [scrolls] = useState(() => new Map<string, { left: number; top: number }>());
+  const team = useTeam(state, dispatch);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const live = state.runs.some((r) => r.status === "running" || r.status === "waiting");
   useEffect(() => {
@@ -52,7 +59,38 @@ export function ProcessView({ onOpenPane }: ProcessViewProps) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const store = useMemo(() => ({ state, dispatch, now, onOpenPane }), [state, now, onOpenPane]);
+  // Team processes save, run and restore through the team; yours stay here.
+  const offline = useCallback((processId: string) => !!team && !team.online && teamOf(stateRef.current, processId) !== null, [team]);
+  const saveProcess = useCallback(
+    (processId: string, message: string) => {
+      if (teamOf(stateRef.current, processId)) void team?.save(processId);
+      else dispatch({ type: "save", processId, message, now: Date.now() });
+    },
+    [team],
+  );
+  const runProcess = useCallback(
+    (processId: string) => {
+      const s = stateRef.current;
+      if (teamOf(s, processId) && recordOf(s, processId)?.draft) {
+        void team?.save(processId).then((saved) => saved && dispatch({ type: "run", processId, now: Date.now() }));
+      } else if (!offline(processId)) {
+        dispatch({ type: "run", processId, now: Date.now() });
+      }
+    },
+    [team, offline],
+  );
+  const restoreProcess = useCallback(
+    (processId: string, version: number) => {
+      if (teamOf(stateRef.current, processId)) void team?.restore(processId, version);
+      else dispatch({ type: "restore", processId, version, now: Date.now() });
+    },
+    [team],
+  );
+
+  const store = useMemo<ProcessStore>(
+    () => ({ state, dispatch, now, onOpenPane, team, saveProcess, runProcess, restoreProcess, offline }),
+    [state, now, onOpenPane, team, saveProcess, runProcess, restoreProcess, offline],
+  );
   const route = state.route;
 
   return (
@@ -67,6 +105,7 @@ export function ProcessView({ onOpenPane }: ProcessViewProps) {
           {state.sheet && <RunSheet templateId={state.sheet.templateId} />}
           {state.importOpen && <ImportSheet />}
           {state.notice && <FolderNotice />}
+          {state.teamDialog && <TeamDialogs />}
         </div>
       </ScrollMemory.Provider>
     </ProcessContext.Provider>

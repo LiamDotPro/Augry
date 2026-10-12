@@ -35,6 +35,10 @@ export const STROKE_ICONS = {
   plug: "M9 3v5M15 3v5M6.5 8h11v3a5.5 5.5 0 0 1-11 0zM12 16.5V21",
   mail: "M3.5 5.5h17v13h-17zM3.5 6.5l8.5 6.5 8.5-6.5",
   lock: "M6.5 10.5h11v9.5h-11zM8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5",
+  // Board 11 (team processes): the share-blocked and team-conflict tiles, and Share to team.
+  warn: "M12 4l9 15.5H3zM12 10v4M12 17v.01",
+  merge: "M7 4v10M17 10v10M7 14a5 5 0 0 0 5 5h5M17 10a5 5 0 0 0-5-5H7",
+  share: "M12 14.5V3.5M7.5 8 12 3.5 16.5 8M5 12.5v8h14v-8",
 } as const;
 
 export const BRAND_ICONS: Record<string, { d: string; color: string | null }> = {

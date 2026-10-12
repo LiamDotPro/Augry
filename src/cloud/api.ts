@@ -23,6 +23,8 @@ import type {
   Team,
   TeamDetail,
   TeamProcess,
+  TeamConnection,
+  TeamConnectionPage,
   Template,
   User,
 } from "./types";
@@ -220,6 +222,24 @@ export async function listTemplates(): Promise<Template[]> {
 }
 export const installTemplate = (slug: string, teamId: string) =>
   request<TeamProcess>("POST", `/v1/templates/${enc(slug)}/install`, { teamId });
+
+// Team connections (cloud epic 005, behind the "connections" feature) -----------
+
+export const listTeamConnections = (teamId: string, since: number) =>
+  request<TeamConnectionPage>("GET", `/v1/teams/${enc(teamId)}/connections?since=${since}`);
+/** Admins only; 409 when the name is taken. */
+export const createTeamConnection = (
+  teamId: string,
+  body: { name: string; kind: string; settings: Record<string, string>; secret?: string; editors?: "admins" | "members" },
+) => request<TeamConnection>("POST", `/v1/teams/${enc(teamId)}/connections`, body);
+/** Leaving out `secret` keeps the stored one. 409 carries the newer connection as `current`. */
+export const saveTeamConnection = (
+  teamId: string,
+  id: string,
+  body: { settings: Record<string, string>; secret?: string; editors?: "admins" | "members"; baseVersion: number },
+) => request<TeamConnection>("PUT", `/v1/teams/${enc(teamId)}/connections/${enc(id)}`, body);
+export const deleteTeamConnection = (teamId: string, id: string, baseVersion: number) =>
+  request<void>("DELETE", `/v1/teams/${enc(teamId)}/connections/${enc(id)}?baseVersion=${baseVersion}`);
 
 // Notes sync --------------------------------------------------------------------
 

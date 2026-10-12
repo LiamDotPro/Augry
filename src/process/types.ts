@@ -127,6 +127,8 @@ export interface ProcessVersion {
   process: Process;
   /** "restored v1", "template" and the like. Run tags are derived. */
   note?: string;
+  /** A team version: who saved it, as a user id. `by` then holds the same id; views name it. */
+  byId?: string;
 }
 
 /** A process as the app holds it: its numbered versions and any draft. */

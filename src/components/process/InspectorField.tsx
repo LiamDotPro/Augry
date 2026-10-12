@@ -8,7 +8,7 @@ import { useDismiss } from "./useDismiss";
  * control; every one is live and reports changes through its callbacks.
  */
 export type Field =
-  | { type: "segmented"; label: string; options: string[]; value: string; onChange(value: string): void; hint?: string }
+  | { type: "segmented"; label: string; options: string[]; value: string; onChange(value: string): void; hint?: string; readOnly?: boolean }
   | { type: "agents"; label: string; options: string[]; value: string; onChange(value: string): void; hint?: string }
   | {
       type: "select";
@@ -31,6 +31,8 @@ export type Field =
       secret?: boolean;
       placeholder?: string;
       hint?: string;
+      /** Shown but not changeable (a team connection only owners and admins change). */
+      readOnly?: boolean;
     }
   | { type: "checks"; label: string; items: { label: string; detail?: string; on: boolean; onChange(on: boolean): void }[]; hint?: string }
   | { type: "switches"; label: string; items: { label: string; on: boolean; onChange(on: boolean): void }[]; hint?: string }
@@ -86,6 +88,7 @@ function FieldControl({ field, id }: { field: Field; id: string }) {
               role="radio"
               aria-checked={o === field.value}
               className={cx("process-seg__item", o === field.value && "process-seg__item--on")}
+              disabled={field.readOnly}
               onClick={() => field.onChange(o)}
             >
               {o}
@@ -131,6 +134,7 @@ function FieldControl({ field, id }: { field: Field; id: string }) {
               value={field.value}
               placeholder={field.placeholder}
               spellCheck={!field.mono}
+              readOnly={field.readOnly}
               onChange={(e) => field.onChange(e.target.value)}
             />
           ) : (
@@ -142,6 +146,7 @@ function FieldControl({ field, id }: { field: Field; id: string }) {
               placeholder={field.placeholder}
               spellCheck={false}
               autoComplete="off"
+              readOnly={field.readOnly}
               onChange={(e) => field.onChange(e.target.value)}
             />
           )}
