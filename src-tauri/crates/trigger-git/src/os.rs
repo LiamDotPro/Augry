@@ -5,9 +5,10 @@
 // Removed when lib.rs reads everything in this file.
 #![allow(dead_code)]
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use notify::RecursiveMode;
+use notify::{EventKind, RecursiveMode, Watcher};
 use trigger_core::Availability;
 
 use crate::git::{run, value, TIMEOUT};
@@ -129,6 +130,68 @@ fn relevant_inside(rel: &Path, own: bool) -> bool {
         Some(name) => own && OWN_NAMES.contains(&name),
         None => false,
     }
+}
+
+/// True when a `notify` event is about a file that can change the snapshot.
+/// Pure, so the cases are unit tests.
+pub fn event_matters(dirs: &GitDirs, event: &notify::Event) -> bool {
+    if event.need_rescan() {
+        return true;
+    }
+    if matches!(event.kind, EventKind::Access(_) | EventKind::Other) {
+        return false;
+    }
+    event.paths.iter().any(|path| dirs.is_relevant(path))
+}
+
+/// Watchers over one repository. Dropping it stops them.
+pub struct RepoWatch {
+    _watcher: notify::RecommendedWatcher,
+}
+
+impl RepoWatch {
+    /// Starts watching and returns at once. `on_change` runs on the watcher's
+    /// own thread for every event that matters, so it must only send a
+    /// message: no git calls in it. It may be called many times for one
+    /// commit; the settle step in the caller merges them.
+    pub fn start(
+        dirs: &GitDirs,
+        on_change: impl Fn() + Send + 'static,
+    ) -> Result<RepoWatch, String> {
+        let filter = dirs.clone();
+        let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+            // A watcher error carries no path to act on; the next event puts
+            // things right.
+            let Ok(event) = res else { return };
+            if event_matters(&filter, &event) {
+                on_change();
+            }
+        })
+        .map_err(|e| e.to_string())?;
+        for (dir, mode) in dirs.watch_list() {
+            watcher
+                .watch(&dir, mode)
+                .map_err(|e| format!("cannot watch {}: {e}", dir.display()))?;
+        }
+        Ok(RepoWatch { _watcher: watcher })
+    }
+}
+
+/// The names of the children of `folder` that are repositories: folders that
+/// contain `.git` (a folder, or a file in a linked worktree). Unreadable or
+/// missing folders give an empty set.
+pub fn scan_folder(folder: &Path) -> BTreeSet<String> {
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return BTreeSet::new();
+    };
+    entries
+        .flatten()
+        .filter(|entry| {
+            let path = entry.path();
+            path.is_dir() && path.join(".git").exists()
+        })
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .collect()
 }
 
 #[cfg(test)]
