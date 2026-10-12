@@ -2,7 +2,7 @@
 id: T28
 epic: 002-trigger-internal
 title: Publish tg.app-started after the first refresh
-status: todo
+status: done
 depends_on: [T20]
 size: S
 model: haiku
@@ -119,3 +119,5 @@ and put this test directly above them:
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed (clippy baseline 7, after 7)
+- 2026-10-13 checker: pass

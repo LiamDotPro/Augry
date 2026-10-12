@@ -166,7 +166,14 @@ pub fn start(app: &AppHandle) {
     state.triggers.start_forwarding(move |payload| {
         let _ = handle.emit_to("main", EVENT_FIRED, payload);
     });
-    refresh_app(app);
+    // `tg.app-started` goes out only after the first refresh has armed the
+    // rules; published sooner, nothing would be listening.
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<crate::AppState>();
+        refresh_now(&state);
+        state.triggers.publish_internal(InternalSignal::AppStarted);
+    });
 }
 
 /// Repository roots of the open panes, from the git cache where it is fresh.
@@ -395,6 +402,35 @@ mod tests {
         assert_eq!(payload.process_id, "ring");
         assert_eq!(payload.rule_id, "ring/bell");
         assert!(!service.wants_output());
+        cleanup(&dir);
+    }
+
+    #[test]
+    fn app_started_fires_only_once_the_rules_are_armed() {
+        let dir = std::env::temp_dir().join(format!("tg-triggers-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("hello.json"),
+            r#"{"schemaVersion":1,"name":"Hello","triggers":[
+                {"id":"started","kind":"tg.app-started","when":{}}]}"#,
+        )
+        .unwrap();
+        let service = TriggerService::new(dir.clone());
+        let (tx, rx) = channel();
+        service.start_forwarding(move |payload| {
+            let _ = tx.send(payload);
+        });
+
+        // Before the first refresh nothing is armed, so the signal goes nowhere.
+        service.publish_internal(InternalSignal::AppStarted);
+        assert!(rx.recv_timeout(Duration::from_millis(300)).is_err());
+
+        service.refresh(&config(&["hello"]), &ctx());
+        service.publish_internal(InternalSignal::AppStarted);
+        let payload = rx.recv_timeout(Duration::from_secs(5)).expect("a payload");
+        assert_eq!(payload.rule_id, "hello/started");
+        assert_eq!(payload.kind, "tg.app-started");
+        assert!(payload.payload.is_empty());
         cleanup(&dir);
     }
 
