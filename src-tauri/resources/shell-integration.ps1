@@ -9,9 +9,18 @@ if (Test-Path $PROFILE) { . $PROFILE }
 
 $global:__tg_original_prompt = $function:prompt
 $global:__tg_last_history_id = -1
+$global:__tg_last_error = $null
 
 function global:prompt {
-    $exit = if ($?) { 0 } else { 1 }
+    # Read $? and $LASTEXITCODE first: any other statement changes them.
+    $ok = $?
+    $native = $global:LASTEXITCODE
+    # A failed native command sets $LASTEXITCODE and adds no error record. A
+    # failed cmdlet adds one, and then a stale $LASTEXITCODE must not be reported.
+    $lastError = if ($global:Error.Count -gt 0) { $global:Error[0] } else { $null }
+    $newError = -not [object]::ReferenceEquals($lastError, $global:__tg_last_error)
+    $global:__tg_last_error = $lastError
+    $exit = if ($ok) { 0 } elseif (-not $newError -and $native -is [int] -and $native -ne 0) { $native } else { 1 }
     $esc = [char]27; $bel = [char]7
 
     $h = Get-History -Count 1

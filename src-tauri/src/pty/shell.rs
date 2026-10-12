@@ -382,6 +382,20 @@ mod tests {
     }
 
     #[test]
+    fn powershell_script_reports_the_native_exit_code() {
+        let script = include_str!("../../resources/shell-integration.ps1");
+        assert!(script.contains("$global:LASTEXITCODE"));
+        // $? only means something if nothing runs before it is read.
+        let body = script.split("function global:prompt {").nth(1).unwrap();
+        let first = body
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty() && !line.starts_with('#'))
+            .unwrap();
+        assert_eq!(first, "$ok = $?");
+    }
+
+    #[test]
     fn cmd_launches_bare() {
         assert!(integration_args(ShellKind::Cmd, Path::new("C:/data")).is_empty());
     }

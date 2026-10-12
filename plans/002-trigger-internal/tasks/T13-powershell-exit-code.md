@@ -2,7 +2,7 @@
 id: T13
 epic: 002-trigger-internal
 title: Report the native exit code from the PowerShell prompt
-status: todo
+status: done
 depends_on: [T12]
 size: S
 model: haiku
@@ -107,3 +107,5 @@ function global:prompt {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Clippy baseline 7 warnings, after 7. Manual pwsh check (`cmd /c exit 3` gives 133;D;3, `Get-Item nope` gives 133;D;1) not run: no pwsh on this machine.
+- 2026-10-12 checker: pass
