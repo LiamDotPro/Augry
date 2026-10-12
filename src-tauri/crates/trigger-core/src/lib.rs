@@ -144,6 +144,47 @@ pub struct Event {
 
 pub type Sink = Sender<Event>;
 
+#[derive(Debug, thiserror::Error)]
+pub enum RuleError {
+    #[error("unknown kind {0}")]
+    UnknownKind(String),
+    #[error("field {field}: {problem}")]
+    Field { field: String, problem: String },
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SourceError {
+    #[error("{0}")]
+    Unavailable(String),
+    #[error("{0}")]
+    Os(String),
+}
+
+/// Dropping it stops the watcher. Stop must not block for more than a second.
+pub struct Handle(Option<Box<dyn FnOnce() + Send>>);
+
+impl Handle {
+    pub fn new(stop: impl FnOnce() + Send + 'static) -> Handle {
+        Handle(Some(Box::new(stop)))
+    }
+}
+
+impl Drop for Handle {
+    fn drop(&mut self) {
+        if let Some(stop) = self.0.take() {
+            stop()
+        }
+    }
+}
+
+pub trait Source: Send + Sync + 'static {
+    fn id(&self) -> &'static str;
+    fn kinds(&self) -> &'static [KindInfo];
+    fn availability(&self) -> Availability;
+    fn check(&self, rule: &Rule) -> Result<(), RuleError>;
+    fn start(&self, rules: Vec<Rule>, sink: Sink) -> Result<Handle, SourceError>;
+}
+
 #[cfg(test)]
 mod platforms_tests {
     use super::*;
@@ -286,5 +327,42 @@ mod json_tests {
             serde_json::from_value(json!({"id": "a", "kind": "fs.x", "when": {"path": "/tmp"}}))
                 .unwrap();
         assert_eq!(rule.when["path"], json!("/tmp"));
+    }
+}
+
+#[cfg(test)]
+mod handle_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU32, Ordering};
+    use std::sync::Arc;
+
+    #[test]
+    fn dropping_a_handle_runs_stop_once() {
+        let count = Arc::new(AtomicU32::new(0));
+        let c = count.clone();
+        let handle = Handle::new(move || {
+            c.fetch_add(1, Ordering::SeqCst);
+        });
+        assert_eq!(count.load(Ordering::SeqCst), 0);
+        drop(handle);
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn error_messages() {
+        assert_eq!(
+            RuleError::UnknownKind("x.y".into()).to_string(),
+            "unknown kind x.y"
+        );
+        assert_eq!(
+            RuleError::Field {
+                field: "path".into(),
+                problem: "is required".into()
+            }
+            .to_string(),
+            "field path: is required"
+        );
+        assert_eq!(SourceError::Os("boom".into()).to_string(), "boom");
+        assert_eq!(SourceError::Unavailable("no".into()).to_string(), "no");
     }
 }

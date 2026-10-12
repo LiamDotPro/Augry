@@ -2,7 +2,7 @@
 id: T04
 epic: 001-trigger-core
 title: Add RuleError, SourceError, Handle and the Source trait
-status: todo
+status: done
 depends_on: [T03]
 size: S
 model: haiku
@@ -124,3 +124,5 @@ mod handle_tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
