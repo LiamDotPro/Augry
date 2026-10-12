@@ -11,6 +11,8 @@ pub mod json;
 pub mod payload;
 pub mod pulls;
 pub mod response;
+pub mod runs;
+pub mod simple;
 pub mod text;
 
 #[cfg(test)]
