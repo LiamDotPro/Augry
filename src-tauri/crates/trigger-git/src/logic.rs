@@ -279,3 +279,8 @@ pub mod repo;
 
 #[cfg(test)]
 pub mod fake;
+
+pub mod polled;
+
+#[cfg(test)]
+mod polled_tests;
