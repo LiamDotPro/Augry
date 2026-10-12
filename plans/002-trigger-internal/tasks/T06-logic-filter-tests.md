@@ -2,7 +2,7 @@
 id: T06
 epic: 002-trigger-internal
 title: Test every filter of step
-status: todo
+status: done
 depends_on: [T05]
 size: M
 model: haiku
@@ -219,3 +219,5 @@ fn repo_filters_a_pane_opened_by_its_repo_root() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7, after 7; 35 internal tests passed; workspace tests, fmt --check, no-default-features check all exit 0)
+- 2026-10-12 checker: pass
