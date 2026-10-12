@@ -729,6 +729,20 @@ Unit tests in Rust:
 - `agent::state` transitions with minimum running time and duplicate suppression.
 - `pty::reader` coalescing with a fake reader (size and time thresholds).
 
+Unit tests for process triggers, all run by `cargo test --workspace` offline and without a display:
+
+- `trigger-core`: the JSON the frontend sees (`Platforms`, `Permission`, `Event.at`), `kinds_markdown` against an exact table, the test kit (`RecordingSink`, `FixedClock`, `FakeSource`).
+- `trigger-hub`: apply, restart only the sources whose rules changed, rejected rules, a source whose start fails, the two second cool down and the `coalesced` count, using `FakeSource`.
+- `trigger-fs`: `rule.rs` parsing and `logic.rs` (globs and default ignores, settle and debounce, rename pairing, download finished) as pure tests over observed signals. No timers and no disk.
+- Each source crate's `tests/readme.rs` fails when the Kinds table in its README is stale. Refresh it with `cargo run -p trigger-<name> --example readme`.
+- The app side (`src-tauri/src/triggers/`): definition parsing, variable expansion with string level tests for `${screenshots}` on every OS, the rule planner, the status and `trigger://fired` JSON, and `TriggerService::refresh` applying only when the rules change, using a hub with no sources.
+
+Live tests, which watch the real file system, are `#[ignore]` in `tests/live.rs` of a crate and run with `cargo test -p trigger-fs -- --ignored --test-threads=1`. Each uses its own canonicalised temp directory, waits 400 ms after the watcher starts, and waits for events with a 10 second ceiling rather than a fixed sleep; a negative check first waits for an event on a sentinel file. CI runs them on macOS, Windows and Linux after the other checks.
+
+CI (`.github/workflows/ci.yml`) runs on each of the three systems: `npm test`, `npm run build`, `cargo fmt --check`, `cargo clippy` with `-D warnings` on the three trigger crates, `cargo test --workspace`, `node plans/_tools/check-crates.mjs` (crate isolation, README sections, file sizes) and the live tests.
+
+Manual check for triggers: in Settings switch on "Process triggers (experimental)", put a definition file in the `processes/` folder with a `fs.file-saved` trigger on a folder, tick "Armed", save a file in that folder, and confirm the toast "Trigger fs.file-saved fired for <name>" appears within a few seconds.
+
 Unit tests in TypeScript:
 
 - `layoutFor`, `pageOf`, and the move function across page boundaries.

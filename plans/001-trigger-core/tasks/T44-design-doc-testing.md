@@ -2,7 +2,7 @@
 id: T44
 epic: 001-trigger-core
 title: Document trigger testing in design section 14
-status: todo
+status: done
 depends_on: [T43]
 size: S
 model: haiku
@@ -64,3 +64,5 @@ Manual check for triggers: in Settings switch on "Process triggers (experimental
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Anchor "Unit tests in TypeScript:" found at line 732 (section 14 is at 723, not 649-673 as the card Read-first says; located by heading). Block inserted with blank lines around it. Card depends_on T43 was not checked.
+- 2026-10-12 checker: pass
