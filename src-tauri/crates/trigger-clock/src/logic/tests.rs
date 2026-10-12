@@ -147,3 +147,115 @@ fn kinds_that_are_not_schedules_are_left_alone() {
     run(&mut state, start + secs(30), &rules);
     assert!(state.cursors.is_empty());
 }
+
+#[test]
+fn a_gap_of_exactly_jump_is_still_normal() {
+    let start = at(2026, 3, 6, 12, 0, 0);
+    let rules = [armed("i", "clock.interval", json!({ "every_s": 30 }))];
+    let mut state = State::new(ClockConfig::default(), start);
+    let fired = run(&mut state, start + secs(90), &rules);
+    assert_eq!(fired.len(), 3);
+}
+
+#[test]
+fn after_a_six_hour_jump_catch_up_fires_once_for_the_latest_missed_time() {
+    let start = at(2026, 3, 6, 22, 0, 0);
+    let rules = [armed(
+        "a",
+        "clock.schedule",
+        json!({ "cron": "0 * * * *", "catch_up": true }),
+    )];
+    let mut state = State::new(ClockConfig::default(), start);
+    walk(&mut state, start, start + secs(120), &rules);
+    // Six hours pass in one step. Hourly slots 23:00 to 04:00 were missed.
+    let fired = run(&mut state, start + secs(120 + 6 * 3600), &rules);
+    assert_eq!(fired.len(), 1);
+    assert_eq!(due_of(&fired[0]), millis(at(2026, 3, 7, 4, 0, 0)));
+    assert_eq!(fired[0].payload["caught_up"], json!(true));
+    // Back to normal: the next slot fires on time and is not a catch up.
+    let woke = start + secs(120 + 6 * 3600);
+    let fired = walk(&mut state, woke, at(2026, 3, 7, 5, 1, 0), &rules);
+    assert_eq!(fired.len(), 1);
+    assert_eq!(due_of(&fired[0]), millis(at(2026, 3, 7, 5, 0, 0)));
+    assert_eq!(fired[0].payload["caught_up"], json!(false));
+}
+
+#[test]
+fn after_a_jump_without_catch_up_missed_slots_are_skipped() {
+    let start = at(2026, 3, 6, 22, 0, 0);
+    let rules = [armed("a", "clock.schedule", json!({ "cron": "0 * * * *" }))];
+    let mut state = State::new(ClockConfig::default(), start);
+    walk(&mut state, start, start + secs(120), &rules);
+    let woke = start + secs(120 + 6 * 3600);
+    assert!(run(&mut state, woke, &rules).is_empty());
+    // The cursor moved past the missed slots: 05:00 is next, nothing is owed.
+    assert!(run(&mut state, woke + secs(30), &rules).is_empty());
+    let fired = walk(&mut state, woke, at(2026, 3, 7, 5, 1, 0), &rules);
+    assert_eq!(fired.len(), 1);
+    assert_eq!(due_of(&fired[0]), millis(at(2026, 3, 7, 5, 0, 0)));
+}
+
+#[test]
+fn a_jump_with_nothing_missed_fires_nothing_even_with_catch_up() {
+    let start = at(2026, 3, 6, 8, 0, 0);
+    let rules = [armed(
+        "a",
+        "clock.schedule",
+        json!({ "cron": "0 9 * * *", "catch_up": true }),
+    )];
+    let mut state = State::new(ClockConfig::default(), start);
+    walk(&mut state, start, start + secs(60), &rules);
+    // A 10 minute nap that ends before 09:00.
+    assert!(run(&mut state, start + secs(60 + 600), &rules).is_empty());
+}
+
+#[test]
+fn an_interval_with_catch_up_fires_once_after_a_jump() {
+    let start = at(2026, 3, 6, 12, 0, 0);
+    let rules = [armed(
+        "i",
+        "clock.interval",
+        json!({ "every_s": 3600, "catch_up": true }),
+    )];
+    let mut state = State::new(ClockConfig::default(), start);
+    walk(&mut state, start, start + secs(60), &rules);
+    // 5.5 hours later: slots at +1 h to +5 h were missed.
+    let fired = run(&mut state, start + secs(60 + 19_800), &rules);
+    assert_eq!(fired.len(), 1);
+    assert_eq!(due_of(&fired[0]), millis(start + secs(5 * 3600)));
+    assert_eq!(fired[0].payload["caught_up"], json!(true));
+    // The next slot keeps the original rhythm: +6 h.
+    let woke = start + secs(60 + 19_800);
+    let fired = walk(&mut state, woke, start + secs(6 * 3600 + 5), &rules);
+    assert_eq!(due_of(&fired[0]), millis(start + secs(6 * 3600)));
+}
+
+#[test]
+fn an_interval_without_catch_up_skips_the_missed_slots() {
+    let start = at(2026, 3, 6, 12, 0, 0);
+    let rules = [armed("i", "clock.interval", json!({ "every_s": 3600 }))];
+    let mut state = State::new(ClockConfig::default(), start);
+    walk(&mut state, start, start + secs(60), &rules);
+    assert!(run(&mut state, start + secs(60 + 19_800), &rules).is_empty());
+}
+
+#[test]
+fn a_backwards_jump_fires_nothing_and_plans_again() {
+    let start = at(2026, 3, 6, 9, 0, 0);
+    let rules = [armed(
+        "a",
+        "clock.schedule",
+        json!({ "cron": "30 9 * * *" }),
+    )];
+    let mut state = State::new(ClockConfig::default(), start);
+    walk(&mut state, start, start + secs(600), &rules);
+    // The clock is set back an hour, to 08:10.
+    let back = at(2026, 3, 6, 8, 10, 0);
+    assert!(run(&mut state, back, &rules).is_empty());
+    assert_eq!(state.prev_wall, back);
+    assert_eq!(state.normal_since, back);
+    // 09:30 comes round again and the rule fires for it.
+    let fired = walk(&mut state, back, at(2026, 3, 6, 9, 31, 0), &rules);
+    assert_eq!(fired.len(), 1);
+    assert_eq!(due_of(&fired[0]), millis(at(2026, 3, 6, 9, 30, 0)));
+}

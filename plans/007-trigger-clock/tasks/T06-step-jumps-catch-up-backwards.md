@@ -2,7 +2,7 @@
 id: T06
 epic: 007-trigger-clock
 title: Handle sleep jumps, catch up and backwards clocks in step
-status: todo
+status: done
 depends_on: [T05]
 size: M
 model: haiku
@@ -236,3 +236,5 @@ fn a_backwards_jump_fires_nothing_and_plans_again() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

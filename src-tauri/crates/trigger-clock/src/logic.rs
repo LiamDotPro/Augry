@@ -170,11 +170,12 @@ fn due_payload(due: SystemTime, caught_up: bool) -> Payload {
     ])
 }
 
-/// Schedule and interval rules.
+/// Schedule and interval rules. `jumped` is true when the machine slept.
 fn fire_due<Tz: TimeZone>(
     state: &mut State,
     tz: &Tz,
     now: SystemTime,
+    jumped: bool,
     rules: &[Armed],
     out: &mut Vec<Fire>,
 ) {
@@ -189,11 +190,18 @@ fn fire_due<Tz: TimeZone>(
         let Some(cursor) = cursor else { continue };
         let (slots, next) = due_slots(armed, tz, cursor, now);
         state.cursors.insert(armed.id.clone(), next);
-        for due in slots {
+        let fires: Vec<(SystemTime, bool)> = if !jumped {
+            slots.into_iter().map(|t| (t, false)).collect()
+        } else if armed.parsed.catch_up() {
+            slots.last().map(|t| (*t, true)).into_iter().collect()
+        } else {
+            Vec::new()
+        };
+        for (due, caught_up) in fires {
             out.push(Fire {
                 rule: armed.id.clone(),
                 kind: armed.kind.clone(),
-                payload: due_payload(due, false),
+                payload: due_payload(due, caught_up),
             });
         }
     }
@@ -208,7 +216,19 @@ pub fn step<Tz: TimeZone>(
     rules: &[Armed],
 ) -> Vec<Fire> {
     let mut out = Vec::new();
-    fire_due(state, tz, now, rules, &mut out);
+    let Ok(gap) = now.duration_since(state.prev_wall) else {
+        // The wall clock went backwards (NTP, or the user): fire nothing and
+        // plan again from the new time.
+        state.prev_wall = now;
+        state.normal_since = now;
+        state.replan();
+        return out;
+    };
+    let jumped = gap > state.cfg.jump;
+    if jumped {
+        state.normal_since = now;
+    }
+    fire_due(state, tz, now, jumped, rules, &mut out);
     state.prev_wall = now;
     out
 }
