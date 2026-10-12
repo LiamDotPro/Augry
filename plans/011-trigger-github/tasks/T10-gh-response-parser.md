@@ -2,7 +2,7 @@
 id: T10
 epic: 011-trigger-github
 title: Parse the output of gh api -i into GhResponse
-status: todo
+status: done
 depends_on: [T08]
 size: M
 model: haiku
@@ -306,3 +306,5 @@ use trigger_core::RuleId;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
