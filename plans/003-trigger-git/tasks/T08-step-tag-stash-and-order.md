@@ -2,7 +2,7 @@
 id: T08
 epic: 003-trigger-git
 title: Add tag and stash to step and test the order
-status: todo
+status: done
 depends_on: [T07]
 size: M
 model: haiku
@@ -218,3 +218,5 @@ Note on `check-crates.mjs`: `check-crates.mjs` prints warnings, not errors, abou
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

@@ -405,3 +405,133 @@ fn a_conflict_and_a_switch_in_one_window_come_in_order() {
         vec!["git.merge-conflict", "git.branch-switched"]
     );
 }
+
+fn with_ref(mut snap: RepoSnapshot, name: &str, sha: &str) -> RepoSnapshot {
+    snap.refs.insert(name.into(), sha.into());
+    snap
+}
+
+#[test]
+fn a_new_tag_fires_tag_created() {
+    let prev = with_ref(on("main", "aaaaaaa1"), "refs/heads/main", "aaaaaaa1");
+    let next = with_ref(prev.clone(), "refs/tags/v1.0", "aaaaaaa1");
+    assert_eq!(
+        step(&prev, &next),
+        vec![Change::TagCreated {
+            branch: Some("main".into()),
+            tag: "v1.0".into()
+        }]
+    );
+}
+
+#[test]
+fn several_new_tags_fire_once_for_the_first_by_name() {
+    let prev = on("main", "aaaaaaa1");
+    let next = with_ref(
+        with_ref(prev.clone(), "refs/tags/v2", "x"),
+        "refs/tags/v1",
+        "x",
+    );
+    assert_eq!(
+        step(&prev, &next),
+        vec![Change::TagCreated {
+            branch: Some("main".into()),
+            tag: "v1".into()
+        }]
+    );
+}
+
+#[test]
+fn moving_or_deleting_a_tag_fires_nothing() {
+    let prev = with_ref(on("main", "aaaaaaa1"), "refs/tags/v1", "x");
+    let moved = with_ref(on("main", "aaaaaaa1"), "refs/tags/v1", "y");
+    assert!(step(&prev, &moved).is_empty());
+    assert!(step(&prev, &on("main", "aaaaaaa1")).is_empty());
+}
+
+#[test]
+fn a_new_branch_ref_alone_is_not_a_tag() {
+    let prev = on("main", "aaaaaaa1");
+    let next = with_ref(prev.clone(), "refs/heads/other", "aaaaaaa1");
+    assert!(step(&prev, &next).is_empty());
+}
+
+#[test]
+fn a_stash_fires_when_the_ref_appears_or_changes() {
+    let prev = on("main", "aaaaaaa1");
+    let stashed = with_ref(prev.clone(), "refs/stash", "s1");
+    assert_eq!(
+        step(&prev, &stashed),
+        vec![Change::StashCreated {
+            branch: Some("main".into())
+        }]
+    );
+    let again = with_ref(prev.clone(), "refs/stash", "s2");
+    assert_eq!(kinds(&step(&stashed, &again)), vec!["git.stash-created"]);
+}
+
+#[test]
+fn popping_or_dropping_the_last_stash_fires_nothing() {
+    let prev = with_ref(on("main", "aaaaaaa1"), "refs/stash", "s1");
+    let next = on("main", "aaaaaaa1");
+    assert!(step(&prev, &next).is_empty());
+}
+
+#[test]
+fn gc_and_fetch_fire_nothing() {
+    // gc moves loose refs into packed-refs: the ref map is the same.
+    // fetch only changes remote refs, which are never in the snapshot.
+    let mut prev = on("main", "aaaaaaa1");
+    prev.refs
+        .insert("refs/heads/main".into(), "aaaaaaa1".into());
+    prev.refs.insert("refs/tags/v1".into(), "t1".into());
+    prev.refs.insert("refs/stash".into(), "s1".into());
+    assert!(step(&prev, &prev.clone()).is_empty());
+}
+
+#[test]
+fn everything_in_one_window_comes_in_the_documented_order() {
+    let prev = on("main", "aaaaaaa1");
+    let mut next = with_ref(
+        with_ref(on("feature", "bbbbbbb2"), "refs/tags/v1", "x"),
+        "refs/stash",
+        "s1",
+    );
+    next.merge_head = Some("ccccccc3".into());
+    next.unmerged = 2;
+    assert_eq!(
+        kinds(&step(&prev, &next)),
+        vec![
+            "git.merge-conflict",
+            "git.branch-switched",
+            "git.tag-created",
+            "git.stash-created"
+        ]
+    );
+}
+
+#[test]
+fn a_commit_and_a_tag_in_one_window_fire_both_commit_first() {
+    let prev = on("main", "aaaaaaa1");
+    let mut next = with_ref(on("main", "bbbbbbb2"), "refs/tags/v1", "x");
+    next.reflog_subject = Some("commit: release".into());
+    assert_eq!(
+        kinds(&step(&prev, &next)),
+        vec!["git.commit", "git.tag-created"]
+    );
+}
+
+#[test]
+fn a_pull_a_tag_and_a_stash_come_in_order() {
+    let prev = on("main", "aaaaaaa1");
+    let mut next = with_ref(
+        with_ref(on("main", "bbbbbbb2"), "refs/tags/v1", "x"),
+        "refs/stash",
+        "s1",
+    );
+    next.reflog_subject = Some("pull: Fast-forward".into());
+    assert_eq!(
+        kinds(&step(&prev, &next)),
+        vec!["git.pulled", "git.tag-created", "git.stash-created"]
+    );
+}

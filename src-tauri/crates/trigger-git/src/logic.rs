@@ -235,7 +235,30 @@ pub fn step(prev: &RepoSnapshot, next: &RepoSnapshot) -> Vec<Change> {
         }
     }
 
-    // T08 adds the new tag and the new stash here.
+    // Only the first new tag by name: the hub's cool down would drop a second
+    // event for the same rule anyway.
+    let new_tag = next
+        .refs
+        .keys()
+        .filter(|name| name.starts_with("refs/tags/") && !prev.refs.contains_key(*name))
+        .map(|name| name.trim_start_matches("refs/tags/"))
+        .next();
+    if let Some(tag) = new_tag {
+        out.push(Change::TagCreated {
+            branch: next.branch.clone(),
+            tag: tag.to_string(),
+        });
+    }
+
+    // A stash that appeared, or one pushed on top of another. Removing the
+    // last stash (pop or drop) removes the ref and fires nothing.
+    if let Some(stash) = next.refs.get("refs/stash") {
+        if prev.refs.get("refs/stash") != Some(stash) {
+            out.push(Change::StashCreated {
+                branch: next.branch.clone(),
+            });
+        }
+    }
 
     out
 }
