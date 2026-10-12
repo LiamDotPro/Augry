@@ -2,7 +2,7 @@
 id: T08
 epic: 010-trigger-docker
 title: Replay whole engine sessions and check the slice
-status: todo
+status: done
 depends_on: [T07]
 size: S
 model: haiku
@@ -153,3 +153,5 @@ fn a_podman_only_rule_ignores_a_docker_stream() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

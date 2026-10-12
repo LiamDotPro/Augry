@@ -234,3 +234,96 @@ fn fire_returns_one_entry_per_matching_rule() {
 fn fire_with_no_rules_is_empty() {
     assert!(fire(&[], &started()).is_empty());
 }
+
+/// One rule per kind, no `when` fields: what fires for a stream of lines.
+fn fired_kinds(lines: &[&str], rules: &[Armed]) -> Vec<String> {
+    lines
+        .iter()
+        .filter_map(|line| parse_line(line))
+        .flat_map(|event| fire(rules, &event))
+        .map(|(_, kind, _)| kind)
+        .collect()
+}
+
+fn one_rule_per_kind() -> Vec<Armed> {
+    crate::KINDS
+        .iter()
+        .map(|k| armed(k.id, json!({})))
+        .collect()
+}
+
+#[test]
+fn a_docker_session_fires_each_thing_once() {
+    // The order R01 captured, with the noise in between.
+    let lines = [
+        DOCKER_IMAGE_CREATE,
+        DOCKER_IMAGE_TAG,
+        DOCKER_CREATE,
+        DOCKER_NETWORK_CONNECT,
+        DOCKER_START,
+        DOCKER_EXEC_START,
+        DOCKER_EXEC_DIE,
+        DOCKER_UNHEALTHY,
+        DOCKER_HEALTHY,
+        DOCKER_KILL,
+        DOCKER_STOP,
+        DOCKER_DIE_137,
+        DOCKER_DESTROY,
+        DOCKER_DIE_3,
+    ];
+    assert_eq!(
+        fired_kinds(&lines, &one_rule_per_kind()),
+        vec![
+            "docker.image-built",
+            "docker.container-started",
+            "docker.container-unhealthy",
+            "docker.container-healthy",
+            "docker.container-stopped",
+            "docker.container-stopped",
+        ]
+    );
+}
+
+#[test]
+fn a_podman_session_fires_each_thing_once() {
+    let lines = [
+        PODMAN_CREATE,
+        PODMAN_START,
+        PODMAN_HEALTHY,
+        PODMAN_UNHEALTHY,
+        PODMAN_STOP,
+        PODMAN_DIED_137,
+        PODMAN_IMAGE_PULL,
+        PODMAN_BUILD,
+    ];
+    assert_eq!(
+        fired_kinds(&lines, &one_rule_per_kind()),
+        vec![
+            "docker.container-started",
+            "docker.container-healthy",
+            "docker.container-unhealthy",
+            "docker.container-stopped",
+            "docker.image-built",
+        ]
+    );
+}
+
+#[test]
+fn a_label_rule_skips_the_container_without_that_label() {
+    let rules = vec![armed(
+        "docker.container-stopped",
+        json!({ "label": "com.example.team=x" }),
+    )];
+    let fired = fired_kinds(&[DOCKER_DIE_137, DOCKER_DIE_3], &rules);
+    assert_eq!(fired, vec!["docker.container-stopped"]);
+}
+
+#[test]
+fn a_podman_only_rule_ignores_a_docker_stream() {
+    let rules = vec![armed(
+        "docker.container-started",
+        json!({ "engine": "podman" }),
+    )];
+    assert!(fired_kinds(&[DOCKER_START], &rules).is_empty());
+    assert_eq!(fired_kinds(&[PODMAN_START], &rules).len(), 1);
+}
