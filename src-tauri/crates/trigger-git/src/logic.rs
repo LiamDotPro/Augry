@@ -3,9 +3,6 @@
 //! case is a unit test. The design is Decisions 8 and 9 of
 //! plans/003-trigger-git/epic.md, checked against research note R01.
 
-// Removed when lib.rs reads everything in this file.
-#![allow(dead_code)]
-
 use std::collections::BTreeMap;
 
 use trigger_core::Value;

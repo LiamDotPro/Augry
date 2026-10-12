@@ -2,7 +2,7 @@
 id: T29
 epic: 003-trigger-git
 title: Remove temporary allows and finish the README
-status: todo
+status: done
 depends_on: [T28]
 size: S
 model: haiku
@@ -100,3 +100,5 @@ Note on `check-crates.mjs`: it prints warnings, not errors. A warning about `src
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

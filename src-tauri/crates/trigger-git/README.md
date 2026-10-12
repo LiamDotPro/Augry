@@ -114,3 +114,9 @@ What does not work, on which platform, and why.
 - `git.behind-remote` fires when the count goes from 0 to above 0. The first check is only a baseline, and behind by 2 and then by 5 is one event. A repository with no upstream, or a detached HEAD, never fires it.
 - `git.uncommitted-older-than` fires once and waits for a clean tree before it can fire again. Work that is already old when the rule starts fires on the first check.
 - `git.repo-cloned` sees only direct children of `folder` that contain `.git`. The first scan is a baseline, so repositories already there fire nothing.
+- A rebase that finishes within one 300 ms settle window is not seen as stopped, so `git.rebase-stopped` fires only for a rebase that stays stopped. The same merging means two commits made within 300 ms can give one `git.commit`.
+- Submodules and bare repositories are untested. Repositories made with `--ref-format=reftable` are watched but untested.
+- `start` fails for the whole source if one rule names a folder that is not a git repository, and it runs a few git calls per repository (the baseline snapshot) before it returns.
+- A `git fetch` for `fetch: true` can take up to 30 seconds, and the thread does not notice a stop until it ends.
+- A rule with a `branch` glob on `git.behind-remote` or `git.uncommitted-older-than` uses the branch of the latest snapshot. While the glob does not match, the rule is not checked and its memory is cleared, so the first check after a match is a baseline again.
+- The hub's two second cool down per rule applies on top of the 300 ms settle.

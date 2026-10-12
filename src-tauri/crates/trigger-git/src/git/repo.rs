@@ -3,7 +3,7 @@
 //! has tests that need no git.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::SystemTime;
 
 use super::{run, value, FETCH_TIMEOUT, TIMEOUT};
@@ -20,10 +20,6 @@ impl GitRepo {
     /// `path` is the work tree root, the rule's `repo`.
     pub fn new(path: impl Into<PathBuf>) -> GitRepo {
         GitRepo { path: path.into() }
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
     }
 
     fn value(&self, args: &[&str]) -> Option<String> {

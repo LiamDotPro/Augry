@@ -2,9 +2,6 @@
 //! `git/cli.rs` copied here, because a trigger crate may not depend on the
 //! app (research note R02). Together with `os.rs` it is the crate's OS layer.
 
-// Removed when lib.rs reads everything in this file.
-#![allow(dead_code)]
-
 use std::fmt;
 use std::io::Read;
 use std::path::Path;
@@ -164,8 +161,6 @@ pub fn value(cwd: &Path, args: &[&str]) -> Option<String> {
 
 mod repo;
 
-// Removed when lib.rs uses GitRepo.
-#[allow(unused_imports)]
 pub use repo::GitRepo;
 
 #[cfg(test)]
