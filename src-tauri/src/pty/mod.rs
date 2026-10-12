@@ -73,6 +73,9 @@ struct Session {
     spawned_at: Instant,
     /// Bumped on restart so the previous reader and waiter threads fall silent.
     generation: u64,
+    /// Times commands for the internal triggers. `write` starts it, the reader
+    /// thread stops it.
+    clock: Arc<Mutex<tap::CommandClock>>,
 }
 
 impl Session {
@@ -257,6 +260,7 @@ impl PtyManager {
             })?;
 
         let generation = self.generations.fetch_add(1, Ordering::SeqCst) + 1;
+        let clock = Arc::new(Mutex::new(tap::CommandClock::default()));
 
         let session = Session {
             master: pair.master,
@@ -269,6 +273,7 @@ impl PtyManager {
             exit_code: None,
             spawned_at: Instant::now(),
             generation,
+            clock: Arc::clone(&clock),
         };
         let info = session.info(&id);
         self.sessions
@@ -276,7 +281,7 @@ impl PtyManager {
             .expect("pty sessions")
             .insert(id.clone(), session);
 
-        self.start_reader(app.clone(), id.clone(), generation, output);
+        self.start_reader(app.clone(), id.clone(), generation, output, clock);
         self.start_waiter(app.clone(), id, generation, child);
 
         Ok(info)
@@ -291,9 +296,13 @@ impl PtyManager {
         id: TerminalId,
         generation: u64,
         mut output: Box<dyn Read + Send>,
+        clock: Arc<Mutex<tap::CommandClock>>,
     ) {
         let pump = Arc::new(OutputPump::new());
         let sessions = Arc::clone(&self.sessions);
+        // The reader thread publishes trigger signals, so it needs the app.
+        let tap_app = app.clone();
+        let mut tap = tap::Tap::new(id.clone(), clock);
 
         {
             let pump = Arc::clone(&pump);
@@ -305,6 +314,7 @@ impl PtyManager {
                         Ok(0) => break,
                         Ok(count) => {
                             pump.push(&buffer[..count]);
+                            publish_signals(&tap_app, &mut tap, &buffer[..count]);
                             // Pace a runaway writer rather than dropping its bytes.
                             if pump.should_throttle() {
                                 std::thread::sleep(reader::THROTTLE_SLEEP);
@@ -363,6 +373,13 @@ impl PtyManager {
         let session = guard.get_mut(id).ok_or_else(|| not_found(id))?;
         if session.exited {
             return Ok(());
+        }
+        if bytes.contains(&b'\r') {
+            session
+                .clock
+                .lock()
+                .expect("pty clock")
+                .on_enter(Instant::now());
         }
         session.writer.write_all(bytes)?;
         session.writer.flush()?;
@@ -468,6 +485,28 @@ fn is_current(
         .expect("pty sessions")
         .get(id)
         .is_some_and(|session| session.generation == generation)
+}
+
+/// Gives a chunk of output to the session's tap and publishes what it finds
+/// (command ended, bell, output lines) to the internal triggers. Runs after the
+/// chunk is queued for the window, so it never delays the screen.
+fn publish_signals(app: &AppHandle, tap: &mut tap::Tap, chunk: &[u8]) {
+    let state = app.state::<crate::AppState>();
+    let signals = tap.process(
+        chunk,
+        state.triggers.wants_output(),
+        Instant::now(),
+        |pane| {
+            state
+                .pty
+                .cwd_of(&pane.to_string())
+                .map(|cwd| path_string(&cwd))
+                .unwrap_or_default()
+        },
+    );
+    for signal in signals {
+        state.triggers.publish_internal(signal);
+    }
 }
 
 fn emit_output(app: &AppHandle, id: &TerminalId, bytes: Vec<u8>) -> bool {

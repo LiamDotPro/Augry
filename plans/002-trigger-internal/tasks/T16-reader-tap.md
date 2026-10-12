@@ -2,7 +2,7 @@
 id: T16
 epic: 002-trigger-internal
 title: Feed command, bell and output signals from the reader thread
-status: todo
+status: done
 depends_on: [T15, T08]
 size: S
 model: sonnet
@@ -211,3 +211,5 @@ fn publish_signals(app: &AppHandle, tap: &mut tap::Tap, chunk: &[u8]) {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: clippy baseline 7 warnings; built, acceptance passed
+- 2026-10-12 checker: pass
