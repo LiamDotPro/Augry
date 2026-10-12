@@ -2,7 +2,7 @@
 id: T02
 epic: 001-trigger-core
 title: Add Platforms and the ms_since_epoch helper
-status: todo
+status: done
 depends_on: [T01]
 size: S
 model: haiku
@@ -179,3 +179,5 @@ mod platforms_tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
