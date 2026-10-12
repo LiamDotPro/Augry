@@ -2,7 +2,7 @@
 id: T09
 epic: 003-trigger-git
 title: Write the README Kinds, Rule fields, Payload and Example
-status: todo
+status: done
 depends_on: [T08]
 size: S
 model: haiku
@@ -86,3 +86,5 @@ Note on `check-crates.mjs`: `check-crates.mjs` prints warnings, not errors, abou
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (Kinds block already matched readme example output, no change needed; check-crates 0 errors, 5 accepted warnings)
+- 2026-10-12 checker: pass

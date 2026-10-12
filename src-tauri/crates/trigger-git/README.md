@@ -34,16 +34,30 @@ error, so a typo shows up in the editor.
 
 | Field | Required | Default | Meaning |
 |---|---|---|---|
-| `example` | yes | | Replace with the real fields |
+| `repo` | yes, for every kind except `git.repo-cloned` | | Absolute path of the repository. Use `${repo.root}` so it follows the terminal's repository. `git.repo-cloned` rejects it |
+| `folder` | only for `git.repo-cloned` | | Absolute path of the folder whose new children are watched |
+| `branch` | no | any branch | Glob for the branch name. `*` does not cross `/`, so `release/*` matches `release/1.0` and `feature/**` matches `feature/a/b`. Case sensitive. Matched against the new branch for `git.branch-switched` and the branch left for `git.detached-head`. A rule with a glob never fires when there is no branch name |
+| `interval_s` | no | 300 | Seconds between checks for `git.behind-remote`, `git.uncommitted-older-than` and `git.repo-cloned`. At least 30. Ignored by the other kinds |
+| `older_than_min` | no | 60 | `git.uncommitted-older-than` only: minutes the oldest uncommitted change must have waited |
+| `fetch` | no | false | `git.behind-remote` only: run `git fetch` before each check. Without it the check uses the remote refs already on disk |
 
 ## Payload
 
 What an event carries, available to steps as `${trigger.<field>}`. Paths, names,
 ids and numbers only. Never file contents or secrets, never more than 4 KiB.
 
-| Field | Meaning |
-|---|---|
-| `example` | Replace with the real fields |
+| Field | Kinds | Meaning |
+|---|---|---|
+| `repo` | every kind but `git.repo-cloned` | Absolute path of the repository |
+| `branch` | every kind but `git.repo-cloned` | Branch name. Empty when HEAD is detached. For `git.branch-switched` it is the new branch; for `git.detached-head` it is the branch left |
+| `commit` | commit, branch-switched, pulled, rebase-stopped, detached-head | Short hash of HEAD |
+| `message` | commit, pulled | First line of the HEAD commit message |
+| `from`, `to` | branch-switched | The branch left and the branch entered |
+| `files` | merge-conflict | Number of files with conflicts (a number) |
+| `tag` | tag-created | Name of the new tag |
+| `behind` | behind-remote | Commits the branch is behind its upstream (a number) |
+| `minutes` | uncommitted-older-than | Minutes the oldest uncommitted change has waited (a number) |
+| `path` | repo-cloned | Absolute path of the new repository |
 
 ## Platforms
 
@@ -60,7 +74,7 @@ What the OS asks the user for, and when. "None" is a fine answer.
 ## Example
 
 ```json
-{ "id": "example", "kind": "git.example", "when": { "example": "value" } }
+{ "id": "on-commit", "kind": "git.commit", "when": { "repo": "${repo.root}", "branch": "main" } }
 ```
 
 ## Develop
