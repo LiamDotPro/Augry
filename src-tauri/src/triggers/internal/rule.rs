@@ -5,9 +5,13 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use globset::{GlobBuilder, GlobMatcher};
+use regex::{Regex, RegexBuilder};
 use trigger_core::{Rule, RuleError, Value};
 
 use super::KINDS;
+
+/// Compiled patterns bigger than this are refused.
+const REGEX_SIZE_LIMIT: usize = 256 * 1024;
 
 /// The kinds that take a `repo` field: every pane, worktree and review kind
 /// except the bell.
@@ -30,6 +34,18 @@ pub enum Filter {
     None,
     /// `tg.agent-finished`: the agent name matches, or any agent when None.
     Agent(Option<GlobMatcher>),
+    /// `tg.command-failed`: this exit code, or any code except 0 when None.
+    Failed {
+        exit_code: Option<i64>,
+    },
+    /// `tg.command-slow`: ran for more than `longer_than_ms`, and this exit
+    /// code when set.
+    Slow {
+        longer_than_ms: u64,
+        exit_code: Option<i64>,
+    },
+    /// `tg.output-matched`: the line matches.
+    Pattern(Regex),
     /// `tg.note-saved`: the path below the notes folder matches, or any note
     /// when None.
     Note(Option<GlobMatcher>),
@@ -59,6 +75,26 @@ impl Fields {
             None => Ok(None),
             Some(Value::String(text)) => Ok(Some(text)),
             Some(_) => Err(bad(name, "must be a string")),
+        }
+    }
+
+    fn int(&mut self, name: &str) -> Result<Option<i64>, RuleError> {
+        match self.0.remove(name) {
+            None => Ok(None),
+            Some(value) => value
+                .as_i64()
+                .map(Some)
+                .ok_or_else(|| bad(name, "must be a whole number")),
+        }
+    }
+
+    fn uint(&mut self, name: &str) -> Result<Option<u64>, RuleError> {
+        match self.0.remove(name) {
+            None => Ok(None),
+            Some(value) => value
+                .as_u64()
+                .map(Some)
+                .ok_or_else(|| bad(name, "must be a whole number, 0 or more")),
         }
     }
 
@@ -110,6 +146,26 @@ pub fn parse(rule: &Rule) -> Result<Parsed, RuleError> {
         "tg.note-saved" => {
             let glob = fields.text("glob")?;
             Filter::Note(glob.map(|g| matcher("glob", &g, true)).transpose()?)
+        }
+        "tg.command-failed" => Filter::Failed {
+            exit_code: fields.int("exit_code")?,
+        },
+        "tg.command-slow" => Filter::Slow {
+            longer_than_ms: fields
+                .uint("longer_than_ms")?
+                .ok_or_else(|| bad("longer_than_ms", "is required"))?,
+            exit_code: fields.int("exit_code")?,
+        },
+        "tg.output-matched" => {
+            let pattern = fields
+                .text("pattern")?
+                .ok_or_else(|| bad("pattern", "is required"))?;
+            let regex = RegexBuilder::new(&pattern)
+                .case_insensitive(true)
+                .size_limit(REGEX_SIZE_LIMIT)
+                .build()
+                .map_err(|e| bad("pattern", e.to_string()))?;
+            Filter::Pattern(regex)
         }
         _ => Filter::None,
     };
@@ -184,18 +240,14 @@ mod tests {
     }
 
     #[test]
-    fn the_pane_worktree_and_review_kinds_take_a_repo() {
-        let kinds = [
-            "tg.agent-finished",
-            "tg.task-reported",
-            "tg.pane-opened-in-repo",
-            "tg.worktree-created",
-            "tg.worktree-removed",
-            "tg.review-staged",
-            "tg.focus-entered",
-        ];
-        for kind in kinds {
-            assert!(parsed(kind, json!({ "repo": dir() })).is_ok(), "{kind}");
+    fn every_pane_worktree_and_review_kind_takes_a_repo() {
+        for kind in REPO_KINDS {
+            let when = match *kind {
+                "tg.command-slow" => json!({ "repo": dir(), "longer_than_ms": 1 }),
+                "tg.output-matched" => json!({ "repo": dir(), "pattern": "x" }),
+                _ => json!({ "repo": dir() }),
+            };
+            assert!(parsed(kind, when).is_ok(), "{kind}");
         }
     }
 
@@ -223,5 +275,61 @@ mod tests {
         assert!(!glob.is_match("a/ideas.md"));
         let any = parsed("tg.note-saved", json!({})).unwrap();
         assert!(matches!(any.filter, Filter::Note(None)));
+    }
+
+    #[test]
+    fn command_failed_defaults_to_any_non_zero_code() {
+        let any = parsed("tg.command-failed", json!({})).unwrap();
+        assert!(matches!(any.filter, Filter::Failed { exit_code: None }));
+        let two = parsed("tg.command-failed", json!({ "exit_code": 2 })).unwrap();
+        assert!(matches!(two.filter, Filter::Failed { exit_code: Some(2) }));
+        let text = parsed("tg.command-failed", json!({ "exit_code": "2" }));
+        assert_eq!(field_of(text.unwrap_err()), "exit_code");
+    }
+
+    #[test]
+    fn command_slow_needs_longer_than_ms() {
+        let missing = parsed("tg.command-slow", json!({ "exit_code": 0 }));
+        assert_eq!(field_of(missing.unwrap_err()), "longer_than_ms");
+        let negative = parsed("tg.command-slow", json!({ "longer_than_ms": -5 }));
+        assert_eq!(field_of(negative.unwrap_err()), "longer_than_ms");
+        let ok = parsed(
+            "tg.command-slow",
+            json!({ "longer_than_ms": 30000, "exit_code": 0 }),
+        )
+        .unwrap();
+        assert!(matches!(
+            ok.filter,
+            Filter::Slow {
+                longer_than_ms: 30000,
+                exit_code: Some(0)
+            }
+        ));
+    }
+
+    #[test]
+    fn output_pattern_is_required_and_ignores_case() {
+        let missing = parsed("tg.output-matched", json!({}));
+        assert_eq!(field_of(missing.unwrap_err()), "pattern");
+        let p = parsed("tg.output-matched", json!({ "pattern": "error: .*failed" })).unwrap();
+        let Filter::Pattern(regex) = p.filter else {
+            panic!("expected a pattern");
+        };
+        assert!(regex.is_match("ERROR: build FAILED"));
+        assert!(!regex.is_match("all good"));
+    }
+
+    #[test]
+    fn a_bad_or_oversized_pattern_is_refused_with_the_reason() {
+        let syntax = parsed("tg.output-matched", json!({ "pattern": "(" }));
+        assert_eq!(field_of(syntax.unwrap_err()), "pattern");
+        let huge = parsed("tg.output-matched", json!({ "pattern": r"(\w{50}){50}" }));
+        match huge.unwrap_err() {
+            RuleError::Field { field, problem } => {
+                assert_eq!(field, "pattern");
+                assert!(problem.contains("size limit"), "{problem}");
+            }
+            other => panic!("expected a field error, got {other:?}"),
+        }
     }
 }

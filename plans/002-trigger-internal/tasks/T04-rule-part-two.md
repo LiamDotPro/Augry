@@ -2,7 +2,7 @@
 id: T04
 epic: 002-trigger-internal
 title: Parse exit codes, durations and output patterns
-status: todo
+status: done
 depends_on: [T03]
 size: M
 model: haiku
@@ -392,3 +392,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7, after 7; regex 1.13.1 size-limit test passed)
+- 2026-10-12 checker: pass
