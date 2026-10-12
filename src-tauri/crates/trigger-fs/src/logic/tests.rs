@@ -66,6 +66,12 @@ impl Fx {
         self.observe(Signal::Tick { now })
     }
 
+    fn step(&mut self, signal: Signal) -> Vec<(String, Payload)> {
+        let disk = self.disk.clone();
+        let is_file = move |p: &Path| disk.borrow().contains(p);
+        step(&mut self.state, &self.armed, signal, &is_file)
+    }
+
     fn observe(&mut self, signal: Signal) -> Vec<Obs> {
         let disk = self.disk.clone();
         let is_file = move |p: &Path| disk.borrow().contains(p);
@@ -190,4 +196,49 @@ fn a_rescan_forgets_pending_paths_and_asks_for_a_new_scan() {
     fx.put("b.txt");
     fx.raw(3000, RawKind::Modify, &["b.txt"]);
     assert_eq!(fx.tick(4000), vec![Obs::Saved(fx.p("b.txt"))]);
+}
+
+#[test]
+fn glob_and_ignore_apply_when_emitting() {
+    let mut fx = Fx::new(
+        "fs.file-created",
+        json!({ "glob": "**/*.md", "ignore": ["drafts/**"] }),
+        &[],
+    );
+    for rel in ["a.md", "b.txt", "drafts/c.md", "d.md.tmp", ".git/e.md"] {
+        fx.put(rel);
+        fx.raw(1000, RawKind::Create, &[rel]);
+    }
+    assert_eq!(fx.tick(2000), vec![Obs::Created(fx.p("a.md"))]);
+}
+
+#[test]
+fn step_keeps_only_the_rules_kind_and_builds_the_payload() {
+    let mut fx = Fx::new("fs.file-saved", json!({}), &["docs/Plan.md"]);
+    fx.raw(1000, RawKind::Modify, &["docs/Plan.md"]);
+    let out = fx.step(Signal::Tick { now: 2000 });
+    assert_eq!(out.len(), 1);
+    let (kind, payload) = &out[0];
+    assert_eq!(kind, "fs.file-saved");
+    assert_eq!(payload["name"], json!("Plan.md"));
+    assert_eq!(payload["relative"], json!("docs/Plan.md"));
+    assert_eq!(payload["ext"], json!("md"));
+    assert_eq!(
+        payload["path"],
+        json!(fx.p("docs/Plan.md").to_string_lossy())
+    );
+    assert!(!payload.contains_key("from"));
+
+    // The same change is nothing to a rule of another kind.
+    let mut other = Fx::new("fs.file-created", json!({}), &["docs/Plan.md"]);
+    other.raw(1000, RawKind::Modify, &["docs/Plan.md"]);
+    assert!(other.step(Signal::Tick { now: 2000 }).is_empty());
+}
+
+#[test]
+fn a_file_without_an_extension_has_an_empty_ext() {
+    let fx = Fx::saved();
+    let payload = Obs::Saved(fx.p("Makefile")).payload(&fx.armed);
+    assert_eq!(payload["ext"], json!(""));
+    assert_eq!(payload["relative"], json!("Makefile"));
 }

@@ -131,15 +131,29 @@ fn is_partial(path: &Path) -> bool {
     PARTIAL_SUFFIXES.iter().any(|s| name.ends_with(s))
 }
 
+/// True when the path is below the root and passes the rule's `glob` and
+/// `ignore`. Both are matched against the path relative to the root.
+fn accepts(armed: &Armed, path: &Path) -> bool {
+    let Ok(rel) = path.strip_prefix(&armed.root) else {
+        return false;
+    };
+    !rel.as_os_str().is_empty() && armed.glob.is_match(rel) && !armed.ignore.is_match(rel)
+}
+
 /// The events a signal fires for this rule: (kind, payload). `is_file` says
-/// whether a path is an existing regular file.
+/// whether a path is an existing regular file; directories are never
+/// reported.
 pub fn step(
-    _state: &mut State,
-    _armed: &Armed,
-    _signal: Signal,
-    _is_file: &dyn Fn(&Path) -> bool,
+    state: &mut State,
+    armed: &Armed,
+    signal: Signal,
+    is_file: &dyn Fn(&Path) -> bool,
 ) -> Vec<(String, Payload)> {
-    Vec::new()
+    observe(state, armed, signal, is_file)
+        .iter()
+        .filter(|o| o.kind_id() == armed.kind)
+        .map(|o| (o.kind_id().to_string(), o.payload(armed)))
+        .collect()
 }
 
 /// Every observation a signal produces, whatever the rule's kind.
@@ -195,7 +209,9 @@ fn ingest(state: &mut State, armed: &Armed, at: u64, kind: RawKind, paths: Vec<P
 }
 
 /// Decides every pending path that has been quiet for `settle_ms`, using a
-/// stat and the known set, and keeps the known set up to date.
+/// stat and the known set, and keeps the known set up to date. Paths that
+/// the rule's glob and ignore reject are decided too (so the known set stays
+/// right) but not returned.
 fn resolve(
     state: &mut State,
     armed: &Armed,
@@ -230,6 +246,9 @@ fn resolve(
             (false, false) => {}
         }
     }
+    out.created.retain(|r| accepts(armed, &r.path));
+    out.saved.retain(|r| accepts(armed, &r.path));
+    out.removed.retain(|r| accepts(armed, &r.path));
     out
 }
 
@@ -240,6 +259,47 @@ fn settle(state: &mut State, armed: &Armed, now: u64, is_file: &dyn Fn(&Path) ->
     obs.extend(resolved.created.into_iter().map(|r| Obs::Created(r.path)));
     obs.extend(resolved.saved.into_iter().map(|r| Obs::Saved(r.path)));
     obs
+}
+
+impl Obs {
+    pub fn kind_id(&self) -> &'static str {
+        match self {
+            Obs::Created(_) => "fs.file-created",
+            Obs::Saved(_) => "fs.file-saved",
+            Obs::Removed(_) => "fs.file-removed",
+            Obs::Renamed { .. } => "fs.file-renamed",
+            Obs::DownloadFinished(_) => "fs.download-finished",
+        }
+    }
+
+    /// Decision 8: `path`, `name`, `relative`, `ext`, and `from` for a rename.
+    pub fn payload(&self, armed: &Armed) -> Payload {
+        let (path, from) = match self {
+            Obs::Created(p) | Obs::Saved(p) | Obs::Removed(p) | Obs::DownloadFinished(p) => {
+                (p, None)
+            }
+            Obs::Renamed { from, to } => (to, Some(from)),
+        };
+        let text = |s: &std::ffi::OsStr| Value::from(s.to_string_lossy().into_owned());
+        let relative = path
+            .strip_prefix(&armed.root)
+            .map(|rel| {
+                rel.components()
+                    .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                    .collect::<Vec<_>>()
+                    .join("/")
+            })
+            .unwrap_or_default();
+        let mut payload = Payload::new();
+        payload.insert("path".into(), text(path.as_os_str()));
+        payload.insert("name".into(), text(path.file_name().unwrap_or_default()));
+        payload.insert("relative".into(), Value::from(relative));
+        payload.insert("ext".into(), text(path.extension().unwrap_or_default()));
+        if let Some(from) = from {
+            payload.insert("from".into(), text(from.as_os_str()));
+        }
+        payload
+    }
 }
 
 #[cfg(test)]
