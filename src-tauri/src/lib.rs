@@ -1,6 +1,7 @@
 //! Terminal Grid core. Module layout follows docs/technical-design.md section 2.
 
 pub mod agent;
+pub mod cloud;
 pub mod error;
 pub mod git;
 mod glass;

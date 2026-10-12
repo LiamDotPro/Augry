@@ -25,6 +25,14 @@ serde_json = "1"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 dirs = "7"
+# Cloud API client (src/cloud). generated.rs needs these; keep progenitor-client
+# on the version tools/api-codegen generates with.
+progenitor-client = "=0.15.0"
+reqwest = { version = "0.13", features = ["json"] }
+futures-util = "0.3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 # Native window glass for the Glass theme (src/glass.rs), and the full screen
 # traffic lights (src/traffic_lights.rs).

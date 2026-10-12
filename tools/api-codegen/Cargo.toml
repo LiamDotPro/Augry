@@ -1,0 +1,17 @@
+# Generates src-tauri/src/cloud/generated.rs from the API contract. Run it
+# with `npm run api:generate`, not by hand. Kept out of the app's build so the
+# app never needs the contract or these crates to compile.
+[package]
+name = "api-codegen"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+progenitor = { version = "=0.15.0", default-features = false }
+openapiv3 = "2.2"
+serde_yaml = "0.9"
+syn = { version = "3", features = ["full", "visit-mut"] }
+prettyplease = "0.3"
+
+[workspace]
