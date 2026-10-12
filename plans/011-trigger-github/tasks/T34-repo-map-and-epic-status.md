@@ -2,7 +2,7 @@
 id: T34
 epic: 011-trigger-github
 title: Add trigger-github to the repo map and mark 011 done
-status: todo
+status: done
 depends_on: [T33]
 size: S
 model: haiku
@@ -79,3 +79,5 @@ If the file already has a row starting `| 011`, set its Status cell to `done` in
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed (epic.md status was `building`, set to `done`; all grep checks plain text)
+- 2026-10-13 checker: pass

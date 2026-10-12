@@ -25,7 +25,7 @@ A Tauri 2 desktop app: a Rust core in `src-tauri/` and a React frontend in
 | `src/cloud/` | `api.ts` (openapi-fetch client, React Query `$api`, `withSessionToken`), `schema.d.ts` (generated), `api.cloud.test.ts` (needs an API, skipped otherwise) |
 | `src/styles/tokens.css` | Design tokens lifted from Claude Design. Colours and sizes live here, never in components |
 | `src/styles/*.css` | One file per area: `chrome.css`, `pane.css`, `notes.css`, `overlays.css` (settings sheet, toast), `review.css` |
-| `src-tauri/Cargo.toml` | The app crate `terminal-grid` (lib `terminal_grid_lib`), also the root of a Cargo workspace whose members are `crates/*`. `[workspace.dependencies]` holds the shared versions. Feature `trigger-fs` (on by default) wires in the file source. Rust 2021, stable toolchain |
+| `src-tauri/Cargo.toml` | The app crate `terminal-grid` (lib `terminal_grid_lib`), also the root of a Cargo workspace whose members are `crates/*`. `[workspace.dependencies]` holds the shared versions. Features `trigger-fs` and `trigger-github` (both on by default) wire in the file and GitHub sources. Rust 2021, stable toolchain |
 | `src-tauri/src/lib.rs` | Builder, plugins, `AppState` (`pty`, `git`, `agent`, `notes`, `state`), the `generate_handler![...]` command list, `blocking()` |
 | `src-tauri/src/error.rs` | `AppError`: thiserror enum, serialised with `code` tag in PascalCase |
 | `src-tauri/src/pty/` | PTY sessions, shell integration, the reader thread. `create_terminal`, `write_terminal` |
@@ -33,10 +33,11 @@ A Tauri 2 desktop app: a Rust core in `src-tauri/` and a React frontend in
 | `src-tauri/src/git/` | git CLI wrapper, worktree parser, `GitService` cache, review commands |
 | `src-tauri/src/notes/` | `NotesService`: sandboxed file tree under a notes root, `notify` watcher for external changes |
 | `src-tauri/src/state/` | `config.json` and `session.json` in the app config dir (`~/Library/Application Support/com.liamread.terminalgrid` on macOS), atomic writes, `Config` and `ConfigPatch` |
-| `src-tauri/src/triggers/` | `mod.rs` (`TriggerService` in `AppState`, `sources()`, `refresh()`, the forward thread, the four commands), `store.rs` (definition files in `<config dir>/processes/`), `variables.rs` (`${home}`, `${downloads}`, `${notes.root}`, `${screenshots}`, `${repo.root}`), `rules.rs` (the pure planner), `status.rs` (status and `trigger://fired` JSON) |
+| `src-tauri/src/triggers/` | `mod.rs` (`TriggerService` in `AppState`, `sources()`, `refresh()`, the forward thread, the four commands), `store.rs` (definition files in `<config dir>/processes/`), `variables.rs` (`${home}`, `${downloads}`, `${notes.root}`, `${screenshots}`, `${repo.root}`, `${repo.remote}`), `rules.rs` (the pure planner), `status.rs` (status and `trigger://fired` JSON) |
 | `src-tauri/crates/trigger-core/` | The contract (`Source`, `Rule`, `Event`, `KindInfo`, `kinds_markdown`) and `testkit` (`RecordingSink`, `FixedClock`, `FakeSource`) |
 | `src-tauri/crates/trigger-hub/` | `Hub`: catalogue, `check`, `apply`, `publish`, `subscribe`, the two second cool down, the `trigger-hub` thread |
 | `src-tauri/crates/trigger-fs/` | The reference source. Kinds `fs.file-saved`, `fs.file-created`, `fs.file-removed`, `fs.file-renamed`, `fs.download-finished`, over `notify` |
+| `src-tauri/crates/trigger-github/` | Fires on what happens on GitHub for the signed in user, by polling with the user's own `gh api` login (no token is handled). Kinds `github.issue-assigned`, `github.review-requested`, `github.ci-failed`, `github.ci-passed`, `github.pr-commented`, `github.pr-merged`, `github.release-published`, `github.dependency-pr-opened`. `rule.rs` (`repo`, `branch`, `interval_s`, `author`), `logic/` (pure: parsing `gh api -i` output, `Backoff`, the diff per endpoint group, `poll.rs` the `Poller`), `os.rs` (finding `gh`, `GhCli`, the login check), `run.rs` (the `trigger-github` thread). `when.repo` may be `${repo.remote}` |
 | `src-tauri/src/cloud/` | `generated.rs` (progenitor client from the API contract) and `mod.rs` (`client()`, `poll_github_token`, a test that needs `AUGRY_API_URL`) |
 | `src-tauri/tauri.conf.json` | Window, CSP (`connect-src` allows the API), bundle |
 | `src-tauri/capabilities/default.json` | Permissions for the webview: window, dialog, opener |
@@ -59,6 +60,7 @@ Run from the repo root unless stated.
 | Type check and build | `npm run build` |
 | Rust tests | `cd src-tauri && cargo test --workspace` |
 | Live file watching tests | `cd src-tauri && cargo test -p trigger-fs -- --ignored --test-threads=1` |
+| Live GitHub tests | `cd src-tauri && cargo test -p trigger-github -- --ignored --nocapture` (needs `gh` installed and signed in; each test prints `skipped:` and passes without it; read only requests; CI does not run them) |
 | Rust formatting | `cd src-tauri && cargo fmt --check` |
 | Rust lints | `cd src-tauri && cargo clippy --all-targets -- -D warnings` (the app crate has a few existing warnings; new crates must be clean; CI lints only `-p trigger-core -p trigger-hub -p trigger-fs`) |
 | Run the app | `npm run tauri dev` |
@@ -83,7 +85,7 @@ The checker runs the first five for every card that touches `src/` or
 How a trigger gets from a file on disk to a toast:
 
 1. A definition file `<app config dir>/processes/<id>.json` has a `triggers` list. Settings, under "Process triggers (experimental)", switches triggers on (`Config.triggers.enabled`) and arms processes (`Config.triggers.armed`, set by `triggers_arm`).
-2. `TriggerService::refresh()` reads the files, expands variables, and gives the rules to `Hub::apply`. Rule ids are `<processId>/<triggerId>`, with `#<n>` added when `${repo.root}` fans out. It runs on start, after config saves, and after a terminal is created, closed or changes directory.
+2. `TriggerService::refresh()` reads the files, expands variables, and gives the rules to `Hub::apply`. Rule ids are `<processId>/<triggerId>`, with `#<n>` added when `${repo.root}` or `${repo.remote}` fans out. It runs on start, after config saves, and after a terminal is created, closed or changes directory.
 3. `trigger-hub` starts the source that owns each rule (`fs.*` goes to `trigger-fs`), applies the two second cool down, and publishes `Fired`.
 4. The `trigger-forward` thread logs one line (ids and kind only) and emits `trigger://fired`. The reducer shows a neutral toast for six seconds. Running a process on a trigger is a later epic.
 

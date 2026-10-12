@@ -1,7 +1,7 @@
 ---
 id: 011-trigger-github
 title: trigger-github
-status: building
+status: done
 depends_on: [001-trigger-core]
 ---
 
