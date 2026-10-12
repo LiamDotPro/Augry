@@ -2,7 +2,7 @@
 id: T21
 epic: 010-trigger-docker
 title: Add the version check and probe to os.rs
-status: todo
+status: done
 depends_on: [T20]
 size: S
 model: haiku
@@ -225,3 +225,5 @@ fn probe_is_consistent_with_find_engine() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
