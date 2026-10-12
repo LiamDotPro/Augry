@@ -40,7 +40,13 @@ ids and numbers only. Never file contents or secrets, never more than 4 KiB.
 
 | Field | Meaning |
 |---|---|
-| `example` | Replace with the real fields |
+| `engine` | `docker` or `podman`, whichever printed the event |
+| `container_id` | First 12 characters of the container id. Not on `docker.image-built` |
+| `name` | Container name, or the image reference for `docker.image-built` |
+| `image` | Image the container runs, as the engine reports it. For `docker.image-built` the same as `name` |
+| `time` | When the engine reported it, in milliseconds since 1970 |
+| `exit_code` | `docker.container-stopped` only. Exit code of the main process, `-1` when the engine did not report one |
+| `health` | `docker.container-healthy` and `docker.container-unhealthy` only: `healthy` or `unhealthy` |
 
 ## Platforms
 

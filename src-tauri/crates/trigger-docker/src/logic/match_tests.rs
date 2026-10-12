@@ -123,3 +123,114 @@ fn health_kinds_are_told_apart() {
     assert!(matches(&healthy, &event));
     assert!(!matches(&unhealthy, &event));
 }
+
+fn payload_of(line: &str) -> Payload {
+    payload(&parse_line(line).unwrap())
+}
+
+#[test]
+fn started_payload() {
+    let p = payload_of(DOCKER_START);
+    assert_eq!(p["engine"], json!("docker"));
+    assert_eq!(p["container_id"], json!("ef63764e9679"));
+    assert_eq!(p["name"], json!("r01c"));
+    assert_eq!(p["image"], json!("r01test:1"));
+    assert_eq!(p["time"], json!(1_791_837_794_607_i64));
+    assert!(!p.contains_key("exit_code") && !p.contains_key("health"));
+}
+
+#[test]
+fn stopped_payload_has_the_exit_code() {
+    assert_eq!(payload_of(DOCKER_DIE_137)["exit_code"], json!(137));
+    assert_eq!(payload_of(PODMAN_DIED_3)["exit_code"], json!(3));
+    let none = PODMAN_DIED_3.replace(r#""ContainerExitCode":3,"#, "");
+    assert_eq!(payload_of(&none)["exit_code"], json!(-1));
+}
+
+#[test]
+fn health_payload_has_the_verdict() {
+    assert_eq!(payload_of(DOCKER_HEALTHY)["health"], json!("healthy"));
+    assert_eq!(payload_of(DOCKER_UNHEALTHY)["health"], json!("unhealthy"));
+    assert_eq!(payload_of(PODMAN_UNHEALTHY)["health"], json!("unhealthy"));
+}
+
+#[test]
+fn image_built_payload_has_no_container_id() {
+    let p = payload_of(DOCKER_IMAGE_TAG);
+    assert_eq!(p["name"], json!("r01test:1"));
+    assert_eq!(p["image"], json!("r01test:1"));
+    assert!(!p.contains_key("container_id"));
+    let podman = payload_of(PODMAN_BUILD);
+    assert_eq!(podman["engine"], json!("podman"));
+    assert_eq!(podman["name"], json!("localhost/r01test:1"));
+}
+
+#[test]
+fn a_podman_container_id_is_shortened_too() {
+    assert_eq!(
+        payload_of(PODMAN_START)["container_id"],
+        json!("b2b0cf48d0c0")
+    );
+}
+
+#[test]
+fn payload_keys_are_exactly_the_ones_kinds_documents() {
+    for line in [
+        DOCKER_START,
+        DOCKER_DIE_137,
+        DOCKER_HEALTHY,
+        DOCKER_UNHEALTHY,
+        DOCKER_IMAGE_TAG,
+        PODMAN_START,
+        PODMAN_DIED_3,
+        PODMAN_HEALTHY,
+        PODMAN_BUILD,
+    ] {
+        let event = parse_line(line).unwrap();
+        let info = crate::KINDS
+            .iter()
+            .find(|k| k.id == event.kind.id())
+            .unwrap();
+        let mut documented: Vec<&str> = info.payload.iter().map(|f| f.name).collect();
+        documented.sort();
+        let p = payload(&event);
+        let mut actual: Vec<&str> = p.keys().map(String::as_str).collect();
+        actual.sort();
+        assert_eq!(actual, documented, "{}", event.kind.id());
+    }
+}
+
+#[test]
+fn fire_returns_one_entry_per_matching_rule() {
+    let rules = vec![
+        Armed {
+            id: "p/a".into(),
+            ..armed("docker.container-started", json!({ "name": "r01*" }))
+        },
+        Armed {
+            id: "p/b".into(),
+            ..armed("docker.container-started", json!({ "name": "web-*" }))
+        },
+        Armed {
+            id: "p/c".into(),
+            ..armed("docker.container-stopped", json!({}))
+        },
+        Armed {
+            id: "p/d".into(),
+            ..armed(
+                "docker.container-started",
+                json!({ "label": "com.example.k=v" }),
+            )
+        },
+    ];
+    let fired = fire(&rules, &started());
+    let ids: Vec<&str> = fired.iter().map(|(id, _, _)| id.as_str()).collect();
+    assert_eq!(ids, vec!["p/a", "p/d"]);
+    assert_eq!(fired[0].1, "docker.container-started");
+    assert_eq!(fired[0].2["name"], json!("r01c"));
+}
+
+#[test]
+fn fire_with_no_rules_is_empty() {
+    assert!(fire(&[], &started()).is_empty());
+}

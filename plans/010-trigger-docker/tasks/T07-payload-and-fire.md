@@ -2,7 +2,7 @@
 id: T07
 epic: 010-trigger-docker
 title: Add the payload builder and logic::fire
-status: todo
+status: done
 depends_on: [T06]
 size: M
 model: haiku
@@ -244,3 +244,5 @@ fn fire_with_no_rules_is_empty() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

@@ -299,6 +299,57 @@ pub fn matches(armed: &Armed, event: &EngineEvent) -> bool {
     true
 }
 
+/// The first 12 characters of an id, without a `sha256:` prefix.
+fn short_id(id: &str) -> String {
+    id.strip_prefix("sha256:")
+        .unwrap_or(id)
+        .chars()
+        .take(12)
+        .collect()
+}
+
+/// What an event carries to the steps. The keys are the ones `KINDS` documents
+/// for the event's kind: a test checks they stay in step.
+pub fn payload(event: &EngineEvent) -> Payload {
+    let mut out = Payload::new();
+    out.insert("engine".into(), Value::from(event.engine.as_str()));
+    out.insert("name".into(), Value::from(event.name.clone()));
+    out.insert("image".into(), Value::from(event.image.clone()));
+    out.insert("time".into(), Value::from(event.time_ms));
+    match event.kind {
+        EventKind::ImageBuilt => {}
+        EventKind::Started => {
+            out.insert("container_id".into(), Value::from(short_id(&event.id)));
+        }
+        EventKind::Stopped => {
+            out.insert("container_id".into(), Value::from(short_id(&event.id)));
+            out.insert(
+                "exit_code".into(),
+                Value::from(event.exit_code.unwrap_or(-1)),
+            );
+        }
+        EventKind::Healthy | EventKind::Unhealthy => {
+            out.insert("container_id".into(), Value::from(short_id(&event.id)));
+            let verdict = if event.kind == EventKind::Healthy {
+                "healthy"
+            } else {
+                "unhealthy"
+            };
+            out.insert("health".into(), Value::from(verdict));
+        }
+    }
+    out
+}
+
+/// The rules an event fires: (rule id, kind, payload).
+pub fn fire(armed: &[Armed], event: &EngineEvent) -> Vec<(RuleId, String, Payload)> {
+    armed
+        .iter()
+        .filter(|a| matches(a, event))
+        .map(|a| (a.id.clone(), a.kind.clone(), payload(event)))
+        .collect()
+}
+
 #[cfg(test)]
 mod fixtures;
 #[cfg(test)]
