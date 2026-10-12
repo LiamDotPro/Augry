@@ -75,3 +75,115 @@ mod catalogue_tests {
         );
     }
 }
+
+mod publish_tests {
+    use crate::Hub;
+    use std::collections::BTreeMap;
+    use std::sync::mpsc::Receiver;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use trigger_core::Event;
+
+    use crate::Fired;
+
+    const WAIT: Duration = Duration::from_secs(5);
+
+    fn event(rule: &str, secs: u64) -> Event {
+        Event {
+            rule: rule.to_string(),
+            kind: "fake.x".to_string(),
+            at: UNIX_EPOCH + Duration::from_secs(secs),
+            payload: BTreeMap::new(),
+        }
+    }
+
+    fn at(secs: u64) -> SystemTime {
+        UNIX_EPOCH + Duration::from_secs(secs)
+    }
+
+    fn nothing_more(rx: &Receiver<Fired>) -> bool {
+        rx.recv_timeout(Duration::from_millis(200)).is_err()
+    }
+
+    #[test]
+    fn publish_reaches_a_subscriber() {
+        let hub = Hub::new(vec![]);
+        let rx = hub.subscribe();
+        hub.publish(event("r1", 100));
+        let fired = rx.recv_timeout(WAIT).unwrap();
+        assert_eq!(fired.event.rule, "r1");
+        assert_eq!(fired.coalesced, 0);
+    }
+
+    #[test]
+    fn publish_reaches_every_subscriber() {
+        let hub = Hub::new(vec![]);
+        let a = hub.subscribe();
+        let b = hub.subscribe();
+        hub.publish(event("r1", 100));
+        assert_eq!(a.recv_timeout(WAIT).unwrap().event.rule, "r1");
+        assert_eq!(b.recv_timeout(WAIT).unwrap().event.rule, "r1");
+    }
+
+    #[test]
+    fn a_dropped_subscriber_does_not_stop_the_others() {
+        let hub = Hub::new(vec![]);
+        let gone = hub.subscribe();
+        let kept = hub.subscribe();
+        drop(gone);
+        hub.publish(event("r1", 100));
+        assert!(kept.recv_timeout(WAIT).is_ok());
+        hub.publish(event("r2", 100));
+        assert_eq!(kept.recv_timeout(WAIT).unwrap().event.rule, "r2");
+    }
+
+    #[test]
+    fn cool_down_drops_and_counts_and_the_next_fired_carries_the_count() {
+        let hub = Hub::new(vec![]);
+        let rx = hub.subscribe();
+        hub.publish(event("r1", 100));
+        hub.publish(event("r1", 101));
+        hub.publish(event("r1", 101));
+        hub.publish(event("r1", 103));
+        let first = rx.recv_timeout(WAIT).unwrap();
+        assert_eq!(first.event.at, at(100));
+        assert_eq!(first.coalesced, 0);
+        let second = rx.recv_timeout(WAIT).unwrap();
+        assert_eq!(second.event.at, at(103));
+        assert_eq!(second.coalesced, 2);
+        assert!(nothing_more(&rx));
+        // The count was reset.
+        hub.publish(event("r1", 106));
+        assert_eq!(rx.recv_timeout(WAIT).unwrap().coalesced, 0);
+    }
+
+    #[test]
+    fn rules_cool_down_separately() {
+        let hub = Hub::new(vec![]);
+        let rx = hub.subscribe();
+        hub.publish(event("r1", 100));
+        hub.publish(event("r2", 100));
+        assert_eq!(rx.recv_timeout(WAIT).unwrap().event.rule, "r1");
+        assert_eq!(rx.recv_timeout(WAIT).unwrap().event.rule, "r2");
+    }
+
+    #[test]
+    fn with_cool_down_replaces_the_default() {
+        let hub = Hub::new(vec![]).with_cool_down(Duration::ZERO);
+        let rx = hub.subscribe();
+        hub.publish(event("r1", 100));
+        hub.publish(event("r1", 100));
+        assert_eq!(rx.recv_timeout(WAIT).unwrap().coalesced, 0);
+        assert_eq!(rx.recv_timeout(WAIT).unwrap().coalesced, 0);
+    }
+
+    #[test]
+    fn dropping_the_hub_stops_the_thread_quickly() {
+        let hub = Hub::new(vec![]);
+        let rx = hub.subscribe();
+        let started = std::time::Instant::now();
+        drop(hub);
+        assert!(started.elapsed() < Duration::from_secs(2));
+        // The thread is gone, so its sender to this subscriber is gone too.
+        assert!(rx.recv_timeout(Duration::from_secs(2)).is_err());
+    }
+}

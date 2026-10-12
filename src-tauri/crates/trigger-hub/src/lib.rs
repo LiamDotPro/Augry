@@ -4,15 +4,33 @@
 
 pub mod cool_down;
 
+use cool_down::CoolDown;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::thread::JoinHandle;
+use std::time::Duration;
 use trigger_core::{Availability, Event, KindInfo, Source};
 
 #[cfg(test)]
 mod tests;
 
+const DEFAULT_COOL_DOWN: Duration = Duration::from_secs(2);
+
+/// How often the drain thread looks at the stop flag when nothing arrives.
+const POLL: Duration = Duration::from_millis(50);
+
 /// Owns the sources. Every method takes `&self`, so the app can keep one in
 /// Tauri state.
 pub struct Hub {
     sources: Vec<Box<dyn Source>>,
+    /// Sources get clones of this as their sink, and `publish` sends into it.
+    tx: Sender<Event>,
+    subscribers: Arc<Mutex<Vec<Sender<Fired>>>>,
+    cool_down: Arc<Mutex<CoolDown>>,
+    stop: Arc<AtomicBool>,
+    /// `None` only if the operating system refused to start the thread.
+    thread: Option<JoinHandle<()>>,
 }
 
 /// One source as the frontend sees it.
@@ -43,9 +61,40 @@ pub enum RuleState {
     SourceFailed { reason: String },
 }
 
+/// A poisoned lock only means another thread panicked; the data is still fine.
+fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
+    m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 impl Hub {
     pub fn new(sources: Vec<Box<dyn Source>>) -> Hub {
-        Hub { sources }
+        let (tx, rx) = channel();
+        let subscribers = Arc::new(Mutex::new(Vec::new()));
+        let cool_down = Arc::new(Mutex::new(CoolDown::new(DEFAULT_COOL_DOWN)));
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread = {
+            let subscribers = Arc::clone(&subscribers);
+            let cool_down = Arc::clone(&cool_down);
+            let stop = Arc::clone(&stop);
+            std::thread::Builder::new()
+                .name("trigger-hub".to_string())
+                .spawn(move || drain(rx, subscribers, cool_down, stop))
+                .ok()
+        };
+        Hub {
+            sources,
+            tx,
+            subscribers,
+            cool_down,
+            stop,
+            thread,
+        }
+    }
+
+    /// Replaces the default two second cool down per rule.
+    pub fn with_cool_down(self, d: Duration) -> Hub {
+        lock(&self.cool_down).set_window(d);
+        self
     }
 
     /// Every source with its kinds and whether it can run here.
@@ -58,5 +107,50 @@ impl Hub {
                 availability: s.availability(),
             })
             .collect()
+    }
+
+    /// Sends an event into the same channel the sources use, so it goes through
+    /// the cool down like any other. For triggers that come from inside the app.
+    pub fn publish(&self, event: Event) {
+        let _ = self.tx.send(event);
+    }
+
+    /// A new receiver of every `Fired` from now on. Drop it to unsubscribe.
+    pub fn subscribe(&self) -> Receiver<Fired> {
+        let (tx, rx) = channel();
+        lock(&self.subscribers).push(tx);
+        rx
+    }
+}
+
+impl Drop for Hub {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+/// The body of the `trigger-hub` thread.
+fn drain(
+    rx: Receiver<Event>,
+    subscribers: Arc<Mutex<Vec<Sender<Fired>>>>,
+    cool_down: Arc<Mutex<CoolDown>>,
+    stop: Arc<AtomicBool>,
+) {
+    while !stop.load(Ordering::SeqCst) {
+        match rx.recv_timeout(POLL) {
+            Ok(event) => {
+                let admitted = lock(&cool_down).admit(&event.rule, event.at);
+                if let Some(coalesced) = admitted {
+                    let fired = Fired { event, coalesced };
+                    // A subscriber whose receiver was dropped fails to send and is removed.
+                    lock(&subscribers).retain(|s| s.send(fired.clone()).is_ok());
+                }
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => break,
+        }
     }
 }
