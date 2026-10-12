@@ -2,7 +2,7 @@
 id: T04
 epic: 003-trigger-git
 title: Add RepoSnapshot and Change to logic.rs
-status: todo
+status: done
 depends_on: [T03]
 size: M
 model: haiku
@@ -250,3 +250,5 @@ Note on `check-crates.mjs`: `check-crates.mjs` prints warnings, not errors, abou
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
