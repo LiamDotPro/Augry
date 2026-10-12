@@ -205,4 +205,6 @@ fn run(
 #[cfg(test)]
 mod fakes;
 #[cfg(test)]
+mod kill_tests;
+#[cfg(test)]
 mod tests;
