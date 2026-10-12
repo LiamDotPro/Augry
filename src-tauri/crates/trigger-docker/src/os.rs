@@ -2,9 +2,6 @@
 //! binary, asking it whether it is up, and running its event stream. The
 //! decisions about events are all in `logic.rs`.
 
-// Removed when lib.rs uses everything in this file (slice C).
-#![allow(dead_code)]
-
 use std::ffi::OsString;
 use std::io::{self, BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};

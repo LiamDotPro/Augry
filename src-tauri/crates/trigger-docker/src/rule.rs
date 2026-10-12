@@ -1,8 +1,5 @@
 //! The `when` object of a rule, typed, with its globs compiled. Pure.
 
-// Removed when lib.rs reads everything in this file.
-#![allow(dead_code)]
-
 use globset::{GlobBuilder, GlobMatcher};
 use serde::Deserialize;
 use trigger_core::{Rule, RuleError};

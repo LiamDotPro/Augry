@@ -10,8 +10,12 @@ mod plan;
 mod rule;
 mod supervisor;
 
+use std::sync::Arc;
+use std::time::SystemTime;
+
+use supervisor::{real_pause, Emit, Supervisor};
 use trigger_core::{
-    Availability, FieldInfo, Handle, KindInfo, Platforms, Rule, RuleError, Sink, Source,
+    Availability, Event, FieldInfo, Handle, KindInfo, Platforms, Rule, RuleError, Sink, Source,
     SourceError,
 };
 
@@ -149,7 +153,7 @@ impl Source for DockerSource {
     }
 
     fn start(&self, rules: Vec<Rule>, sink: Sink) -> Result<Handle, SourceError> {
-        let _armed = rules
+        let armed = rules
             .iter()
             .map(|r| {
                 rule::parse(r).map(|when| logic::Armed {
@@ -160,9 +164,66 @@ impl Source for DockerSource {
             })
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| SourceError::Os(e.to_string()))?;
-        // The engine child process and the thread are added by the glue card
-        // in slice C.
-        let _ = sink;
-        Err(SourceError::Unavailable("not implemented yet".into()))
+        // Asks each engine to answer `version`, which can take five seconds.
+        let groups = plan::plan(armed, &os::probe).map_err(SourceError::Unavailable)?;
+        let emit: Emit = Arc::new(move |rule, kind, payload| {
+            let event = Event {
+                rule,
+                kind,
+                at: SystemTime::now(),
+                payload,
+            };
+            // The receiver is gone while the app shuts down.
+            let _ = sink.send(event);
+        });
+        let mut running = Vec::new();
+        for group in groups {
+            let engine = group.engine;
+            let process = Arc::new(os::RealEngine::new(engine, group.path));
+            let supervisor =
+                Supervisor::start(process, group.rules, emit.clone(), Arc::new(real_pause))
+                    .map_err(|e| {
+                        SourceError::Os(format!(
+                            "could not start the {} reader: {e}",
+                            engine.as_str()
+                        ))
+                    })?;
+            running.push(supervisor);
+        }
+        // Dropping the handle stops every supervisor, which kills its child.
+        Ok(Handle::new(move || {
+            for supervisor in running {
+                supervisor.stop();
+            }
+        }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::sync::mpsc::channel;
+    use trigger_core::testkit::rule;
+
+    #[test]
+    fn every_kind_belongs_to_the_docker_source() {
+        assert!(KINDS.iter().all(|k| k.id.starts_with("docker.")));
+        assert_eq!(DockerSource.id(), "docker");
+    }
+
+    #[test]
+    fn start_with_no_rules_runs_nothing_and_stops_cleanly() {
+        let (tx, _rx) = channel();
+        let handle = DockerSource.start(Vec::new(), tx).unwrap();
+        drop(handle);
+    }
+
+    #[test]
+    fn start_rejects_a_rule_of_another_source() {
+        let (tx, _rx) = channel();
+        let other = rule("p/t", "fs.file-saved", json!({}));
+        let err = DockerSource.start(vec![other], tx).err().unwrap();
+        assert!(matches!(err, SourceError::Os(_)));
     }
 }

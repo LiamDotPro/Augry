@@ -2,9 +2,6 @@
 //! what payload. No child processes, no threads, no clocks: every case is a
 //! unit test.
 
-// Removed when lib.rs reads everything in this file.
-#![allow(dead_code)]
-
 use std::collections::BTreeMap;
 
 use serde_json::Map;

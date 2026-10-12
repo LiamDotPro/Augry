@@ -1,9 +1,6 @@
 //! Keeps one engine child process running and feeds its lines to the rules.
 //! The child is behind `EngineProcess`, so tests use fakes. Pure of the OS.
 
-// Removed when lib.rs reads everything in this file (slice C).
-#![allow(dead_code)]
-
 use std::io;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;

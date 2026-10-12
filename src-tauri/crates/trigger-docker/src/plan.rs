@@ -1,9 +1,6 @@
 //! Decides which engine runs which rules. Pure: the check that an engine
 //! answers is passed in, so every case is a unit test.
 
-// Removed when lib.rs reads everything in this file (slice C).
-#![allow(dead_code)]
-
 use std::path::PathBuf;
 
 use crate::logic::{Armed, Engine};
