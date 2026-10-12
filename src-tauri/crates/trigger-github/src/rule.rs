@@ -29,6 +29,30 @@ pub struct When {
     pub author: Vec<String>,
 }
 
+/// The app fills this in from the pane's origin before the rule starts; the
+/// editor's `check` sees it unresolved, so it is accepted as it is.
+const REPO_VARIABLE: &str = "${repo.remote}";
+
+/// `owner/name`. The text goes straight into a request path, so only the
+/// characters GitHub allows in names are let through.
+fn check_repo(repo: &str) -> Result<(), String> {
+    if repo == REPO_VARIABLE {
+        return Ok(());
+    }
+    let valid = |part: &str| {
+        !part.is_empty()
+            && part != "."
+            && part != ".."
+            && part
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    };
+    match repo.split_once('/') {
+        Some((owner, name)) if valid(owner) && valid(name) => Ok(()),
+        _ => Err("must look like owner/name, such as cli/cli".into()),
+    }
+}
+
 /// A parsed rule: the typed fields plus anything compiled from them.
 #[derive(Debug, Clone)]
 pub struct Parsed {
@@ -45,6 +69,10 @@ pub fn parse(rule: &Rule) -> Result<Parsed, RuleError> {
     let when: When = serde_json::from_value(value).map_err(|e| RuleError::Field {
         field: "when".into(),
         problem: e.to_string(),
+    })?;
+    check_repo(&when.repo).map_err(|problem| RuleError::Field {
+        field: "repo".into(),
+        problem,
     })?;
     Ok(Parsed { when })
 }
@@ -115,5 +143,33 @@ mod tests {
         assert_eq!(field_of(missing.unwrap_err()), "when");
         let other = parse(&rule("p/t", "fs.file-saved", json!({ "repo": "a/b" })));
         assert!(matches!(other, Err(RuleError::UnknownKind(_))));
+    }
+
+    #[test]
+    fn repo_must_look_like_owner_slash_name() {
+        for good in ["cli/cli", "my-org/my_repo.js", "a/b", "${repo.remote}"] {
+            assert!(
+                parsed(json!({ "repo": good })).is_ok(),
+                "{good} should pass"
+            );
+        }
+        for bad in [
+            "",
+            "cli",
+            "cli/",
+            "/cli",
+            "a/b/c",
+            "a b/c",
+            "a/b?x=1",
+            "a/../b",
+            "../b",
+            "a/b\n",
+            "https://github.com/cli/cli",
+            "${repo.root}",
+            "${repo.remote}/x",
+        ] {
+            let err = parsed(json!({ "repo": bad })).unwrap_err();
+            assert_eq!(field_of(err), "repo", "{bad:?} should be rejected");
+        }
     }
 }

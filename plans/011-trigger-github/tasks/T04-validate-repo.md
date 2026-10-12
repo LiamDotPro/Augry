@@ -2,7 +2,7 @@
 id: T04
 epic: 011-trigger-github
 title: Validate that when.repo looks like owner/name
-status: todo
+status: done
 depends_on: [T03]
 size: S
 model: haiku
@@ -227,3 +227,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
