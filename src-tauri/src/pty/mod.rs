@@ -1,5 +1,6 @@
 //! Terminal sessions. See docs/technical-design.md section 4.
 
+pub mod marks;
 pub mod reader;
 pub mod shell;
 
