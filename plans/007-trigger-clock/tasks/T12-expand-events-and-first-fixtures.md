@@ -2,7 +2,7 @@
 id: T12
 epic: 007-trigger-clock
 title: Expand calendar events with calcard, with the first four fixtures
-status: todo
+status: done
 depends_on: [T11]
 size: M
 model: haiku
@@ -389,3 +389,5 @@ fn the_window_keeps_events_that_overlap_it_and_drops_the_rest() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

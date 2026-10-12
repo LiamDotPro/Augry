@@ -4,6 +4,14 @@
 //! design, and the two calcard traps worked around here, are in
 //! `plans/007-trigger-clock/research/R02-ics-and-http.md`.
 
+use std::time::SystemTime;
+
+use calcard::common::timezone::Tz as CalTz;
+use calcard::icalendar::dates::TimeOrDelta;
+use calcard::icalendar::{ICalendar, ICalendarProperty, ICalendarValue};
+
+use crate::logic::Occurrence;
+
 /// What a fetch returned.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Fetched {
@@ -168,5 +176,69 @@ pub fn split_by_uid(text: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+/// Most occurrences expanded from one UID. calcard applies its limit across
+/// everything it is given, so one endless series would use it all up; each UID
+/// is expanded on its own instead.
+pub const LIMIT_PER_UID: usize = 20_000;
+
+/// The result of expanding a feed.
+#[derive(Debug, Default, PartialEq)]
+pub struct Expansion {
+    /// Sorted by start, then UID.
+    pub occurrences: Vec<Occurrence>,
+    /// Events that could not be read, described without their content.
+    pub problems: Vec<String>,
+}
+
+fn title_of(ical: &ICalendar, comp_id: u32) -> String {
+    ical.components
+        .get(comp_id as usize)
+        .and_then(|c| c.property(&ICalendarProperty::Summary))
+        .and_then(|e| e.values.first())
+        .and_then(ICalendarValue::as_text)
+        .unwrap_or_default()
+        .to_string()
+}
+
+/// Every occurrence of every event in `text` that overlaps `from` to `to`
+/// (both ends included), sorted by start. `tz` is the zone for times written
+/// without one; pass `CalTz::Floating` when the local zone is unknown.
+pub fn expand(text: &str, tz: CalTz, from: SystemTime, to: SystemTime) -> Expansion {
+    let mut out = Expansion::default();
+    for (n, (uid, part)) in split_by_uid(&normalise(text)).into_iter().enumerate() {
+        let Ok(ical) = ICalendar::parse(part) else {
+            out.problems.push(format!("event {n} could not be parsed"));
+            continue;
+        };
+        let expanded = ical.expand_dates(tz, LIMIT_PER_UID);
+        if !expanded.errors.is_empty() {
+            out.problems.push(format!(
+                "event {n} had {} expansion errors",
+                expanded.errors.len()
+            ));
+        }
+        for event in expanded.events {
+            let start = SystemTime::from(event.start);
+            let end = match event.end {
+                TimeOrDelta::Time(t) => SystemTime::from(t),
+                TimeOrDelta::Delta(d) => SystemTime::from(event.start + d),
+            };
+            if start <= to && end >= from {
+                out.occurrences.push(Occurrence {
+                    uid: uid.clone(),
+                    title: title_of(&ical, event.comp_id),
+                    start,
+                    end,
+                });
+            }
+        }
+    }
+    out.occurrences
+        .sort_by(|a, b| a.start.cmp(&b.start).then_with(|| a.uid.cmp(&b.uid)));
+    out
+}
+
+#[cfg(test)]
+mod fixture_tests;
 #[cfg(test)]
 mod tests;
