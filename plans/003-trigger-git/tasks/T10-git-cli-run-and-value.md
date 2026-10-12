@@ -2,7 +2,7 @@
 id: T10
 epic: 003-trigger-git
 title: Add git.rs with run and value
-status: todo
+status: done
 depends_on: [T09]
 size: M
 model: haiku
@@ -373,3 +373,5 @@ Note on `check-crates.mjs`: it prints warnings, not errors, about template text.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (47 lib tests, 8 git:: tests, clippy and fmt clean, check-crates 0 errors; git 2.50.1 present so no skips)
+- 2026-10-12 checker: pass

@@ -4,6 +4,7 @@
 //! thread that feeds OS signals through the pure logic into the sink. Rules
 //! live in `rule.rs`, decisions in `logic.rs`, the OS in `os.rs`.
 
+mod git;
 mod logic;
 mod os;
 mod rule;
