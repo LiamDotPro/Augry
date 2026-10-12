@@ -2,6 +2,10 @@
 //! command failed, a worktree created). Built up over several cards; the
 //! finished module doc and `README.md` come with the last ones.
 
+mod kinds;
+
+pub use kinds::KINDS;
+
 /// Something the app saw. The feeds build one and hand it to
 /// `TriggerService::publish_internal`.
 #[derive(Debug, Clone, PartialEq)]

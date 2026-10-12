@@ -2,7 +2,7 @@
 id: T02
 epic: 002-trigger-internal
 title: Add the thirteen tg kinds
-status: todo
+status: done
 depends_on: [T01]
 size: M
 model: haiku
@@ -414,3 +414,5 @@ pub use kinds::KINDS;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7, after 7)
+- 2026-10-12 checker: pass
