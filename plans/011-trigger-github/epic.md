@@ -1,7 +1,7 @@
 ---
 id: 011-trigger-github
 title: trigger-github
-status: carding
+status: building
 depends_on: [001-trigger-core]
 ---
 
