@@ -2,6 +2,8 @@
 //! noisy rules and passes fired events to subscribers. See
 //! docs/process-triggers.md Part 2.
 
+pub mod cool_down;
+
 use trigger_core::{Availability, Event, KindInfo, Source};
 
 #[cfg(test)]
