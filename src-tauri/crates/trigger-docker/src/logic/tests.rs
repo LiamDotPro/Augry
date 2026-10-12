@@ -202,3 +202,102 @@ fn a_tag_on_a_container_is_not_an_image_built() {
     let line = DOCKER_IMAGE_TAG.replace(r#""Type":"image""#, r#""Type":"container""#);
     assert_eq!(parse_line(&line), None);
 }
+
+// The Podman fixtures are synthetic: see the note in fixtures.rs.
+
+const PODMAN_ID: &str = "b2b0cf48d0c03b1e222b1270f8519ef55058954383be0ea0be1251e10ee22244";
+
+#[test]
+fn podman_start() {
+    let e = parse_line(PODMAN_START).unwrap();
+    assert_eq!(
+        e,
+        EngineEvent {
+            engine: Engine::Podman,
+            kind: EventKind::Started,
+            id: PODMAN_ID.into(),
+            name: "r01c".into(),
+            image: "docker.io/library/alpine:3".into(),
+            labels: labels(&[("com.example.k", "v")]),
+            exit_code: None,
+            time_ms: 1_791_799_200_123,
+        }
+    );
+}
+
+#[test]
+fn podman_died_is_stopped_with_a_numeric_exit_code() {
+    let e = parse_line(PODMAN_DIED_3).unwrap();
+    assert_eq!(e.engine, Engine::Podman);
+    assert_eq!(e.kind, EventKind::Stopped);
+    assert_eq!(e.exit_code, Some(3));
+    assert_eq!(parse_line(PODMAN_DIED_137).unwrap().exit_code, Some(137));
+}
+
+#[test]
+fn podman_died_without_an_exit_code_is_still_stopped() {
+    let line = PODMAN_DIED_3.replace(r#""ContainerExitCode":3,"#, "");
+    let e = parse_line(&line).unwrap();
+    assert_eq!(e.kind, EventKind::Stopped);
+    assert_eq!(e.exit_code, None);
+}
+
+#[test]
+fn podman_health_verdict_comes_from_the_top_level_field() {
+    assert_eq!(parse_line(PODMAN_HEALTHY).unwrap().kind, EventKind::Healthy);
+    assert_eq!(
+        parse_line(PODMAN_UNHEALTHY).unwrap().kind,
+        EventKind::Unhealthy
+    );
+    let starting = PODMAN_HEALTHY.replace(
+        r#""health_status":"healthy""#,
+        r#""health_status":"starting""#,
+    );
+    assert_eq!(parse_line(&starting), None);
+    let none = PODMAN_HEALTHY.replace(r#""health_status":"healthy","#, "");
+    assert_eq!(parse_line(&none), None);
+}
+
+#[test]
+fn podman_build_is_image_built_with_null_attributes() {
+    let e = parse_line(PODMAN_BUILD).unwrap();
+    assert_eq!(
+        e,
+        EngineEvent {
+            engine: Engine::Podman,
+            kind: EventKind::ImageBuilt,
+            id: String::new(),
+            name: "localhost/r01test:1".into(),
+            image: "localhost/r01test:1".into(),
+            labels: BTreeMap::new(),
+            exit_code: None,
+            time_ms: 1_791_799_200_123,
+        }
+    );
+}
+
+#[test]
+fn podman_noise_gives_none() {
+    for (what, line) in [
+        ("stop", PODMAN_STOP),
+        ("create", PODMAN_CREATE),
+        ("image pull", PODMAN_IMAGE_PULL),
+    ] {
+        assert_eq!(parse_line(line), None, "{what} must be ignored");
+    }
+}
+
+#[test]
+fn each_engine_only_builds_on_its_own_image_event() {
+    // Docker's `tag` shape with Podman's `build` word, and the reverse.
+    let docker_build = DOCKER_IMAGE_TAG.replace(r#""Action":"tag""#, r#""Action":"build""#);
+    assert_eq!(parse_line(&docker_build), None);
+    let podman_tag = PODMAN_BUILD.replace(r#""Status":"build""#, r#""Status":"tag""#);
+    assert_eq!(parse_line(&podman_tag), None);
+}
+
+#[test]
+fn the_shape_not_the_caller_decides_the_engine() {
+    assert_eq!(parse_line(DOCKER_START).unwrap().engine, Engine::Docker);
+    assert_eq!(parse_line(PODMAN_START).unwrap().engine, Engine::Podman);
+}

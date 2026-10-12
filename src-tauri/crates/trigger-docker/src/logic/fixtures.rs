@@ -58,3 +58,35 @@ pub const DOCKER_IMAGE_PULL: &str = r#"{"Type":"image","Action":"pull","Actor":{
 
 /// Hand made. Must be ignored.
 pub const DOCKER_IMAGE_UNTAG: &str = r#"{"Type":"image","Action":"untag","Actor":{"ID":"sha256:d760162063cb2959aa76446b17be2d95caa8289dd13aca56a65e12ec54eafa9f","Attributes":{"name":"sha256:d760162063cb2959aa76446b17be2d95caa8289dd13aca56a65e12ec54eafa9f"}},"scope":"local","time":1791837900,"timeNano":1791837900000000000}"#;
+
+// Podman lines. SYNTHETIC: R01 had no Podman to capture from. They were made by
+// marshalling Podman v5.6.0's own event struct, so key names and order are
+// right for v5, but they are not captured from a running Podman. Replace them
+// with a capture when a machine with Podman is available.
+
+/// Synthetic.
+pub const PODMAN_START: &str = r#"{"ID":"b2b0cf48d0c03b1e222b1270f8519ef55058954383be0ea0be1251e10ee22244","Image":"docker.io/library/alpine:3","Name":"r01c","Status":"start","time":1791799200,"timeNano":1791799200123456789,"Type":"container","Attributes":{"com.example.k":"v"}}"#;
+
+/// Synthetic.
+pub const PODMAN_DIED_3: &str = r#"{"ContainerExitCode":3,"ID":"b2b0cf48d0c03b1e222b1270f8519ef55058954383be0ea0be1251e10ee22244","Image":"docker.io/library/alpine:3","Name":"r01c","Status":"died","time":1791799200,"timeNano":1791799200123456789,"Type":"container","Attributes":{"com.example.k":"v"}}"#;
+
+/// Synthetic.
+pub const PODMAN_DIED_137: &str = r#"{"ContainerExitCode":137,"ID":"b2b0cf48d0c03b1e222b1270f8519ef55058954383be0ea0be1251e10ee22244","Image":"docker.io/library/alpine:3","Name":"r01c","Status":"died","time":1791799200,"timeNano":1791799200123456789,"Type":"container","Attributes":{"com.example.k":"v"}}"#;
+
+/// Synthetic. Must be ignored.
+pub const PODMAN_STOP: &str = r#"{"ID":"b2b0cf48d0c03b1e222b1270f8519ef55058954383be0ea0be1251e10ee22244","Image":"docker.io/library/alpine:3","Name":"r01c","Status":"stop","time":1791799200,"timeNano":1791799200123456789,"Type":"container","Attributes":{"com.example.k":"v"}}"#;
+
+/// Synthetic.
+pub const PODMAN_HEALTHY: &str = r#"{"ID":"b2b0cf48d0c03b1e222b1270f8519ef55058954383be0ea0be1251e10ee22244","Image":"docker.io/library/alpine:3","Name":"r01c","Status":"health_status","time":1791799200,"timeNano":1791799200123456789,"Type":"container","health_status":"healthy","Attributes":{"com.example.k":"v"}}"#;
+
+/// Synthetic.
+pub const PODMAN_UNHEALTHY: &str = r#"{"ID":"b2b0cf48d0c03b1e222b1270f8519ef55058954383be0ea0be1251e10ee22244","Image":"docker.io/library/alpine:3","Name":"r01c","Status":"health_status","time":1791799200,"timeNano":1791799200123456789,"Type":"container","health_status":"unhealthy","Attributes":{"com.example.k":"v"}}"#;
+
+/// Synthetic. Podman's image build event: no id, `Attributes` is null.
+pub const PODMAN_BUILD: &str = r#"{"Name":"localhost/r01test:1","Status":"build","time":1791799200,"timeNano":1791799200123456789,"Type":"image","Attributes":null}"#;
+
+/// Hand made. Must be ignored.
+pub const PODMAN_CREATE: &str = r#"{"ID":"b2b0cf48d0c03b1e222b1270f8519ef55058954383be0ea0be1251e10ee22244","Image":"docker.io/library/alpine:3","Name":"r01c","Status":"create","time":1791799200,"timeNano":1791799200123456789,"Type":"container","Attributes":{"com.example.k":"v"}}"#;
+
+/// Hand made. Must be ignored: a pulled image is not a built one.
+pub const PODMAN_IMAGE_PULL: &str = r#"{"ID":"sha256:d760162063cb2959aa76446b17be2d95caa8289dd13aca56a65e12ec54eafa9f","Name":"docker.io/library/alpine:3","Status":"pull","time":1791799200,"timeNano":1791799200123456789,"Type":"image","Attributes":null}"#;

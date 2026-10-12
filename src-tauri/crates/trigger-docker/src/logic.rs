@@ -162,9 +162,32 @@ fn raw_docker(obj: &Map<String, Value>) -> Option<Raw> {
     })
 }
 
-/// Filled in by the Podman card.
-fn raw_podman(_obj: &Map<String, Value>) -> Option<Raw> {
-    None
+/// Podman prints a flat object: the container is at the top level and only the
+/// labels are under `Attributes`, which is `null` for some events.
+fn raw_podman(obj: &Map<String, Value>) -> Option<Raw> {
+    let status = obj.get("Status")?.as_str()?.trim();
+    let action = if status == "died" { "die" } else { status };
+    let labels = obj
+        .get("Attributes")
+        .and_then(Value::as_object)
+        .map(|a| {
+            a.iter()
+                .filter_map(|(k, v)| v.as_str().map(|v| (k.clone(), v.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(Raw {
+        engine: Engine::Podman,
+        kind_type: text(obj.get("Type")),
+        action: action.to_string(),
+        detail: text(obj.get("health_status")).trim().to_string(),
+        id: text(obj.get("ID")),
+        name: text(obj.get("Name")),
+        image: text(obj.get("Image")),
+        labels,
+        exit_code: number(obj.get("ContainerExitCode")).and_then(|n| i32::try_from(n).ok()),
+        time_ms: time_ms(obj),
+    })
 }
 
 fn map_kind(raw: &Raw) -> Option<EventKind> {
@@ -172,6 +195,7 @@ fn map_kind(raw: &Raw) -> Option<EventKind> {
         ("container", "start") => Some(EventKind::Started),
         ("container", "die") => Some(EventKind::Stopped),
         ("image", "tag") if raw.engine == Engine::Docker => Some(EventKind::ImageBuilt),
+        ("image", "build") if raw.engine == Engine::Podman => Some(EventKind::ImageBuilt),
         ("container", "health_status") => match raw.detail.as_str() {
             "healthy" => Some(EventKind::Healthy),
             "unhealthy" => Some(EventKind::Unhealthy),
