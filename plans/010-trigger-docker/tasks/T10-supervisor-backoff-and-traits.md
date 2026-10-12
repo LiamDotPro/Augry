@@ -2,7 +2,7 @@
 id: T10
 epic: 010-trigger-docker
 title: Add the supervisor backoff and process traits
-status: todo
+status: done
 depends_on: [T08]
 size: S
 model: haiku
@@ -135,3 +135,5 @@ fn backoff_stops_at_sixty_seconds() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
