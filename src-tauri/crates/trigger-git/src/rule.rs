@@ -1,8 +1,5 @@
 //! The `when` object of a rule, typed, with the branch glob compiled. Pure.
 
-// Removed when lib.rs reads everything in this file.
-#![allow(dead_code)]
-
 use std::path::PathBuf;
 
 use globset::{GlobBuilder, GlobMatcher};

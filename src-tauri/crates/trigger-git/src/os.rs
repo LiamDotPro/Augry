@@ -2,9 +2,6 @@
 //! them matter, the `notify` watcher and the folder scan. The design is
 //! Decision 6 of plans/003-trigger-git/epic.md and research note R01.
 
-// Removed when lib.rs reads everything in this file.
-#![allow(dead_code)]
-
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 

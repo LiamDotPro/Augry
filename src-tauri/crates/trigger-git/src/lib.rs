@@ -10,6 +10,11 @@ mod os;
 mod rule;
 mod worker;
 
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::sync::mpsc;
+use std::time::Instant;
+
 use trigger_core::{
     Availability, FieldInfo, Handle, KindInfo, Platforms, Rule, RuleError, Sink, Source,
     SourceError,
@@ -224,11 +229,65 @@ impl Source for GitSource {
     }
 
     fn start(&self, rules: Vec<Rule>, sink: Sink) -> Result<Handle, SourceError> {
-        for r in &rules {
-            rule::parse(r).map_err(|e| SourceError::Os(e.to_string()))?;
-        }
-        // The watcher and the thread are added by the glue card (slice C).
-        let _ = sink;
-        Err(SourceError::Unavailable("not implemented yet".into()))
+        start_rules(rules, sink)
     }
 }
+
+/// Groups the rules by repository, takes a baseline snapshot of each, starts
+/// one file watcher per repository and then the `trigger-git` thread that
+/// owns them. Everything that can fail runs here, before the thread, so the
+/// hub hears about it from `start`.
+fn start_rules(rules: Vec<Rule>, sink: Sink) -> Result<Handle, SourceError> {
+    let now = Instant::now();
+    let mut by_repo: BTreeMap<PathBuf, Vec<worker::Entry>> = BTreeMap::new();
+    let mut folders = Vec::new();
+    for r in &rules {
+        let parsed = rule::parse(r).map_err(|e| SourceError::Os(format!("{}: {e}", r.id)))?;
+        if let Some(folder) = parsed.when.folder.clone() {
+            let interval_s = parsed.when.interval_s;
+            let list = os::scan_folder;
+            folders.push(worker::FolderSlot::new(
+                r.id.clone(),
+                folder,
+                interval_s,
+                now,
+                list,
+            ));
+        } else if let Some(repo) = parsed.when.repo.clone() {
+            let entry = worker::Entry::new(r.id.clone(), r.kind.clone(), parsed, now);
+            by_repo.entry(repo).or_default().push(entry);
+        }
+    }
+    if by_repo.is_empty() && folders.is_empty() {
+        return Ok(Handle::new(|| {}));
+    }
+
+    let (tx, rx) = mpsc::channel::<worker::Msg>();
+    let mut slots = Vec::new();
+    let mut keep: Vec<Box<dyn Send>> = Vec::new();
+    for (index, (repo, entries)) in by_repo.into_iter().enumerate() {
+        let dirs = os::GitDirs::resolve(&repo)
+            .map_err(|e| SourceError::Os(format!("{}: {e}", repo.display())))?;
+        let ping = tx.clone();
+        let watch = os::RepoWatch::start(&dirs, move || {
+            let _ = ping.send(worker::Msg::Changed(index));
+        })
+        .map_err(|e| SourceError::Os(format!("{}: {e}", repo.display())))?;
+        keep.push(Box::new(watch));
+        let locked = dirs.clone();
+        slots.push(worker::RepoSlot::new(
+            repo.to_string_lossy().into_owned(),
+            Box::new(git::GitRepo::new(&repo)),
+            Box::new(move || locked.lock_held()),
+            entries,
+        ));
+    }
+
+    worker::spawn(slots, folders, keep, rx, sink).map_err(|e| SourceError::Os(e.to_string()))?;
+    Ok(Handle::new(move || {
+        let _ = tx.send(worker::Msg::Stop);
+    }))
+}
+
+#[cfg(test)]
+mod tests;

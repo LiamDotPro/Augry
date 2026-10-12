@@ -63,13 +63,13 @@ ids and numbers only. Never file contents or secrets, never more than 4 KiB.
 
 | Platform | How it is detected | Limits |
 |---|---|---|
-| macOS | | |
-| Windows | | |
-| Linux | | |
+| macOS | FSEvents through `notify`, on the repository's git folders only. Then the `git` command line | git comes from the PATH, then `/opt/homebrew/bin/git`, then `/usr/local/bin/git`. The live tests pass here |
+| Windows | `ReadDirectoryChangesW` through `notify`. Then the `git` command line, run with no console window | git must be on the PATH (Git for Windows puts it there). The live tests have not been run on Windows yet |
+| Linux | inotify through `notify`. Then the `git` command line | Each watched repository uses a few inotify watches (the git folder and every folder under `refs/`). The live tests have not been run on Linux yet |
 
 ## Permissions
 
-What the OS asks the user for, and when. "None" is a fine answer.
+None. The crate reads the repository folders named in the rules and runs the `git` command line; it asks the OS for no permission. macOS may ask the user once before an app reads a repository inside Documents, Desktop or Downloads. That prompt belongs to the OS, not to this crate.
 
 ## Example
 
@@ -81,14 +81,16 @@ What the OS asks the user for, and when. "None" is a fine answer.
 
 | File | What it holds |
 |---|---|
-| `src/lib.rs` | `KINDS`, `GitSource` and the thread that joins the OS layer to the logic. Glue only |
+| `src/lib.rs` | `KINDS`, `GitSource` and `start_rules`: parses the rules, groups them by repository, takes each baseline snapshot, starts the file watchers and the `trigger-git` thread. Glue only |
 | `src/rule.rs` | The typed `When` and `parse`. Pure, unit tested |
-| `src/logic.rs` | Pure: which rules a `Signal` fires, with what payload, and any debounce state. Unit tested |
+| `src/logic.rs` | Pure: `RepoSnapshot`, `Change`, `step` and `observe` (which changes two snapshots show) and the event payloads. Unit tested in `src/logic/tests.rs` |
 | `src/git.rs` | The git command line, std only: `run` (timeout, no console window on Windows, a fallback to the Homebrew paths on macOS) and `value`. A copy of the app's pattern, since a trigger crate cannot depend on the app |
 | `src/git/repo.rs` | `GitRepo`, the real `Repo`: builds a `RepoSnapshot` from read only git commands, counts commits behind the upstream, finds the age of the oldest uncommitted change |
 | `src/logic/repo.rs` | The `Repo` trait: what the glue asks about a repository. `src/logic/fake.rs` is the fake used in tests |
 | `src/logic/polled.rs` | Pure transitions for the polled kinds: `BehindWatch`, `UncommittedWatch`, `CloneScan`, and their payloads |
-| `src/os.rs` | The only file that talks to the OS: `availability()` and `listen()`, per platform behind `cfg` |
+| `src/logic/settle.rs` | Pure: `Settle`, the 300 ms quiet time before a snapshot, with up to 10 retries while `index.lock` or `HEAD.lock` exists |
+| `src/worker.rs` | The `trigger-git` thread: `run` sleeps until the next deadline or message, `spawn` starts it. `src/worker/repo.rs` holds `RepoSlot` (one repository: snapshot, diff, rule filter, polled kinds) and `src/worker/folder.rs` holds `FolderSlot` (one `git.repo-cloned` folder). Both are tested with a fake `Repo` and no threads |
+| `src/os.rs` | The only file besides `git.rs` that talks to the OS: `GitDirs` (where a repository keeps its files and which of them matter), `RepoWatch` (the `notify` watchers), `scan_folder` and `availability()` |
 | `tests/live.rs` | `#[ignore]` tests against the real OS |
 | `tests/readme.rs` | Fails when the Kinds table above is stale |
 
