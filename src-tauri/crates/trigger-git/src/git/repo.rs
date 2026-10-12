@@ -4,8 +4,10 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use super::{run, value, FETCH_TIMEOUT, TIMEOUT};
+use crate::logic::repo::Repo;
 use crate::logic::RepoSnapshot;
 
 /// A repository on disk, read by running git in its work tree.
@@ -44,6 +46,24 @@ impl GitRepo {
         self.value(&["rev-list", "--count", "HEAD..@{u}"])?
             .parse()
             .ok()
+    }
+
+    /// Age in seconds of the oldest modified tracked file, from the modified
+    /// times of the files `status` lists. Untracked files are left out, and so
+    /// is a deleted file, which has no modified time to read.
+    fn read_oldest_change_secs(&self) -> Option<u64> {
+        let text = self.value(&["status", "--porcelain=v2", "-z", "--untracked-files=no"])?;
+        let now = SystemTime::now();
+        changed_paths(&text)
+            .iter()
+            .filter_map(|path| {
+                let modified = std::fs::metadata(self.path.join(path))
+                    .ok()?
+                    .modified()
+                    .ok()?;
+                Some(age_secs(now, modified))
+            })
+            .max()
     }
 
     /// The sha in MERGE_HEAD (None unless a merge is in progress) and whether
@@ -132,6 +152,20 @@ impl GitRepo {
     }
 }
 
+impl Repo for GitRepo {
+    fn snapshot(&self) -> Result<RepoSnapshot, String> {
+        self.read_snapshot()
+    }
+
+    fn behind(&self, fetch: bool) -> Option<u32> {
+        self.read_behind(fetch)
+    }
+
+    fn oldest_change_secs(&self) -> Option<u64> {
+        self.read_oldest_change_secs()
+    }
+}
+
 /// Counts the `u` records of `status --porcelain=v2 -z`. A rename record (`2`)
 /// is followed by one more record holding the old path, which is skipped so a
 /// path that happens to start with `u ` is not counted.
@@ -146,6 +180,36 @@ pub(crate) fn count_unmerged(text: &str) -> u32 {
         }
     }
     count
+}
+
+/// The paths in `status --porcelain=v2 -z --untracked-files=no`. Each record
+/// starts with its type and then has a fixed number of space separated fields
+/// before the path: `1` ordinary (8 before the path), `2` renamed or copied
+/// (9, and the old path follows as the next record, which is skipped), `u`
+/// unmerged (10). The path itself may contain spaces.
+pub(crate) fn changed_paths(text: &str) -> Vec<String> {
+    let mut paths = Vec::new();
+    let mut records = text.split('\0');
+    while let Some(record) = records.next() {
+        let parts = match record.get(..2) {
+            Some("1 ") => 9,
+            Some("2 ") => {
+                records.next();
+                10
+            }
+            Some("u ") => 11,
+            _ => continue,
+        };
+        if let Some(path) = record.splitn(parts, ' ').nth(parts - 1) {
+            paths.push(path.to_string());
+        }
+    }
+    paths
+}
+
+/// Whole seconds from `then` to `now`; 0 when `then` is in the future.
+pub(crate) fn age_secs(now: SystemTime, then: SystemTime) -> u64 {
+    now.duration_since(then).map(|d| d.as_secs()).unwrap_or(0)
 }
 
 /// Splits the output of `log -1 --format=%h%x00%s` into the short sha and the

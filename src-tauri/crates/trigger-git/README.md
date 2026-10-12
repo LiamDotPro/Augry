@@ -84,6 +84,8 @@ What the OS asks the user for, and when. "None" is a fine answer.
 | `src/lib.rs` | `KINDS`, `GitSource` and the thread that joins the OS layer to the logic. Glue only |
 | `src/rule.rs` | The typed `When` and `parse`. Pure, unit tested |
 | `src/logic.rs` | Pure: which rules a `Signal` fires, with what payload, and any debounce state. Unit tested |
+| `src/git.rs` | The git command line, std only: `run` (timeout, no console window on Windows, a fallback to the Homebrew paths on macOS) and `value`. A copy of the app's pattern, since a trigger crate cannot depend on the app |
+| `src/git/repo.rs` | `GitRepo`, the real `Repo`: builds a `RepoSnapshot` from read only git commands, counts commits behind the upstream, finds the age of the oldest uncommitted change |
 | `src/os.rs` | The only file that talks to the OS: `availability()` and `listen()`, per platform behind `cfg` |
 | `tests/live.rs` | `#[ignore]` tests against the real OS |
 | `tests/readme.rs` | Fails when the Kinds table above is stale |
@@ -98,3 +100,9 @@ cargo clippy -p trigger-git --all-targets -- -D warnings
 ## Known limits
 
 What does not work, on which platform, and why.
+
+- git must be installed. On macOS, if `git` is not on the PATH, `/opt/homebrew/bin/git` and then `/usr/local/bin/git` are tried.
+- `repo` must be the root of the work tree, which is what `${repo.root}` gives.
+- Every git call has a 3 second limit (30 seconds for `git fetch`). A call that times out leaves its part of the snapshot empty.
+- Remote refs are not read, so a `git fetch` fires nothing. With `fetch: true` the fetch runs with `--no-tags`, so tags on the remote do not become local tags and do not fire `git.tag-created`. A fetch that fails (offline) is ignored and the count uses the remote refs already on disk.
+- `git.uncommitted-older-than` uses the modified time of each tracked file that `git status` lists. Untracked files and deleted files are not counted, and a file saved again looks younger.
