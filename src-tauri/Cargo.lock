@@ -4872,6 +4872,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "trigger-hub"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "trigger-core",
+]
+
+[[package]]
 name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
