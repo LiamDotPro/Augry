@@ -1,5 +1,6 @@
 import { cx } from "../../lib/cx";
 import { shortcutLabel } from "../../lib/hotkeys";
+import { NotesSyncProvider, useNotesSync } from "../../notesSync/NotesSyncProvider";
 import { useAppActions, useAppState, useHotkeyScheme } from "../../state/AppProvider";
 import { NoteEditor } from "./NoteEditor";
 import { NotePreview } from "./NotePreview";
@@ -9,16 +10,29 @@ import { NoteTree } from "./NoteTree";
  * Tree, editor and preview. The tree folds away to the left and the preview
  * to the right, each into a slim rail that brings it back; the editor in the
  * middle always stays and takes whatever width is freed.
+ *
+ * The tab is always mounted, so notes sync runs from here in the background
+ * whichever tab is showing.
  */
 export function NotesView() {
+  return (
+    <NotesSyncProvider>
+      <NotesPanels />
+    </NotesSyncProvider>
+  );
+}
+
+function NotesPanels() {
   const { notes } = useAppState();
   const actions = useAppActions();
   const scheme = useHotkeyScheme();
+  const sync = useNotesSync();
 
   return (
     <div
       className={cx(
         "notes",
+        sync.active && "notes--synced",
         notes.treeCollapsed && "notes--no-tree",
         notes.previewCollapsed && "notes--no-preview",
       )}
