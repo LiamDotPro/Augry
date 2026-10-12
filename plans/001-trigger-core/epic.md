@@ -1,7 +1,7 @@
 ---
 id: 001-trigger-core
 title: Trigger contract, hub, file watcher and app wiring
-status: draft
+status: carding
 depends_on: []
 ---
 
@@ -40,8 +40,13 @@ types there are the contract; this file writes them out in full.
 1. **Workspace.** `src-tauri/Cargo.toml` gains `[workspace] members =
    ["crates/*"]` and `[workspace.dependencies]` for `serde`, `serde_json`,
    `thiserror`, `notify`, `uuid` and the versions the lock file already has.
-   The app crate stays the workspace root package. CI and docs use `cargo test
-   --workspace`; whether `default-members` is also set follows R01.
+   The app crate stays the workspace root package. `default-members = [".",
+   "crates/*"]` is set too (R01), so a bare `cargo test` also covers every
+   crate, but CI, docs and every acceptance line say `cargo test --workspace`.
+   A glob member without a `Cargo.toml` breaks every cargo command, so the
+   card that adds the `[workspace]` block also creates `trigger-core` (R01).
+   The app's own dependency lines stay as they are; the app depends on the
+   crates by path only from slice D.
 2. **Three crates**, `publish = false`, edition 2021, under `src-tauri/crates/`:
    `trigger-core`, `trigger-hub`, `trigger-fs`. Lib names `trigger_core`,
    `trigger_hub`, `trigger_fs`. Each has a README with the kinds table.
@@ -54,18 +59,33 @@ types there are the contract; this file writes them out in full.
    renders `KINDS` as a markdown table. Each source crate has
    `tests/readme.rs` asserting its README contains that table between
    `<!-- kinds -->` and `<!-- /kinds -->`, and `examples/readme.rs` printing it.
-6. **`trigger-fs` uses `notify` 8** through `notify::recommended_watcher`, with
-   its own debounce and settle state machine in `logic.rs` (pure, tested).
-   No debouncer crate. Globs use `globset` at the version R02 finds. Default
-   ignores: `.git/`, `node_modules/`, `target/`, `.DS_Store`, and the partial
-   download suffixes `.crdownload`, `.part`, `.download`, `.tmp`.
+6. **`trigger-fs` uses `notify` 8.2** through `notify::recommended_watcher`
+   with `RecursiveMode::Recursive`, with its own settle state machine in
+   `logic.rs` (pure, tested; Decision 22). No debouncer crate. Globs use
+   `globset` 0.4.20, every pattern built with
+   `GlobBuilder::new(p).literal_separator(true).case_insensitive(true)`, and
+   matched against the path relative to the canonical `when.path` as a
+   `&Path` (globset turns `\` into `/` itself on Windows, R02). Default
+   ignores, exactly: `**/.git`, `**/.git/**`, `**/node_modules`,
+   `**/node_modules/**`, `**/target`, `**/target/**`, `**/.DS_Store`,
+   `**/*.crdownload`, `**/*.part`, `**/*.download`, `**/*.tmp`, `**/*~`,
+   `**/*.swp`, `**/*.swx`. User `ignore` globs are added to these. Ignores and
+   `glob` are applied when an observation is emitted, not when a raw event
+   comes in, so partial download names still reach the state machine.
+   `when.path` is canonicalised (`std::fs::canonicalize`) in `start` before
+   `watch()`, because macOS reports `/private/var/...` for `/var/...` and
+   Windows adds `\\?\` (R03); a path that cannot be canonicalised is a
+   `SourceError::Os`. Glob sets are compiled once per rule in `start`; a bad
+   user glob is a `RuleError` from `check`.
 7. **`trigger-fs` kinds** are exactly: `fs.file-saved`, `fs.file-created`,
    `fs.file-removed`, `fs.file-renamed`, `fs.download-finished`. The `when`
    fields: `path` (required, absolute after variables), `glob` (default
    `**/*`), `ignore` (list of globs, added to the defaults), `settle_ms`
    (default 500). Unknown fields are a `RuleError`.
-8. **Payload** of every `fs.*` event: `path`, `name`, `relative` (to
-   `when.path`), `ext`. `fs.file-renamed` adds `from`. Never file contents.
+8. **Payload** of every `fs.*` event: `path` (canonical, absolute), `name`,
+   `relative` (to the canonical `when.path`, with `/` separators), `ext`
+   (without the dot, empty string when none). `fs.file-renamed` adds `from`
+   (canonical, absolute). Never file contents.
 9. **No replay.** `trigger-fs` fires only for changes after `start`. A file
    that already exists is not "created".
 10. **Local definitions** live in `<app config dir>/processes/<id>.json`, the
@@ -83,6 +103,19 @@ types there are the contract; this file writes them out in full.
     which expands to one rule per distinct repository root among the open
     panes (`GitInfo.root`), with the rule id suffixed `#<n>`. A rule whose
     variable has no value on this machine is skipped with a reason.
+    `${screenshots}` follows R05 with no new dependency (`dirs` 7 and
+    `std::process::Command`): macOS reads `defaults read
+    com.apple.screencapture location` (expand a leading `~`, trim a trailing
+    `/`; unset or failed means `~/Desktop`); Windows reads `reg query` on
+    `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell
+    Folders` value `{B7BEDE81-DF94-4682-A7D8-57A52620B86F}` (expand `%VAR%`;
+    missing means `dirs::picture_dir()/Screenshots`); Linux uses
+    `dirs::picture_dir()/Screenshots` if it is a directory, else
+    `dirs::picture_dir()`. The result has a value only when it is an existing
+    directory; a configured macOS location that does not exist has no value
+    (no fall back to Desktop, since screenshots would not land there). The
+    string parsing (tilde, `reg` output, `%VAR%`) is in plain functions with
+    tests that run on every OS.
 13. **The service.** `src-tauri/src/triggers/mod.rs` has `TriggerService` in
     `AppState`, built with `sources()` which lists `trigger_fs::FsSource`
     behind the cargo feature `trigger-fs` (on by default). `refresh()`
@@ -106,9 +139,21 @@ types there are the contract; this file writes them out in full.
     same toast as errors in a neutral colour, auto dismissed after six seconds.
 17. **CI.** `ci.yml` runs, in `src-tauri`: `cargo fmt --check`, `cargo clippy
     -p trigger-core -p trigger-hub -p trigger-fs --all-targets -- -D warnings`,
-    `cargo test --workspace`, and the live tests `cargo test -p trigger-fs --
-    --ignored` on all three runners (R04 confirms they can).
+    `cargo test --workspace`, a Linux only step printing the inotify limits,
+    and the live tests `cargo test -p trigger-fs -- --ignored
+    --test-threads=1` with `timeout-minutes: 10`, on all three runners. The
+    toolchain step gains `components: rustfmt, clippy`. The exact YAML is in
+    R04. No retry action; if macOS flakes in practice, that is a later fix.
+    Live tests (five: created, saved, removed, glob excluded, atomic save)
+    each use their own canonicalised temp dir under `std::env::temp_dir()`
+    with a uuid, wait 400 ms after `start` before touching files, and wait
+    for events with `RecordingSink::wait_for` and a 10 s ceiling. A negative
+    check waits for a positive event on a sentinel file first, then asserts
+    nothing else arrived (R04).
 18. **No new frontend dependencies.** New Rust dependencies: `globset` only.
+    Versions in `[workspace.dependencies]`: `notify = "8.2"`, `globset =
+    "0.4.20"`; the others as the lock file has them. `uuid` is a
+    dev-dependency of `trigger-fs` for temp dir names; no `tempfile`.
 19. **Every crate comes from the template.** `trigger-fs` is created with
     `node plans/_tools/new-trigger-crate.mjs fs "<summary>"` from
     `plans/_templates/trigger-crate/` and then filled in, so the template is
@@ -121,22 +166,63 @@ types there are the contract; this file writes them out in full.
 21. **`os.rs` per platform.** `trigger-fs` keeps one `os.rs` because `notify`
     hides the platform differences. That is the expected case for crates built on
     a cross platform library.
+22. **The matcher decides by stat, not by event kind** (R03: on macOS a plain
+    save arrives as `Create`, and rename halves are unpaired `Name(Any)`).
+    `logic.rs` is pure and driven by the OS layer:
+    - **Known set.** `start` walks each canonical `when.path` once (not
+      descending into the default ignored directories) and seeds a set of
+      existing file paths. That is the "existed before" every decision uses,
+      and why nothing replays (Decision 9). The set is updated after every
+      decision.
+    - **Ingest.** Every raw event with kind `Create`, `Remove` or `Modify` (any
+      sub kind) marks each of its paths pending with `last = now` and remembers
+      whether a `Name` event was seen. `Access` events are ignored.
+      `EventKind::Other` with the rescan flag re-seeds the known set and drops
+      pending paths without emitting. Directories are never reported.
+    - **Settle.** On a tick (the OS layer ticks every 100 ms), every pending
+      path with `now - last >= settle_ms` is resolved in one batch using
+      `exists` from the OS layer: not known and exists is *created*; known and
+      exists is *saved*; known and gone is *removed*; not known and gone is
+      dropped (a temp file that came and went).
+    - **Rename.** In one batch, if exactly one path resolved *removed* and
+      exactly one *created*, both with a `Name` event, they become one
+      *renamed* (`from` the removed one). A Linux `Name(Both)` event pairs its
+      two paths directly. Anything else stays removed plus created.
+    - **Download finished.** A path `F` that resolves *created* or *saved*
+      emits *download-finished* too when some path `F` + one of
+      `.crdownload`, `.part`, `.download` was pending within the last 10 s and
+      no longer exists. Each rule then emits only observations of its own
+      kind.
+    - **Tests** replay R03's sequences as fixtures with a fake clock: macOS
+      plain save of a known file gives exactly one *saved*; macOS atomic save
+      gives one *saved* and nothing for the temp file; Linux atomic save with
+      `Both` gives one *saved*; Windows rename `From`/`To` gives one
+      *renamed*; delete then recreate gives one *saved*; create plus quick
+      writes gives one *created*; Chrome style `x.zip.crdownload` renamed to
+      `x.zip` gives *created* and *download-finished*.
+    Watching a very large tree makes the start walk slow; that is a Known
+    limit in the README, not a cap.
 
 ## Shape
 
 ### Workspace (`src-tauri/Cargo.toml`, added)
 
+The `[workspace]` and `[workspace.dependencies]` blocks go above `[lib]` in
+slice A. The `[features]` block and the three path dependencies are added in
+slice D, when the app starts using the crates.
+
 ```toml
 [workspace]
 members = ["crates/*"]
+default-members = [".", "crates/*"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-notify = "8"
+notify = "8.2"
 uuid = { version = "1", features = ["v4"] }
-globset = "<R02>"
+globset = "0.4.20"
 
 [features]
 default = ["trigger-fs"]
@@ -176,6 +262,12 @@ impl Platforms {
     /// The platform this binary runs on.
     pub fn here() -> Platforms { /* cfg! per target_os */ }
 }
+
+// Serialises as ["macos","windows","linux"] (R06; verified code in the note).
+impl serde::Serialize for Platforms { /* serialize_seq of the names that are set */ }
+
+/// serde helper: SystemTime as whole milliseconds since the Unix epoch (R06).
+pub mod ms_since_epoch { /* serialize and deserialize, as in R06 */ }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -222,6 +314,7 @@ pub struct Rule {
 pub struct Event {
     pub rule: RuleId,
     pub kind: String,
+    #[serde(with = "ms_since_epoch")]
     pub at: SystemTime,
     pub payload: BTreeMap<String, Value>,
 }
@@ -273,14 +366,31 @@ impl RecordingSink {
     pub fn wait_for(&self, kind: &str, timeout: Duration) -> Option<Event>;
     pub fn drain(&self) -> Vec<Event>;
 }
+impl Default for RecordingSink { fn default() -> Self { Self::new() } } // clippy new_without_default
 pub fn rule(id: &str, kind: &str, when: serde_json::Value) -> Rule;
 pub trait Clock: Send + Sync { fn now(&self) -> SystemTime; }
 pub struct SystemClock; pub struct FixedClock(pub Mutex<SystemTime>);
 /// A source for the hub's tests: records the rules it was started with and
 /// fires an event when told to.
-pub struct FakeSource { pub id: &'static str, pub kinds: &'static [KindInfo], pub started: Mutex<Vec<Vec<Rule>>>, pub availability: Availability }
-impl FakeSource { pub fn fire(&self, event: Event); }
+pub struct FakeSource {
+    pub id: &'static str,
+    pub kinds: &'static [KindInfo],
+    pub started: Mutex<Vec<Vec<Rule>>>,
+    pub availability: Availability,
+    pub sink: Mutex<Option<Sink>>,   // set by start, used by fire (R06)
+    pub fail_start: bool,            // start returns SourceError::Os when true
+}
+impl FakeSource { pub fn new(id: &'static str, kinds: &'static [KindInfo]) -> FakeSource; pub fn fire(&self, event: Event); }
 ```
+
+A unit test in `trigger-core` pins the JSON the frontend sees:
+`Platforms::ALL` is `["macos","windows","linux"]`, `Event.at` is a number,
+`Permission::Folder("Downloads")` is `{"folder":"Downloads"}`.
+
+Frontend types (R06): `at: number` (ms since epoch); `platforms: ("macos" |
+"windows" | "linux")[]`; `permission: "accessibility" | "screenRecording" |
+"location" | "calendar" | "reminders" | "microphone" | "camera" |
+"notifications" | { folder: string } | null`.
 
 ### `trigger-hub/src/lib.rs`
 
@@ -370,12 +480,12 @@ Reducer: `triggers: { status: TriggersStatus | null }`, actions
 
 | Id | Question | Why it matters | Answer (filled after research) |
 |---|---|---|---|
-| R01 | With `src-tauri/Cargo.toml` as both a package and a workspace root, do `npm run tauri dev` and `tauri build` work unchanged, and does `default-members = [".", "crates/*"]` make a bare `cargo test` cover every crate? | Decision 1 and every acceptance line | |
-| R02 | Current `globset` version; does `**/*.md` match `docs\a.md` on Windows, or must paths be normalised to `/` first? | Decision 6 | |
-| R03 | What `notify` 8 reports on each OS for a plain save, an atomic save (write temp then rename, as VS Code and vim do), a create and a delete | The matcher state machine in slice C | |
-| R04 | Do GitHub's macOS, Windows and Ubuntu runners deliver file events to `notify` quickly enough for live tests with a 2 s timeout, and is the inotify watch limit on Ubuntu a problem? | Decision 17 | |
-| R05 | Where screenshots land by default on each OS, and how to read the configured folder on macOS (`com.apple.screencapture location`) and Windows | `${screenshots}` in Decision 12 | |
-| R06 | How `thiserror` 2 and `serde` derive behave on a `&'static str` payload (`Permission::Folder`) and `SystemTime` | The contract compiles as written | |
+| R01 | With `src-tauri/Cargo.toml` as both a package and a workspace root, do `npm run tauri dev` and `tauri build` work unchanged, and does `default-members = [".", "crates/*"]` make a bare `cargo test` cover every crate? | Decision 1 and every acceptance line | Yes to both (run). No change to `tauri.conf.json`, `build.rs` or npm scripts. Set `default-members`, still use `--workspace`. A glob member with no manifest breaks cargo, so workspace and first crate land together. |
+| R02 | Current `globset` version; does `**/*.md` match `docs\a.md` on Windows, or must paths be normalised to `/` first? | Decision 6 | 0.4.20. globset normalises separators itself on Windows (source). Use `literal_separator(true)`, relative `&Path`, `**/name` plus `**/name/**` for directory ignores. |
+| R03 | What `notify` 8 reports on each OS for a plain save, an atomic save (write temp then rename, as VS Code and vim do), a create and a delete | The matcher state machine in slice C | notify 8.2.0. Event kinds are unreliable (macOS plain save looks like Create), so decide at settle by stat against a known set (Decision 22). Canonicalise `when.path`. |
+| R04 | Do GitHub's macOS, Windows and Ubuntu runners deliver file events to `notify` quickly enough for live tests with a 2 s timeout, and is the inotify watch limit on Ubuntu a problem? | Decision 17 | Partial: viable, but use a 10 s ceiling, 400 ms start settle, `--test-threads=1`. inotify limit not a concern; a CI step logs it. macOS latency confirmed on first CI run. |
+| R05 | Where screenshots land by default on each OS, and how to read the configured folder on macOS (`com.apple.screencapture location`) and Windows | `${screenshots}` in Decision 12 | `defaults read` on macOS, `reg query` on Windows, `dirs::picture_dir()` on Linux. No new dependency. Folded into Decision 12. |
+| R06 | How `thiserror` 2 and `serde` derive behave on a `&'static str` payload (`Permission::Folder`) and `SystemTime` | The contract compiles as written | One error: `Platforms` needs a hand written `Serialize`. `at` as ms via `ms_since_epoch`. `RecordingSink: Default`. `FakeSource` holds its sink. Folded into Shape. |
 
 ## Risks
 
