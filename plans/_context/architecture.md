@@ -74,5 +74,6 @@ process definition (local file, later synced)      ${variables} filled in
 |---|---|---|
 | 001-trigger-core | workspace, contract, hub, `trigger-fs`, app wiring, Settings switch | done |
 | 002-trigger-internal | triggers from inside the app | draft |
-| 003 to 015 | one crate per integration, all depending on 001 only | draft |
+| 003-trigger-git | `trigger-git`: commit, branch switch, pull, merge conflict, stopped rebase, tag, stash, detached HEAD, behind remote, old uncommitted work and new clones | done |
+| 004 to 015 | one crate per integration, all depending on 001 only | draft |
 | later | process editor, run engine, trigger picker UI, team sync of definitions | not planned |
