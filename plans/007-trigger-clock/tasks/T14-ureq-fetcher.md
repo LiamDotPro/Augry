@@ -2,7 +2,7 @@
 id: T14
 epic: 007-trigger-clock
 title: Add UreqFetcher to os.rs with a local server test
-status: todo
+status: done
 depends_on: [T11]
 size: M
 model: haiku
@@ -278,3 +278,5 @@ fn a_connection_that_is_refused_is_an_error() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
