@@ -631,6 +631,40 @@ A file is usable when it is a JSON object with `schemaVersion` 1 and a non empty
 
 Strings in `when` may use `${home}`, `${downloads}`, `${notes.root}`, `${screenshots}` and `${repo.root}`. `${repo.root}` makes one rule per distinct repository root among the open panes. A rule whose variable has no value on this machine is `skipped` with a reason. Rule ids are `<processId>/<triggerId>`, with `#<n>` added (n from 1) when `${repo.root}` produced several.
 
+### 9.2 Internal triggers (`tg`)
+
+Things the app already sees become triggers with no new crate, because only the app sees them and a crate would need the app to feed it. The source lives in `src-tauri/src/triggers/internal/`: `mod.rs` (`InternalSource`, source id `tg`, and the `InternalSignal` enum), `kinds.rs` (`KINDS`), `rule.rs` (parsing a rule's `when` per kind), `logic.rs` (the pure `step(&[Armed], &InternalSignal)`, tested in `logic/tests.rs`) and a `README.md` with the same sections as a crate. The catalogue and the editor see it like any other source. `triggers/feeds.rs` holds the helpers the feed points call.
+
+`InternalSource` is cloneable (an `Arc` inside). `sources()` boxes one clone for the hub and `TriggerService` keeps another. `start` stores the parsed rules and the sink, and dropping the handle clears them. The app feeds it with `TriggerService::publish_internal(signal)`, which runs `logic::step` and sends an event for every rule that matches. `TriggerService::wants_output()` reads an `AtomicBool` that is true only while a `tg.output-matched` rule is armed, so the reader thread skips line assembly otherwise.
+
+| Kind | Signal | Fed from |
+|---|---|---|
+| `tg.agent-finished` | `AgentFinished` | `agent/mod.rs`, after the finished event is emitted (starts publish nothing) |
+| `tg.command-failed`, `tg.command-slow` | `CommandEnded` | the reader thread tap, on `OSC 133;D` (4.3) |
+| `tg.output-matched` | `OutputLine` | the reader thread tap, only while a rule is armed |
+| `tg.bell` | `Bell` | the reader thread tap |
+| `tg.task-reported` | `TaskReported` | `agent/task.rs`, when a new task line is read (emptying the file publishes nothing) |
+| `tg.pane-opened-in-repo` | `PaneOpened` | `create_terminal`, on a spawned blocking thread after the spawn and a refresh; the repository root comes from the git cache and a pane outside a repository fires nothing |
+| `tg.worktree-created`, `tg.worktree-removed` | `WorktreeCreated`, `WorktreeRemoved` | `git/worktree.rs`, after git succeeded |
+| `tg.review-staged` | `ReviewStaged` | `git/review.rs`, `review_stage`, after `git add` succeeded |
+| `tg.note-saved` | `NoteSaved` | `notes_write`, after the write returned Ok |
+| `tg.focus-entered` | `FocusEntered` | `set_focused_terminal`, only when focus moves onto a different pane |
+| `tg.app-started` | `AppStarted` | `triggers::start`, once, after the first refresh has armed the rules |
+
+Feeds publish after the work they report has succeeded. The pane-opened feed checks that process triggers are switched on before its git lookup, so nothing runs while the feature is off.
+
+Payloads carry `pane`, `cwd`, `repo`, `agent`, `exit_code`, `duration_ms`, `line`, `path`, `relative`, `branch` and `files` as each signal has them, never the full output. The `when` fields per kind: `agent` (glob) for `tg.agent-finished`; `exit_code` for `tg.command-failed` (default: any non zero); `longer_than_ms` (required) and `exit_code` for `tg.command-slow`; `pattern` (required) for `tg.output-matched`, a `regex` 1.13 expression, case insensitive, with a 256 KiB size limit, compiled once when the rule starts; `repo` (absolute path) on every pane, worktree and review kind except `tg.bell`, where pane kinds match it against the pane's working directory; `glob` (relative to the notes root) for `tg.note-saved`. Unknown fields are a rule error. `tg.agent-waiting`, `tg.note-tagged`, `tg.file-dropped`, `tg.file-opened` and `tg.tray-menu` do not exist yet.
+
+Known limits:
+
+- Commands the shell does not record in its history are not reported, so `tg.command-failed` and `tg.command-slow` miss them: bash with `HISTCONTROL=ignoredups` or `ignorespace`, and zsh with `HIST_IGNORE_DUPS`, `HIST_IGNORE_SPACE` and the other `HIST_IGNORE_*` options. The script reports a command only when the history number changed (4.5).
+- `tg.output-matched` can match the echoed command line the shell prints back as the user types, not only the command's own output.
+- A rule sees at most 200 characters of a line, and the scanner keeps at most 1024 bytes of one line.
+- An `OSC 133;D` with no code counts as exit 0.
+- A command's duration starts at the first Enter after a prompt mark (or after the last command end); later Enters typed into a running program do not restart it. A shell with no marks (cmd.exe, `sh`) reports no command ends at all.
+- zsh runs with `-i` and is not a login shell, so the user's `.zprofile` and `.zlogin` do not run for a pane.
+- Each rule has the hub's two second cool down, and rules run on the thread that publishes the signal, so a pattern is matched on the terminal reader thread. The reader thread guards the tap with `catch_unwind`: if the tap panics, that pane stops being tapped and its output keeps flowing.
+
 ---
 
 ## 10. IPC contract summary

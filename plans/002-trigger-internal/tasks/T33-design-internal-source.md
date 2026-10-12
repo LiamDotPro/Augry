@@ -2,7 +2,7 @@
 id: T33
 epic: 002-trigger-internal
 title: Design 9.2, the internal tg trigger source
-status: todo
+status: done
 depends_on: [T32]
 size: M
 model: haiku
@@ -97,3 +97,5 @@ END
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed. Wording changes after checking the code: (1) wants_output() "is an AtomicBool" -> "reads an AtomicBool that is true" (it is a method); (2) pane-opened row: added "on a spawned blocking thread" (create_terminal refreshes and publishes there); (3) "A feed that needs a git lookup checks that process triggers are switched on first" -> only the pane-opened feed calls feeds::enabled (worktree/review feeds do not), so reworded to name it; (4) `repo` "on every pane, worktree and review kind" -> added "except `tg.bell`" (REPO_KINDS in rule.rs); (5) last known limit: added the catch_unwind guard on the reader thread tap.
+- 2026-10-13 checker: pass
