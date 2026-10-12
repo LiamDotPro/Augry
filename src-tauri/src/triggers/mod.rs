@@ -4,5 +4,6 @@
 //! rest of the module; each adds its own `pub mod` line.
 
 pub mod rules;
+pub mod status;
 pub mod store;
 pub mod variables;
