@@ -113,6 +113,13 @@ repo-cloned, `tag` for a tag.
 | C (T20 to T29) | `os.rs` watcher with settle and lock retry, the glue thread, live tests on a temp repo, README | B |
 | D (T30 to T39) | app: feature and `sources()` line, repo map row | C |
 
+Ruling (slice C): `start` fails the whole source when any rule's `repo` is
+missing or not a git repository, as `trigger-fs` does for a missing folder.
+The watch filter is a whitelist (`HEAD`, `MERGE_HEAD`, `packed-refs`, rebase
+folders, `refs/` except `refs/remotes`, `reftable/`), which behaves like
+Decision 6's ignore list. The glue lives in `src/worker*.rs` to keep `lib.rs`
+under 400 lines.
+
 ## Open questions
 
 | Id | Question | Why it matters | Answer (filled after research) |
