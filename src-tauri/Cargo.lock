@@ -4910,6 +4910,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "trigger-github"
+version = "0.1.0"
+dependencies = [
+ "globset",
+ "serde",
+ "serde_json",
+ "trigger-core",
+]
+
+[[package]]
 name = "trigger-hub"
 version = "0.1.0"
 dependencies = [

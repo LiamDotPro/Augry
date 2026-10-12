@@ -2,7 +2,7 @@
 id: T01
 epic: 011-trigger-github
 title: Scaffold the trigger-github crate from the template
-status: todo
+status: done
 depends_on: []
 size: S
 model: haiku
@@ -92,3 +92,5 @@ Add nothing else. (The branch glob in a later card uses it. `serde_json` is alre
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (scaffold ran clean, globset line added under serde_json, tests 3+1+1 ok with live 1 ignored, clippy and fmt clean, check-crates exit 0 with expected template warnings, Cargo.lock changed as expected)
+- 2026-10-12 checker: pass
