@@ -2,7 +2,7 @@
 id: T09
 epic: 007-trigger-clock
 title: Write the clock README for the rule and logic work
-status: todo
+status: done
 depends_on: [T08]
 size: S
 model: haiku
@@ -179,3 +179,5 @@ cargo clippy -p trigger-clock --all-targets -- -D warnings
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

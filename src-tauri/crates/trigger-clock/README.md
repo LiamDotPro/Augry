@@ -24,48 +24,76 @@ the markers; `tests/readme.rs` fails while this table is stale.
 ## Rule fields
 
 The `when` object of a trigger, parsed by `src/rule.rs`. Unknown fields are an
-error, so a typo shows up in the editor.
+error, so a typo shows up in the editor. A field a kind does not use is an
+error too.
 
-| Field | Required | Default | Meaning |
-|---|---|---|---|
-| `example` | yes | | Replace with the real fields |
+| Field | Used by | Required | Default | Meaning |
+|---|---|---|---|---|
+| `cron` | `clock.schedule` | yes | | Five field cron expression in local time: minute, hour, day of month, month, day of week. Six fields (with seconds) are refused |
+| `every_s` | `clock.interval` | yes | | Seconds between firings, at least 10 |
+| `catch_up` | `clock.schedule`, `clock.interval` | no | `false` | After the machine slept, fire once for the latest missed time. Without it, missed times are skipped |
+| `feed` | `clock.event-starting`, `clock.event-ended` | yes | | An `https://` or `webcal://` URL, or an absolute path to an `.ics` file |
+| `title` | `clock.event-starting`, `clock.event-ended` | no | every event | Glob matched against the event title, case insensitive; `*` also matches `/` |
+| `minutes_before` | `clock.event-starting` | no | `5` | Minutes before the start that the rule fires |
+
+`clock.daily-first-use` takes no fields.
 
 ## Payload
 
-What an event carries, available to steps as `${trigger.<field>}`. Paths, names,
-ids and numbers only. Never file contents or secrets, never more than 4 KiB.
+What an event carries, available to steps as `${trigger.<field>}`. Never an
+event description or its attendees.
 
-| Field | Meaning |
-|---|---|
-| `example` | Replace with the real fields |
+| Field | Kinds | Meaning |
+|---|---|---|
+| `due` | `clock.schedule`, `clock.interval` | The time the rule was due, milliseconds since 1970 |
+| `caught_up` | `clock.schedule`, `clock.interval` | `true` when the firing stands for times missed while the machine slept |
+| `date` | `clock.daily-first-use` | The local date, `YYYY-MM-DD` |
+| `title` | event kinds | The event title |
+| `start` | event kinds | When the event starts, milliseconds since 1970 |
+| `end` | event kinds | When the event ends, milliseconds since 1970 |
+| `feed` | event kinds | The feed the event came from, as written in the rule |
 
 ## Platforms
 
 | Platform | How it is detected | Limits |
 |---|---|---|
-| macOS | | |
-| Windows | | |
-| Linux | | |
+| macOS | The wall clock is read at least every 30 seconds; the local zone comes from `chrono::Local` | Same on every platform |
+| Windows | Same | Same |
+| Linux | Same | Same |
+
+A gap of more than 90 seconds between two readings means the machine slept.
+Waits do not count time spent asleep on any of the three systems, so the crate
+never trusts the length of a wait, only the wall clock.
 
 ## Permissions
 
-What the OS asks the user for, and when. "None" is a fine answer.
+None. Reading a calendar file or feed needs no permission from the OS.
 
 ## Example
 
 ```json
-{ "id": "example", "kind": "clock.example", "when": { "example": "value" } }
+{ "id": "morning", "kind": "clock.schedule", "when": { "cron": "0 9 * * 1-5", "catch_up": true } }
+```
+
+```json
+{ "id": "poll", "kind": "clock.interval", "when": { "every_s": 300 } }
+```
+
+```json
+{ "id": "hello", "kind": "clock.daily-first-use", "when": {} }
 ```
 
 ## Develop
 
 | File | What it holds |
 |---|---|
-| `src/lib.rs` | `KINDS`, `ClockSource` and the thread that joins the OS layer to the logic. Glue only |
-| `src/rule.rs` | The typed `When` and `parse`. Pure, unit tested |
-| `src/logic.rs` | Pure: which rules a `Signal` fires, with what payload, and any debounce state. Unit tested |
-| `src/os.rs` | The only file that talks to the OS: `availability()` and `listen()`, per platform behind `cfg` |
-| `tests/live.rs` | `#[ignore]` tests against the real OS |
+| `src/lib.rs` | `KINDS`, `ClockSource` and the thread that joins the wall clock to the logic. Glue only |
+| `src/rule.rs` | The typed `When`, `Parsed` and `parse`, with the per kind checks. Pure, unit tested |
+| `src/logic.rs` | Pure: `State`, `Fire`, `next_due`, `step` and `wait`. Takes `now` as an argument and never sleeps |
+| `src/logic/tests.rs` | Unit tests for normal ticks, jumps, catch up, backwards jumps and daily first use |
+| `src/logic/dst_tests.rs` | Unit tests for the daylight saving cases, in the America/New_York zone |
+| `src/os.rs` | The only file that talks to the OS: `availability()` |
+| `tests/live.rs` | `#[ignore]` tests against the real clock |
 | `tests/readme.rs` | Fails when the Kinds table above is stale |
 
 ```
@@ -77,4 +105,17 @@ cargo clippy -p trigger-clock --all-targets -- -D warnings
 
 ## Known limits
 
-What does not work, on which platform, and why.
+- Cron runs in local time, at each instant the cron library returns. A time
+  that spring forward skips (such as `30 2 * * *`) runs at the first valid
+  minute after the gap (03:00). A fixed time inside the repeated autumn hour
+  (`30 1 * * *`) runs once. An hourly pattern (`0 * * * *`) runs twice in the
+  repeated hour, once for each 01:00.
+- A firing can be up to 30 seconds late, and later still right after the
+  machine wakes: the first check after waking is when missed times are found.
+- A process frozen for more than 90 seconds looks the same as a sleep.
+- If the wall clock is set backwards, nothing fires for that check and every
+  schedule is planned again from the new time, so a time can fire twice.
+- `clock.daily-first-use` remembers the last day only in memory. After the app
+  restarts it fires again on the same day, a minute after it starts.
+- Not finished yet: the threads that run the logic, so `start` still returns
+  unavailable, and the calendar feed code behind the two event kinds.
