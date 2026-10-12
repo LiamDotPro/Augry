@@ -149,13 +149,29 @@ pub fn start(app: &AppHandle) {
     refresh_app(app);
 }
 
-/// Repository roots of the open panes, from the git cache where it is fresh.
-fn repo_roots(state: &crate::AppState) -> Vec<String> {
+/// Repository roots and GitHub `owner/name` slugs of the open panes, from the
+/// git cache where it is fresh.
+fn repo_places(state: &crate::AppState) -> (Vec<String>, Vec<String>) {
     let open_dirs = state.pty.open_dirs();
-    open_dirs
+    let places: Vec<(Option<String>, Option<String>)> = open_dirs
         .iter()
-        .filter_map(|(_, cwd)| state.git.info(cwd, GIT_MAX_AGE, &open_dirs).repo_root)
-        .collect()
+        .map(|(_, cwd)| {
+            let info = state.git.info(cwd, GIT_MAX_AGE, &open_dirs);
+            (info.repo_root, info.remote_url)
+        })
+        .collect();
+    places_of(&places)
+}
+
+/// Splits (repository root, origin remote URL) pairs into the roots and the
+/// GitHub slugs. Remotes on other hosts add nothing.
+fn places_of(places: &[(Option<String>, Option<String>)]) -> (Vec<String>, Vec<String>) {
+    let roots = places.iter().filter_map(|(root, _)| root.clone()).collect();
+    let remotes = places
+        .iter()
+        .filter_map(|(_, url)| url.as_deref().and_then(variables::github_slug))
+        .collect();
+    (roots, remotes)
 }
 
 /// Collects the inputs from the app state and runs `TriggerService::refresh`.
@@ -163,12 +179,12 @@ fn repo_roots(state: &crate::AppState) -> Vec<String> {
 pub fn refresh_now(state: &crate::AppState) -> TriggersStatus {
     let config = state.state.config().triggers;
     // Nobody pays for git lookups while the feature is off.
-    let roots = if config.enabled {
-        repo_roots(state)
+    let (roots, remotes) = if config.enabled {
+        repo_places(state)
     } else {
-        Vec::new()
+        (Vec::new(), Vec::new())
     };
-    let ctx = Context::detect(state.notes.root(), roots, Vec::new());
+    let ctx = Context::detect(state.notes.root(), roots, remotes);
     state.triggers.refresh(&config, &ctx)
 }
 
@@ -283,6 +299,25 @@ mod tests {
 
     fn cleanup(dir: &Path) {
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn places_split_roots_and_github_slugs() {
+        let places = vec![
+            (
+                Some("/r/a".to_string()),
+                Some("git@github.com:o/a.git".to_string()),
+            ),
+            (
+                Some("/r/b".to_string()),
+                Some("https://gitlab.com/o/b.git".to_string()),
+            ),
+            (Some("/r/c".to_string()), None),
+            (None, None),
+        ];
+        let (roots, remotes) = places_of(&places);
+        assert_eq!(roots, ["/r/a", "/r/b", "/r/c"]);
+        assert_eq!(remotes, ["o/a"]);
     }
 
     #[test]

@@ -2,7 +2,7 @@
 id: T32
 epic: 011-trigger-github
 title: Feed pane remotes to the context and document the variable
-status: todo
+status: done
 depends_on: [T31]
 size: S
 model: haiku
@@ -143,7 +143,7 @@ and replace it with:
 - [ ] `cd src-tauri && cargo fmt --check` exits 0
 - [ ] `cd src-tauri && cargo clippy -p terminal-grid --all-targets 2>&1 | grep -c warning` prints a number not larger than the baseline in the Log
 - [ ] `grep -c "repo_roots(state)" src-tauri/src/triggers/mod.rs` prints `0`
-- [ ] `grep -c "repo.remote" docs/process-triggers.md` prints `3` or more
+- [ ] `grep -c "repo.remote" docs/process-triggers.md` prints `2` (two lines of the new text name it)
 - [ ] `git status --porcelain` lists only paths under `files:`, ignoring other card files under `plans/011-trigger-github/tasks/`
 
 ## Out of scope
@@ -162,3 +162,6 @@ and replace it with:
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: BLOCKED. Baseline clippy warnings 7. Edits applied as the card says (mod.rs repo_places, places_of, new test; docs bullet). cargo fmt ran. Acceptance: places_split_roots_and_github_slugs PASS; cargo test triggers 49 passed; cargo fmt --check exit 0; clippy warnings 7 (not larger); grep -cF "repo_roots(state)" mod.rs = 0; grep -cF "repo.remote" docs/process-triggers.md = 2, card needs 3 or more. Cause: the card's own step 5 replacement text has only 2 occurrences of repo.remote, so 3 is not reachable without text outside the steps. Left the doc exactly as the card's step 5 writes it. Used grep -cF for the grep checks. git status: only docs/process-triggers.md and src-tauri/src/triggers/mod.rs changed, plus this card.
+- 2026-10-12 architect: the 3 was a miscount; step 5 puts the name on 2 lines. Reviewed the diff myself; it matches the card.
+- 2026-10-13 checker: pass

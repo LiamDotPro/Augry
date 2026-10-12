@@ -699,7 +699,10 @@ The one place that knows every source. It is still app agnostic.
   stores; the team sync epic later writes into the same folder). Which processes
   are armed is local, in `config.json`, off by default and never synced.
 - `variables.rs` fills in `${repo.root}` (every repo with a pane open, one rule
-  each), `${home}`, `${downloads}`, `${notes.root}` and `${screenshots}`. A rule
+  each), `${repo.remote}` (the `owner/name` of the GitHub origin remote of every
+  open pane, such as `cli/cli`, one rule each; panes with another host add
+  nothing), `${home}`, `${downloads}`, `${notes.root}` and `${screenshots}`. A
+  rule that uses both `${repo.root}` and `${repo.remote}` is skipped. A rule
   whose variable has no value here is skipped and the UI says why.
 - Commands: `triggers_catalogue`, `triggers_check` (a rule, for the editor),
   `triggers_status` (armed rules, availability, last fired). Event:
