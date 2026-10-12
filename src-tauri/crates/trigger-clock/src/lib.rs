@@ -6,10 +6,6 @@
 //! into the sink. Rules live in `rule.rs`, decisions in `logic.rs`, the OS in
 //! `os.rs`.
 
-// Temporary: nothing calls the logic until the glue card wires the thread.
-// That card removes this line.
-#![allow(dead_code)]
-
 mod feed;
 mod logic;
 mod os;

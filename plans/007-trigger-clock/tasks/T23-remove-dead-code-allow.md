@@ -2,7 +2,7 @@
 id: T23
 epic: 007-trigger-clock
 title: Remove the temporary dead_code allow and stale comments
-status: todo
+status: done
 depends_on: [T22]
 size: S
 model: haiku
@@ -79,3 +79,5 @@ and replace them with
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

@@ -53,7 +53,7 @@ pub struct Armed {
 }
 
 /// One occurrence of a calendar event inside the window the feed thread
-/// expanded. Unused until the event kinds are added to `step`.
+/// expanded. `events::fire_events` reads these from `State::feeds`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Occurrence {
     pub uid: String,
