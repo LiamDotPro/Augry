@@ -2,7 +2,7 @@
 id: T14
 epic: 011-trigger-github
 title: Add Group, request paths and the seen set loop
-status: todo
+status: done
 depends_on: [T13]
 size: M
 model: haiku
@@ -323,3 +323,5 @@ impl State {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

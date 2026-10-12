@@ -6,10 +6,16 @@
 #![allow(dead_code)]
 
 pub mod backoff;
+pub mod diff;
 pub mod json;
 pub mod payload;
 pub mod response;
 pub mod text;
+
+#[cfg(test)]
+mod testutil;
+
+use std::collections::BTreeMap;
 
 use trigger_core::RuleId;
 
@@ -23,6 +29,16 @@ pub struct Armed {
     pub parsed: Parsed,
 }
 
-/// Everything remembered between polls (seen ids, etags). Filled in by slice B.
+/// Everything remembered between polls: by repository (`owner/name`), the
+/// seen ids and etags in `diff::RepoState`.
 #[derive(Debug, Default)]
-pub struct State {}
+pub struct State {
+    pub repos: BTreeMap<String, diff::RepoState>,
+}
+
+impl State {
+    /// The memory of one repository, made empty on first use.
+    pub fn repo(&mut self, repo: &str) -> &mut diff::RepoState {
+        self.repos.entry(repo.to_string()).or_default()
+    }
+}
