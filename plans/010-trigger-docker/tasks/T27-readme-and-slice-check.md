@@ -2,7 +2,7 @@
 id: T27
 epic: 010-trigger-docker
 title: Write the README and close slice C
-status: todo
+status: done
 depends_on: [T26]
 size: S
 model: haiku
@@ -117,3 +117,5 @@ What does not work, on which platform, and why.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
