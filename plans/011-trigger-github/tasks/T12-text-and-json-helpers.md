@@ -2,7 +2,7 @@
 id: T12
 epic: 011-trigger-github
 title: Add the text and JSON helpers for the diff
-status: todo
+status: done
 depends_on: [T11]
 size: M
 model: haiku
@@ -313,3 +313,5 @@ pub mod text;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (45 lib tests, 9 new in text.rs and json.rs; full crate tests, clippy -D warnings, fmt check, check-crates exit 0; scope lists only logic.rs, logic/text.rs and logic/json.rs)
+- 2026-10-12 checker: pass

@@ -6,7 +6,9 @@
 #![allow(dead_code)]
 
 pub mod backoff;
+pub mod json;
 pub mod response;
+pub mod text;
 
 use trigger_core::RuleId;
 
