@@ -14,7 +14,11 @@ the markers; `tests/readme.rs` fails while this table is stale.
 <!-- kinds -->
 | Kind | Title | Platforms | Permission | When | Payload |
 | --- | --- | --- | --- | --- | --- |
-| clock.example | Example | macOS, Windows, Linux | none | example* | example |
+| clock.schedule | Schedule | macOS, Windows, Linux | none | cron*, catch_up | due, caught_up |
+| clock.interval | Interval | macOS, Windows, Linux | none | every_s*, catch_up | due, caught_up |
+| clock.daily-first-use | First use of the day | macOS, Windows, Linux | none | none | date |
+| clock.event-starting | Event starting | macOS, Windows, Linux | none | feed*, title, minutes_before | title, start, end, feed |
+| clock.event-ended | Event ended | macOS, Windows, Linux | none | feed*, title | title, start, end, feed |
 <!-- /kinds -->
 
 ## Rule fields
