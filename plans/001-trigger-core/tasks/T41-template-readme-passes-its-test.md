@@ -2,7 +2,7 @@
 id: T41
 epic: 001-trigger-core
 title: Make a fresh trigger crate pass its own readme test
-status: todo
+status: done
 depends_on: [T29]
 size: S
 model: haiku
@@ -94,3 +94,6 @@ cd src-tauri && cargo test -p trigger-zz-test
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: BLOCKED at step 6 (git status check). Template README edited and all other acceptance passed: scaffold printed Created, cargo test -p trigger-zz-test passed incl. readme_kinds_table_is_current, example readme output matched README markers, check-crates exit 0, throwaway crate removed, Cargo.lock checked out. But git status --porcelain lists 3 files: plans/_templates/trigger-crate/README.md plus two modified files that were already in the worktree before this run: .github/workflows/ci.yml and plans/001-trigger-core/tasks/T40-ci-workspace-checks.md. Not reverted, since they are not mine. Needs the orchestrator to confirm these are expected or to move them out of this worktree.
+- 2026-10-12 orchestrator: the scope failure was T40's uncommitted files (a git lock stopped its commit); T40 is now committed, so the card goes to the checker
+- 2026-10-12 checker: pass
