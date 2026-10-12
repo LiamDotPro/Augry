@@ -170,5 +170,60 @@ fn due_payload(due: SystemTime, caught_up: bool) -> Payload {
     ])
 }
 
+/// Schedule and interval rules.
+fn fire_due<Tz: TimeZone>(
+    state: &mut State,
+    tz: &Tz,
+    now: SystemTime,
+    rules: &[Armed],
+    out: &mut Vec<Fire>,
+) {
+    for armed in rules {
+        if !matches!(armed.kind.as_str(), "clock.schedule" | "clock.interval") {
+            continue;
+        }
+        let cursor = *state
+            .cursors
+            .entry(armed.id.clone())
+            .or_insert_with(|| next_due(armed, tz, state.prev_wall));
+        let Some(cursor) = cursor else { continue };
+        let (slots, next) = due_slots(armed, tz, cursor, now);
+        state.cursors.insert(armed.id.clone(), next);
+        for due in slots {
+            out.push(Fire {
+                rule: armed.id.clone(),
+                kind: armed.kind.clone(),
+                payload: due_payload(due, false),
+            });
+        }
+    }
+}
+
+/// The rules due at `now`. `tz` is the zone cron expressions and dates are
+/// read in: `&chrono::Local` in the app, a fixed zone in tests.
+pub fn step<Tz: TimeZone>(
+    state: &mut State,
+    tz: &Tz,
+    now: SystemTime,
+    rules: &[Armed],
+) -> Vec<Fire> {
+    let mut out = Vec::new();
+    fire_due(state, tz, now, rules, &mut out);
+    state.prev_wall = now;
+    out
+}
+
+/// How long the thread may wait before the next step: until the earliest
+/// planned due time, but never longer than `cfg.tick`.
+pub fn wait(state: &State, now: SystemTime) -> Duration {
+    state
+        .cursors
+        .values()
+        .flatten()
+        .map(|t| t.duration_since(now).unwrap_or(Duration::ZERO))
+        .min()
+        .map_or(state.cfg.tick, |d| d.min(state.cfg.tick))
+}
+
 #[cfg(test)]
 mod tests;

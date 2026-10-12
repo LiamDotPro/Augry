@@ -2,7 +2,7 @@
 id: T05
 epic: 007-trigger-clock
 title: Add step and wait for schedules and intervals on normal ticks
-status: todo
+status: done
 depends_on: [T04]
 size: M
 model: haiku
@@ -270,3 +270,5 @@ fn kinds_that_are_not_schedules_are_left_alone() {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
