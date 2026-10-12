@@ -32,7 +32,7 @@ because they tie processes to what the user is already doing in the grid.
    (`KINDS`, `InternalSource` with id `tg`), `rule.rs` and `logic.rs` (pure,
    tested), and `README.md` with the same eight sections. The catalogue and the
    editor see it like any other source.
-2. **Kinds**: `tg.agent-finished`, `tg.agent-waiting`, `tg.command-failed`,
+2. **Kinds**: `tg.agent-finished`, `tg.command-failed`,
    `tg.command-slow`, `tg.output-matched`, `tg.bell`, `tg.task-reported`,
    `tg.pane-opened-in-repo`, `tg.worktree-created`, `tg.worktree-removed`,
    `tg.review-staged`, `tg.note-saved`, `tg.focus-entered`, `tg.app-started`
