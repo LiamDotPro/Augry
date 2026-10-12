@@ -121,6 +121,16 @@ The poll thread wakes every second, polls whatever is due (serially), applies
 | C (T20 to T29) | `os.rs` (find `gh`, `GhCli`, auth check), the poll loop with a fake `Gh`, live tests, README | B |
 | D (T30 to T39) | app: feature and `sources()` line, `${repo.remote}` in `variables.rs`, repo map row | C |
 
+Ruling (slice C): the poll core is `logic/poll.rs` (`Poller`, tested with
+`logic/fake_gh.rs`) and the thread is `src/run.rs`, keeping `os.rs` and
+`lib.rs` small. The signed-in login comes from `gh api user` on the first
+tick, retried every 60 s. `trigger-core` has no channel for errors after
+`start`, so a 401 stops the poller (the next `start` reports `Unavailable`)
+and other errors print one stderr line without a body; Known limits says so.
+`start` may block up to 10 s on `gh auth status`; the hub calls it from
+`refresh`, which the app runs on a blocking thread, as with docker's
+version check.
+
 ## Open questions
 
 | Id | Question | Why it matters | Answer (filled after research) |
