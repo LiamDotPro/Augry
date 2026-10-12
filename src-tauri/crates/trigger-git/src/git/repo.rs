@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use super::{run, value, TIMEOUT};
+use super::{run, value, FETCH_TIMEOUT, TIMEOUT};
 use crate::logic::RepoSnapshot;
 
 /// A repository on disk, read by running git in its work tree.
@@ -26,6 +26,24 @@ impl GitRepo {
 
     fn value(&self, args: &[&str]) -> Option<String> {
         value(&self.path, args)
+    }
+
+    /// Commits `HEAD` is behind its upstream, counted from the remote refs on
+    /// disk. With `fetch` the remote is asked first; a fetch that fails
+    /// (offline, no remote) is ignored and the count uses what is on disk.
+    /// `--no-tags` keeps the fetch from creating local tags, which would show
+    /// up as `git.tag-created`. None without an upstream or on a detached HEAD.
+    fn read_behind(&self, fetch: bool) -> Option<u32> {
+        if fetch {
+            let _ = run(
+                &self.path,
+                &["fetch", "--quiet", "--no-tags"],
+                FETCH_TIMEOUT,
+            );
+        }
+        self.value(&["rev-list", "--count", "HEAD..@{u}"])?
+            .parse()
+            .ok()
     }
 
     /// The sha in MERGE_HEAD (None unless a merge is in progress) and whether
@@ -149,3 +167,6 @@ pub(crate) fn parse_refs(text: &str) -> BTreeMap<String, String> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod poll_tests;
