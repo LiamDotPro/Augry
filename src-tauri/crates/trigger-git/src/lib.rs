@@ -8,6 +8,7 @@ mod git;
 mod logic;
 mod os;
 mod rule;
+mod worker;
 
 use trigger_core::{
     Availability, FieldInfo, Handle, KindInfo, Platforms, Rule, RuleError, Sink, Source,

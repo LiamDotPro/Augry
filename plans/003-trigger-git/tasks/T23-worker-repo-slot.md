@@ -2,7 +2,7 @@
 id: T23
 epic: 003-trigger-git
 title: Add RepoSlot: snapshot, diff and rule filter
-status: todo
+status: done
 depends_on: [T22, T21]
 size: M
 model: haiku
@@ -424,3 +424,5 @@ Note on `check-crates.mjs`: it prints warnings, not errors. A warning about `src
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass
