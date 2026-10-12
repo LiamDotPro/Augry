@@ -2,7 +2,7 @@
 id: T33
 epic: 011-trigger-github
 title: Register trigger-github in the app behind a feature
-status: todo
+status: done
 depends_on: [T32]
 size: S
 model: haiku
@@ -103,3 +103,5 @@ Do not change anything else in the function.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 haiku: built, acceptance passed. Clippy baseline 7 warnings, after 7. Cards line numbers drifted (Cargo.toml features at 26-28, not 21-27) but find text matched exactly once. Cargo.lock gained one line ("trigger-github" in terminal-grid deps).
+- 2026-10-13 checker: pass

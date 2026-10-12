@@ -37,6 +37,8 @@ fn sources() -> Vec<Box<dyn Source>> {
     let mut list: Vec<Box<dyn Source>> = Vec::new();
     #[cfg(feature = "trigger-fs")]
     list.push(Box::new(trigger_fs::FsSource));
+    #[cfg(feature = "trigger-github")]
+    list.push(Box::new(trigger_github::GithubSource));
     list
 }
 
@@ -392,6 +394,18 @@ mod tests {
         assert!(service.has_definition("tidy"));
         assert!(!service.has_definition("nope"));
         cleanup(&dir);
+    }
+
+    #[cfg(feature = "trigger-github")]
+    #[test]
+    fn the_catalogue_lists_the_github_source() {
+        assert!(sources().iter().any(|source| source.id() == "github"));
+    }
+
+    #[cfg(not(feature = "trigger-github"))]
+    #[test]
+    fn the_catalogue_has_no_github_source_without_the_feature() {
+        assert!(!sources().iter().any(|source| source.id() == "github"));
     }
 
     #[test]
