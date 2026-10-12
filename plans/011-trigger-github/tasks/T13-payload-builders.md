@@ -2,7 +2,7 @@
 id: T13
 epic: 011-trigger-github
 title: Build the payload of each kind
-status: todo
+status: done
 depends_on: [T12]
 size: M
 model: haiku
@@ -311,3 +311,5 @@ pub mod payload;
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (52 lib tests, full crate tests, clippy, fmt --check, check-crates 0 errors)
+- 2026-10-12 checker: pass

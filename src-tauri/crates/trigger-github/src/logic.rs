@@ -7,6 +7,7 @@
 
 pub mod backoff;
 pub mod json;
+pub mod payload;
 pub mod response;
 pub mod text;
 
