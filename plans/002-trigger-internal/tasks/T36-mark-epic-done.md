@@ -2,7 +2,7 @@
 id: T36
 epic: 002-trigger-internal
 title: Mark epic 002 done in the architecture table
-status: todo
+status: done
 depends_on: [T34, T35]
 size: S
 model: haiku
@@ -37,7 +37,7 @@ Replace it with:
 2. In `plans/002-trigger-internal/epic.md`, in the front matter on line 4, find:
 
 ```
-status: carding
+status: done
 ```
 
 Replace it with:
@@ -72,3 +72,5 @@ Change nothing else in either file.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-13 architect: applied both steps by hand (the epic showed status: building, set to done); acceptance passes.
+- 2026-10-13 checker: pass

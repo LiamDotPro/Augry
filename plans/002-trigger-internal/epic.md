@@ -1,7 +1,7 @@
 ---
 id: 002-trigger-internal
 title: Triggers from inside Terminal Grid
-status: building
+status: done
 depends_on: [001-trigger-core]
 ---
 
