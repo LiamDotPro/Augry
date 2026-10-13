@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import * as api from "../../cloud/api";
 import { useCloud } from "../../cloud/CloudProvider";
-import { countLiveProcesses, joinedSummary, personalSummary } from "../../cloud/teams";
+import { countLiveConnections, countLiveProcesses, joinedSummary, personalSummary } from "../../cloud/teams";
 import type { Team } from "../../cloud/types";
 import { useAppActions } from "../../state/AppProvider";
 import { initialOf } from "../Account";
@@ -9,15 +9,17 @@ import { TeamDialog, TeamDialogHead, TeamHeadTile } from "./TeamDialog";
 
 /**
  * team-joined (App Shell board 08): Personal is untouched, pick where to go
- * next. The team's member and process counts are fetched here; the sentence
- * leaves out whatever hasn't arrived.
+ * next. The team's member, process and connection counts are fetched here;
+ * the sentence leaves out whatever hasn't arrived.
  */
 export function JoinedDialog({ team }: { team: Team }) {
   const cloud = useCloud();
   const appActions = useAppActions();
   const [members, setMembers] = useState<number | null>(null);
   const [processes, setProcesses] = useState<number | null>(null);
+  const [connections, setConnections] = useState<number | null>(null);
   const showProcesses = cloud.has("processes");
+  const showConnections = cloud.has("connections");
 
   useEffect(() => {
     let cancelled = false;
@@ -31,10 +33,16 @@ export function JoinedDialog({ team }: { team: Team }) {
         () => {},
       );
     }
+    if (showConnections) {
+      void countLiveConnections((since) => api.listTeamConnections(team.id, since)).then(
+        (count) => !cancelled && setConnections(count),
+        () => {},
+      );
+    }
     return () => {
       cancelled = true;
     };
-  }, [team.id, showProcesses]);
+  }, [team.id, showProcesses, showConnections]);
 
   const openTeam = () => {
     cloud.selectSpace(team.id);
@@ -68,9 +76,7 @@ export function JoinedDialog({ team }: { team: Team }) {
               {joinedSummary({
                 members,
                 processes: showProcesses ? processes : null,
-                // Team connections need cloud epic 005; until the API can list
-                // them the sentence leaves them out.
-                connections: null,
+                connections: showConnections ? connections : null,
                 role: team.role,
               })}
             </p>

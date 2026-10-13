@@ -117,28 +117,55 @@ export interface Template {
   installs: number;
 }
 
+/** Who may change or remove a team connection besides owners and admins: nobody, or every member. */
+export type TeamConnectionEditors = "admins" | "members";
+
 /**
- * A team connection (cloud epic 005, not built yet: only used behind the
- * `connections` feature). `settings` is readable by every member; the secret
- * is write only and never comes back here.
+ * A team connection (cloud epic 005, only used behind the `connections`
+ * feature). `settings` is readable by every member; the secret is write only
+ * here and never comes back, only `hasSecret`.
  */
 export interface TeamConnection {
   id: string;
   teamId: string;
-  /** Unique per team, lower case: processes refer to it as `${conn:<name>}`. */
+  /**
+   * Unique among the team's live connections and set for good on create:
+   * processes refer to it as `${conn:<name>}`. Several may share a kind.
+   */
   name: string;
-  /** "github", "postgresql"… */
+  /** The app's catalogue id: "github", "postgresql"… */
   kind: string;
   settings: Record<string, string>;
   hasSecret: boolean;
-  /** Who can change it: owners and admins, or every member. */
-  editors: "admins" | "members";
+  editors: TeamConnectionEditors;
   version: number;
   seq: number;
   deleted: boolean;
   createdBy: PublicUser;
+  createdAt: string;
   updatedBy: PublicUser;
   updatedAt: string;
+}
+
+/** POST /v1/teams/{teamId}/connections. A missing or empty `secret` means none. */
+export interface CreateTeamConnectionRequest {
+  name: string;
+  kind: string;
+  settings: Record<string, string>;
+  secret?: string;
+  editors?: TeamConnectionEditors;
+}
+
+/**
+ * PUT /v1/teams/{teamId}/connections/{id}. `settings` replace the stored ones.
+ * `secret` left out keeps the stored one, `""` removes it, anything else
+ * replaces it. `editors` left out keeps it; only owners and admins change it.
+ */
+export interface SaveTeamConnectionRequest {
+  settings: Record<string, string>;
+  secret?: string;
+  editors?: TeamConnectionEditors;
+  baseVersion: number;
 }
 
 export interface TeamConnectionPage {

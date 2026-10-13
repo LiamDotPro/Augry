@@ -3,7 +3,7 @@
  * error says, who can change what, and the sentences built from counts. Kept
  * apart from the components so it can be tested without a window.
  */
-import type { Invite, Member, ProcessPage, Role } from "./types";
+import type { Invite, Member, ProcessPage, Role, TeamConnectionPage } from "./types";
 
 // Names ------------------------------------------------------------------------
 
@@ -109,7 +109,7 @@ export interface JoinedCounts {
   members: number | null;
   /** Null when unknown or when the server has no team processes. */
   processes: number | null;
-  /** Null until team connections exist (cloud epic 005). */
+  /** Null when unknown or when the server has no team connections. */
   connections: number | null;
   role: Role;
 }
@@ -130,26 +130,44 @@ export function joinedSummary({ members, processes, connections, role }: JoinedC
 }
 
 /**
- * How many processes a team has now, paging through its change feed from the
- * start. The feed includes tombstones and can list a process again after a
+ * How many live items a change feed holds now, paging through it from the
+ * start. The feed includes tombstones and can list an item again after a
  * later change, so the latest entry per id decides.
  */
-export async function countLiveProcesses(fetchPage: (since: number) => Promise<ProcessPage>): Promise<number> {
+async function countLive<T extends { id: string; seq: number; deleted: boolean }>(
+  fetchPage: (since: number) => Promise<{ items: T[]; hasMore: boolean }>,
+): Promise<number> {
   const latest = new Map<string, { seq: number; deleted: boolean }>();
   let since = 0;
   for (;;) {
     const page = await fetchPage(since);
-    for (const process of page.processes) {
-      const seen = latest.get(process.id);
-      if (!seen || process.seq >= seen.seq) latest.set(process.id, { seq: process.seq, deleted: process.deleted });
+    for (const item of page.items) {
+      const seen = latest.get(item.id);
+      if (!seen || item.seq >= seen.seq) latest.set(item.id, { seq: item.seq, deleted: item.deleted });
     }
-    const last = page.processes[page.processes.length - 1];
+    const last = page.items[page.items.length - 1];
     if (!page.hasMore || !last || last.seq <= since) break;
     since = last.seq;
   }
   let live = 0;
   for (const entry of latest.values()) if (!entry.deleted) live += 1;
   return live;
+}
+
+/** How many processes a team has now. */
+export function countLiveProcesses(fetchPage: (since: number) => Promise<ProcessPage>): Promise<number> {
+  return countLive(async (since) => {
+    const page = await fetchPage(since);
+    return { items: page.processes, hasMore: page.hasMore };
+  });
+}
+
+/** How many connections a team has now (the `connections` feature). */
+export function countLiveConnections(fetchPage: (since: number) => Promise<TeamConnectionPage>): Promise<number> {
+  return countLive(async (since) => {
+    const page = await fetchPage(since);
+    return { items: page.connections, hasMore: page.hasMore };
+  });
 }
 
 // Invites ------------------------------------------------------------------------
