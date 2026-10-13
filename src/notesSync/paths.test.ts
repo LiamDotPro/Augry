@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   conflictCopyPath,
+  isSyncableNote,
   joinRoot,
+  kindOf,
   localOfSpace,
+  MAX_PATH_BYTES,
+  pathProblem,
   separatorOf,
   spaceOfLocal,
   teamFolderName,
@@ -67,6 +71,84 @@ describe("localOfSpace", () => {
 
   it("leaves settings.json out", () => {
     expect(localOfSpace("personal", "settings.json", layout)).toBeNull();
+  });
+});
+
+describe("isSyncableNote", () => {
+  it("takes .md only, case sensitive like the server", () => {
+    expect(isSyncableNote("plan.md")).toBe(true);
+    expect(isSyncableNote("plan.MD")).toBe(false);
+    expect(isSyncableNote("plan.Md")).toBe(false);
+    expect(spaceOfLocal("Northwind/plan.MD", layout)).toBeNull();
+  });
+});
+
+describe("pathProblem", () => {
+  it("takes ordinary paths", () => {
+    expect(pathProblem("team", "agents/claude-code.md")).toBeNull();
+    expect(pathProblem("team", "é/日本語 notes.md")).toBeNull();
+    expect(pathProblem("personal", "settings.json")).toBeNull();
+    expect(pathProblem("team", "..notes.md")).toBeNull();
+  });
+
+  it("refuses an empty path", () => {
+    expect(pathProblem("team", "")).toBe("path is empty");
+  });
+
+  it("counts the limit in UTF-8 bytes, not characters", () => {
+    const fits = `${"a".repeat(MAX_PATH_BYTES - 3)}.md`;
+    expect(pathProblem("team", fits)).toBeNull();
+    expect(pathProblem("team", `a${fits}`)).toBe("path is longer than 512 bytes");
+    // 170 three-byte characters are 510 bytes: with ".md", 513.
+    expect(pathProblem("team", `${"日".repeat(170)}.md`)).toBe("path is longer than 512 bytes");
+    expect(pathProblem("team", `${"日".repeat(169)}.md`)).toBeNull();
+  });
+
+  it("refuses half a surrogate pair as not UTF-8", () => {
+    expect(pathProblem("team", "a\ud800.md")).toBe("path is not valid UTF-8");
+    expect(pathProblem("team", "a\udc00.md")).toBe("path is not valid UTF-8");
+    expect(pathProblem("team", "a😀.md")).toBeNull();
+  });
+
+  it("refuses control characters: C0, DEL and C1", () => {
+    for (const control of ["\u0000", "\t", "\n", "\u001f", "\u007f", "\u0080", "\u009f"]) {
+      expect(pathProblem("team", `a${control}b.md`)).toBe("path has a control character");
+    }
+    expect(pathProblem("team", "a b.md")).toBeNull();
+  });
+
+  it("refuses a backslash", () => {
+    expect(pathProblem("team", "a\\b.md")).toBe("path has a backslash");
+  });
+
+  it("refuses a leading or trailing slash", () => {
+    expect(pathProblem("team", "/a.md")).toBe("path starts with a slash");
+    expect(pathProblem("team", "a.md/")).toBe("path ends with a slash");
+  });
+
+  it("refuses empty, . and .. segments", () => {
+    expect(pathProblem("team", "a//b.md")).toBe("path has an empty segment");
+    expect(pathProblem("team", "./a.md")).toBe("path has a . or .. segment");
+    expect(pathProblem("team", "a/../b.md")).toBe("path has a . or .. segment");
+  });
+
+  it("takes .md in a team space and .md or .json in personal, case sensitive", () => {
+    expect(pathProblem("team", "a.MD")).toBe("path must end in .md");
+    expect(pathProblem("team", "settings.json")).toBe("path must end in .md");
+    expect(pathProblem("personal", "a.txt")).toBe("path must end in .md or .json");
+    expect(pathProblem("personal", "a.JSON")).toBe("path must end in .md or .json");
+    expect(pathProblem("personal", "a.md")).toBeNull();
+  });
+
+  it("checks the rules in the server's order", () => {
+    expect(pathProblem("team", "/a\\b")).toBe("path has a backslash");
+    expect(pathProblem("team", "/a//b")).toBe("path starts with a slash");
+    expect(pathProblem("team", "a/./b")).toBe("path has a . or .. segment");
+  });
+
+  it("names the kind of a space", () => {
+    expect(kindOf("personal")).toBe("personal");
+    expect(kindOf("t1")).toBe("team");
   });
 });
 

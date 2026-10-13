@@ -1,9 +1,17 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CloudError } from "../cloud/api";
 import type { Change, ChangePage, Space, SyncDocument } from "../cloud/types";
-import { NotesSyncEngine, type EngineConfig, type IndexStore, type LocalFile, type NotesIO, type SyncApi } from "./engine";
+import {
+  NotesSyncEngine,
+  type EngineClock,
+  type EngineConfig,
+  type IndexStore,
+  type LocalFile,
+  type NotesIO,
+  type SyncApi,
+} from "./engine";
 import { byteLength, sha256Hex } from "./hash";
-import type { SpaceLayout } from "./paths";
+import { MAX_CONTENT_BYTES, pathProblem, type SpaceLayout } from "./paths";
 import type { SpaceIndex } from "./plan";
 
 /** A notes folder in memory. */
@@ -46,40 +54,63 @@ class FakeServer implements SyncApi {
   dropNextAnswer = false;
   /** The next change feed call answers 410. */
   gone = false;
+  /** The next change feed call with a cursor answers 400 "invalid cursor". */
+  badCursor = false;
+  /** Every call answers 404: the user left the team. */
+  spaceGone = false;
+  /** Answers to give instead, by method, once each. */
+  failures: Record<string, CloudError[]> = {};
+  calls = 0;
   puts = 0;
 
-  private check() {
+  fail(method: keyof SyncApi, error: CloudError) {
+    (this.failures[method] ??= []).push(error);
+  }
+  private check(method: keyof SyncApi) {
     if (this.offline) throw new CloudError(0, "offline", "offline");
+    this.calls++;
+    if (this.spaceGone) {
+      throw new CloudError(404, "not_found", method === "getTeamSpace" ? "team not found" : "space not found");
+    }
+    const failure = this.failures[method]?.shift();
+    if (failure) throw failure;
   }
   async getPersonalSpace(): Promise<Space> {
-    this.check();
+    this.check("getPersonalSpace");
     return { id: "space-p", kind: "personal", lastSeq: 0 };
   }
   async getTeamSpace(teamId: string): Promise<Space> {
-    this.check();
+    this.check("getTeamSpace");
     return { id: `space-${teamId}`, kind: "team", teamId, lastSeq: 0 };
   }
   async listChanges(_spaceId: string, cursor: string): Promise<ChangePage> {
-    this.check();
+    this.check("listChanges");
     if (this.gone) {
       this.gone = false;
       throw new CloudError(410, "gone", "gone");
+    }
+    if (this.badCursor && cursor) {
+      this.badCursor = false;
+      throw new CloudError(400, "bad_request", "invalid cursor");
     }
     const from = cursor ? Number(cursor) : 0;
     return { changes: this.feed.slice(from), cursor: String(this.feed.length), hasMore: false };
   }
   async getDocuments(_spaceId: string, ids: string[]) {
-    this.check();
+    this.check("getDocuments");
     return ids.flatMap((id) => (this.docs.has(id) ? [this.docs.get(id)!] : []));
   }
   async putDocument(spaceId: string, id: string, path: string, content: string, baseRevision: number) {
-    this.check();
+    this.check("putDocument");
     this.puts++;
+    const problem = pathProblem(spaceId === "space-p" ? "personal" : "team", path);
+    if (problem) throw new CloudError(400, "bad_request", problem);
+    if (byteLength(content) > MAX_CONTENT_BYTES) throw new CloudError(400, "bad_request", "content is larger than 1 MiB");
     const current = this.docs.get(id);
     const holder = [...this.docs.values()].find((d) => d.path === path && !d.deleted && d.id !== id);
     if (holder) throw new CloudError(409, "conflict", "path in use", holder);
     if (current && baseRevision === 0 && current.path === path && current.content === content) return current;
-    if (!current && baseRevision !== 0) throw new CloudError(404, "not_found", "no such document");
+    if (!current && baseRevision !== 0) throw new CloudError(404, "not_found", "document not found");
     if (current && current.revision !== baseRevision) throw new CloudError(409, "conflict", "stale", current);
     const doc = await this.store(spaceId, id, path, content, (current?.revision ?? 0) + 1, "me");
     if (this.dropNextAnswer) {
@@ -89,9 +120,9 @@ class FakeServer implements SyncApi {
     return doc;
   }
   async deleteDocument(_spaceId: string, id: string, baseRevision: number) {
-    this.check();
+    this.check("deleteDocument");
     const current = this.docs.get(id);
-    if (!current) throw new CloudError(404, "not_found", "no such document");
+    if (!current) throw new CloudError(404, "not_found", "document not found");
     if (current.deleted || current.revision !== baseRevision) throw new CloudError(409, "conflict", "stale", current);
     const doc = { ...current, content: "", deleted: true, revision: current.revision + 1 };
     this.docs.set(id, doc);
@@ -130,6 +161,36 @@ class MemoryStore implements IndexStore {
   save(userId: string, space: string, index: SpaceIndex) {
     this.saved.set(`${userId}.${space}`, structuredClone(index));
   }
+  remove(userId: string, space: string) {
+    this.saved.delete(`${userId}.${space}`);
+  }
+}
+
+/** Time that only moves when a test moves it. */
+class TestClock implements EngineClock {
+  at = 1_000_000;
+  timers: { at: number; ms: number; run: () => void; cancelled: boolean }[] = [];
+  now = () => this.at;
+  after = (ms: number, run: () => void) => {
+    const timer = { at: this.at + ms, ms, run, cancelled: false };
+    this.timers.push(timer);
+    return () => {
+      timer.cancelled = true;
+    };
+  };
+  pending() {
+    return this.timers.filter((timer) => !timer.cancelled);
+  }
+  /** Moves time on and runs the timers that are due. */
+  advance(ms: number) {
+    this.at += ms;
+    for (const timer of this.pending()) {
+      if (timer.at <= this.at) {
+        timer.cancelled = true;
+        timer.run();
+      }
+    }
+  }
 }
 
 const TEAM_LAYOUT: SpaceLayout = { spaces: [{ key: "t1", folder: "Northwind" }], teamFolders: ["Northwind"] };
@@ -141,6 +202,8 @@ describe("NotesSyncEngine", () => {
   let engine: NotesSyncEngine;
   let editing: Set<string>;
   let ids: number;
+  let clock: TestClock;
+  let goneSpaces: string[];
 
   const config = (layout: SpaceLayout = TEAM_LAYOUT): EngineConfig => ({
     userId: "me",
@@ -149,6 +212,7 @@ describe("NotesSyncEngine", () => {
     nameOf: async (_space, userId) => (userId === "maya" ? "Maya Chen" : "another device"),
     editing: (relPath) => editing.has(relPath),
     onSynced: () => {},
+    onGone: (space) => goneSpaces.push(space),
   });
 
   beforeEach(() => {
@@ -157,7 +221,13 @@ describe("NotesSyncEngine", () => {
     store = new MemoryStore();
     editing = new Set();
     ids = 0;
-    engine = new NotesSyncEngine(folder, server, store, () => `doc-${++ids}`);
+    clock = new TestClock();
+    goneSpaces = [];
+    engine = new NotesSyncEngine(folder, server, store, {
+      newId: () => `doc-${++ids}`,
+      clock,
+      pace: null,
+    });
     engine.configure(config());
   });
 
@@ -307,5 +377,190 @@ describe("NotesSyncEngine", () => {
     expect(folder.files.get("todo.md")?.content).toBe("this computer");
     expect(folder.files.get("todo (another device).md")?.content).toBe("laptop");
     expect(server.docs.size).toBe(1);
+  });
+
+  describe("the server's rules", () => {
+    it("never sends a note whose name the server would refuse, and says why", async () => {
+      folder.edit("Northwind/a\\b.md", "backslash");
+      folder.edit(`Northwind/${"n".repeat(510)}.md`, "long");
+      folder.edit("Northwind/tab\there.md", "control");
+      folder.edit("Northwind/ok.md", "fine");
+      await engine.sync(true);
+      expect(server.puts).toBe(1);
+      expect(server.livePaths()).toEqual(["ok.md"]);
+      expect(engine.snapshot.reasons).toEqual({
+        "Northwind/a\\b.md": "Stays on this computer: path has a backslash.",
+        [`Northwind/${"n".repeat(510)}.md`]: "Stays on this computer: path is longer than 512 bytes.",
+        "Northwind/tab\there.md": "Stays on this computer: path has a control character.",
+      });
+      expect(engine.snapshot.refused).toHaveLength(3);
+      expect(engine.snapshot.waiting).toEqual([]);
+    });
+
+    it("leaves .MD alone: extensions are case sensitive", async () => {
+      folder.edit("Northwind/Plan.MD", "x");
+      await engine.sync(true);
+      expect(server.puts).toBe(0);
+      expect(engine.snapshot.waitingCount).toBe(0);
+    });
+
+    it("keeps a note over 1 MiB here, without deleting the synced version", async () => {
+      folder.edit("Northwind/big.md", "small");
+      folder.edit("Northwind/huge.md", "x".repeat(MAX_CONTENT_BYTES + 1));
+      await engine.sync(true);
+      expect(server.livePaths()).toEqual(["big.md"]);
+      folder.edit("Northwind/big.md", "é".repeat(MAX_CONTENT_BYTES / 2 + 1));
+      await engine.sync(true);
+      expect(server.puts).toBe(1);
+      expect(server.livePaths()).toEqual(["big.md"]);
+      expect([...server.docs.values()][0].content).toBe("small");
+      expect(engine.snapshot.reasons).toEqual({
+        "Northwind/big.md": "Stays on this computer: content is larger than 1 MiB.",
+        "Northwind/huge.md": "Stays on this computer: content is larger than 1 MiB.",
+      });
+      // Small again: it syncs.
+      folder.edit("Northwind/big.md", "small again");
+      await engine.sync(true);
+      expect([...server.docs.values()][0].content).toBe("small again");
+      expect(engine.snapshot.refused).toEqual(["Northwind/huge.md"]);
+    });
+
+    it("keeps the server's reason for a refusal, and sends again once the note changes", async () => {
+      folder.edit("Northwind/a.md", "a");
+      server.fail("putDocument", new CloudError(400, "bad_request", "this space already has 5000 documents"));
+      await engine.sync(true);
+      expect(engine.snapshot.reasons).toEqual({
+        "Northwind/a.md": "Stays on this computer: this space already has 5000 documents.",
+      });
+      // Not sent again as it is (only the change feed is read).
+      const calls = server.calls;
+      await engine.sync(true);
+      expect(server.calls).toBe(calls + 1);
+      expect(engine.snapshot.waitingCount).toBe(0);
+      folder.edit("Northwind/a.md", "a, edited");
+      await engine.sync(true);
+      expect(server.livePaths()).toEqual(["a.md"]);
+      expect(engine.snapshot.refused).toEqual([]);
+    });
+
+    it("sends a note again as new when the server has no such document", async () => {
+      folder.edit("Northwind/a.md", "a");
+      await engine.sync(true);
+      server.docs.clear();
+      folder.edit("Northwind/a.md", "a, edited");
+      await engine.sync(true);
+      await engine.sync(true);
+      expect(server.livePaths()).toEqual(["a.md"]);
+      expect(engine.snapshot.waitingCount).toBe(0);
+      expect(engine.snapshot.refused).toEqual([]);
+    });
+  });
+
+  describe("try again later", () => {
+    it("treats 429 as waiting, not refused, and retries after a wait", async () => {
+      folder.edit("Northwind/a.md", "a");
+      server.fail("putDocument", new CloudError(429, "rate_limited", "too many requests, retry later"));
+      await engine.sync(true);
+      expect(engine.snapshot).toMatchObject({
+        refused: [],
+        offline: false,
+        retrying: true,
+        waiting: ["Northwind/a.md"],
+      });
+      expect(clock.pending().map((timer) => timer.ms)).toEqual([2_000]);
+
+      // A round before the wait is up leaves the server alone.
+      const calls = server.calls;
+      await engine.sync(true);
+      expect(server.calls).toBe(calls);
+
+      clock.advance(2_000);
+      await engine.sync(true); // joins the round the timer started
+      expect(server.livePaths()).toEqual(["a.md"]);
+      expect(engine.snapshot.retrying).toBe(false);
+      expect(engine.snapshot.waiting).toEqual([]);
+      expect(clock.pending()).toEqual([]);
+    });
+
+    it("waits longer each time the server says no in a row", async () => {
+      folder.edit("Northwind/a.md", "a");
+      const busy = () => new CloudError(429, "rate_limited", "too many requests, retry later");
+      server.fail("listChanges", busy());
+      server.fail("listChanges", busy());
+      await engine.sync(true);
+      clock.advance(2_000);
+      await engine.sync(true);
+      expect(clock.pending().map((timer) => timer.ms)).toEqual([4_000]);
+      clock.advance(4_000);
+      await engine.sync(true);
+      expect(server.livePaths()).toEqual(["a.md"]);
+      expect(engine.snapshot.retrying).toBe(false);
+    });
+
+    it("stops the round on a 408 too, and the other spaces wait with it", async () => {
+      engine.configure(
+        config({
+          spaces: [
+            { key: "personal", folder: "" },
+            { key: "t1", folder: "Northwind" },
+          ],
+          teamFolders: ["Northwind"],
+        }),
+      );
+      folder.edit("todo.md", "mine");
+      folder.edit("Northwind/a.md", "team");
+      server.fail("getPersonalSpace", new CloudError(408, "timeout", "request timeout"));
+      await engine.sync(true);
+      expect(server.calls).toBe(1);
+      expect(engine.snapshot.waitingCount).toBe(2);
+      expect(engine.snapshot.retrying).toBe(true);
+      clock.advance(2_000);
+      await engine.sync(true);
+      expect(engine.snapshot.waitingCount).toBe(0);
+    });
+  });
+
+  describe("the change feed", () => {
+    it("starts over when the server doesn't take the cursor (400)", async () => {
+      await server.store("space-t1", "r1", "a.md", "one", 1, "maya");
+      await engine.sync(true);
+      await server.store("space-t1", "r2", "b.md", "two", 1, "maya");
+      server.badCursor = true;
+      await engine.sync(true);
+      expect(folder.files.get("Northwind/b.md")?.content).toBe("two");
+      expect(folder.files.get("Northwind/a.md")?.content).toBe("one");
+      expect(store.saved.get("me.t1")?.cursor).toBe("2");
+    });
+
+    it("stops syncing a space that is gone (404) and drops its index", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      folder.edit("Northwind/a.md", "a");
+      await engine.sync(true);
+      expect(store.saved.has("me.t1")).toBe(true);
+
+      server.spaceGone = true;
+      folder.edit("Northwind/a.md", "edited after leaving");
+      await engine.sync(true);
+      expect(goneSpaces).toEqual(["t1"]);
+      expect(store.saved.has("me.t1")).toBe(false);
+      expect(engine.snapshot.waiting).toEqual([]);
+      expect(engine.snapshot.offline).toBe(false);
+      // The notes stay in the folder.
+      expect(folder.files.get("Northwind/a.md")?.content).toBe("edited after leaving");
+
+      const calls = server.calls;
+      await engine.sync(true);
+      expect(server.calls).toBe(calls);
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it("drops a team space whose team answers 404 before its first sync", async () => {
+      server.spaceGone = true;
+      folder.edit("Northwind/a.md", "a");
+      await engine.sync(true);
+      expect(goneSpaces).toEqual(["t1"]);
+      expect(store.saved.size).toBe(0);
+    });
   });
 });

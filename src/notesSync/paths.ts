@@ -36,10 +36,60 @@ export function teamFolderName(teamName: string): string {
   return safeName(teamName, "Team");
 }
 
-/** Team spaces hold markdown only; personal holds .md too (settings.json is out of scope). */
+/**
+ * Team spaces hold markdown only; personal holds .md too (settings.json is
+ * out of scope). Case sensitive, as the server is: "Plan.MD" stays here.
+ */
 export function isSyncableNote(path: string): boolean {
-  return path.toLowerCase().endsWith(".md");
+  return path.endsWith(".md");
 }
+
+// The server's rules (apps/api/internal/docsync/path.go) ---------------------
+
+/** A document's content may be at most 1 MiB of UTF-8. */
+export const MAX_CONTENT_BYTES = 1 << 20;
+/** A path may be at most 512 bytes of UTF-8. */
+export const MAX_PATH_BYTES = 512;
+
+export type SpaceKind = "team" | "personal";
+
+export function kindOf(space: SpaceKey): SpaceKind {
+  return space === PERSONAL ? "personal" : "team";
+}
+
+/** unicode.IsControl: C0 (tab and newline too), DEL and C1. */
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
+/** Half a surrogate pair: not valid UTF-8 once encoded. */
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
+/**
+ * Why the server would refuse this path in a space of this kind, in its own
+ * words, or null when it takes it. The rules, and the order they are checked
+ * in, are path.go's ValidatePath.
+ */
+export function pathProblem(kind: SpaceKind, path: string): string | null {
+  if (path === "") return "path is empty";
+  if (new TextEncoder().encode(path).length > MAX_PATH_BYTES) return `path is longer than ${MAX_PATH_BYTES} bytes`;
+  if (LONE_SURROGATE.test(path)) return "path is not valid UTF-8";
+  if (CONTROL.test(path)) return "path has a control character";
+  if (path.includes("\\")) return "path has a backslash";
+  if (path.startsWith("/")) return "path starts with a slash";
+  if (path.endsWith("/")) return "path ends with a slash";
+  for (const segment of path.split("/")) {
+    if (segment === "") return "path has an empty segment";
+    if (segment === "." || segment === "..") return "path has a . or .. segment";
+  }
+  if (kind === "team") return path.endsWith(".md") ? null : "path must end in .md";
+  return path.endsWith(".md") || path.endsWith(".json") ? null : "path must end in .md or .json";
+}
+
+/** What the "not synced" mark says about a note: why it stays on this computer. */
+export function notSyncedReason(problem: string): string {
+  return `Stays on this computer: ${problem}.`;
+}
+
+/** Why a note too large for the server stays here. */
+export const TOO_LARGE = "content is larger than 1 MiB";
 
 function firstSegment(relPath: string): string {
   const slash = relPath.indexOf("/");

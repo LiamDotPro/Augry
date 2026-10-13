@@ -56,6 +56,15 @@ export function saveIndex(userId: string, space: string, index: SpaceIndex): voi
   }
 }
 
+/** The space is gone for this user (they left the team): nothing of it is kept. */
+export function removeIndex(userId: string, space: string): void {
+  try {
+    storage()?.removeItem(indexKey(userId, space));
+  } catch {
+    // Blocked: the stale index is replaced the next time the space syncs.
+  }
+}
+
 /** Member counts as last seen, so "team · 6" still reads right offline. */
 export function lastMemberCounts(userId: string): Record<string, number> {
   try {

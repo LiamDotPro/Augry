@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clock, conflictLead, footerCopy, savedStatus } from "./status";
 
 const at = new Date(2026, 9, 12, 10, 42).getTime();
-const base = { conflicts: 0, offline: false, waiting: 0, syncedAt: at, personal: true, teams: [{ name: "Northwind", members: 6 }] };
+const base = { conflicts: 0, offline: false, retrying: false, waiting: 0, syncedAt: at, personal: true, teams: [{ name: "Northwind", members: 6 }] };
 
 describe("footerCopy", () => {
   it("says when it synced and who each space reaches", () => {
@@ -27,6 +27,16 @@ describe("footerCopy", () => {
       line: "Offline · 3 changes waiting",
       text: "Saved on this computer. They sync when you’re back online.",
     });
+  });
+
+  it("says changes wait while the server asks to slow down", () => {
+    expect(footerCopy({ ...base, retrying: true, waiting: 1 })).toEqual({
+      tone: "ring",
+      line: "1 change waiting",
+      text: "The server is busy. Saved on this computer; sync tries again in a moment.",
+    });
+    // Nothing waiting: nothing to say about it.
+    expect(footerCopy({ ...base, retrying: true }).line).toBe("Synced · 10:42");
   });
 
   it("leaves out Personal when only a team syncs", () => {

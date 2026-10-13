@@ -208,7 +208,11 @@ function TreeLevel(props: TreeLevelProps) {
                 </button>
               )}
 
-              {mark && <span className={cx("tree__mark", `tree__mark--${mark.tone}`)}>{mark.text}</span>}
+              {mark && (
+                <span className={cx("tree__mark", `tree__mark--${mark.tone}`)} title={mark.reason}>
+                  {mark.text}
+                </span>
+              )}
 
               <button
                 type="button"
