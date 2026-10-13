@@ -31,10 +31,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [features]
-default = ["trigger-fs", "trigger-git", "trigger-clock"]
+default = ["trigger-fs", "trigger-git", "trigger-clock", "trigger-docker"]
 trigger-fs = ["dep:trigger-fs"]
 trigger-git = ["dep:trigger-git"]
 trigger-clock = ["dep:trigger-clock"]
+trigger-docker = ["dep:trigger-docker"]
 
 [dependencies]
 trigger-core = { path = "crates/trigger-core" }
@@ -42,6 +43,7 @@ trigger-hub = { path = "crates/trigger-hub" }
 trigger-fs = { path = "crates/trigger-fs", optional = true }
 trigger-git = { path = "crates/trigger-git", optional = true }
 trigger-clock = { path = "crates/trigger-clock", optional = true }
+trigger-docker = { path = "crates/trigger-docker", optional = true }
 tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"

@@ -76,5 +76,6 @@ process definition (local file, later synced)      ${variables} filled in
 | 002-trigger-internal | the `tg` source inside the app: agent finished, command failed or slow, output matched, bell, task reported, pane opened in a repo, worktrees, review staged, note saved, focus, app started; plus the shell integration fixes and the marks scanner it needed | done |
 | 003-trigger-git | `trigger-git`: commit, branch switch, pull, merge conflict, stopped rebase, tag, stash, detached HEAD, behind remote, old uncommitted work and new clones | done |
 | 007-trigger-clock | `trigger-clock`: schedule, interval, first use of the day, and calendar events, with catch up after sleep | done |
-| 004 to 006, 008 to 015 | one crate per integration, all depending on 001 only | draft |
+| 010-trigger-docker | `trigger-docker`: container started, stopped, healthy, unhealthy and image built, from Docker and Podman | done |
+| 004 to 006, 008, 009, 011 to 015 | one crate per integration, all depending on 001 only | draft |
 | later | process editor, run engine, trigger picker UI, team sync of definitions | not planned |

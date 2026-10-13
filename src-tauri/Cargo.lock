@@ -4688,6 +4688,7 @@ dependencies = [
  "trash",
  "trigger-clock",
  "trigger-core",
+ "trigger-docker",
  "trigger-fs",
  "trigger-git",
  "trigger-hub",
@@ -5100,6 +5101,16 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+]
+
+[[package]]
+name = "trigger-docker"
+version = "0.1.0"
+dependencies = [
+ "globset",
+ "serde",
+ "serde_json",
+ "trigger-core",
 ]
 
 [[package]]
