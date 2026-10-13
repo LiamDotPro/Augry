@@ -14,6 +14,8 @@ export type SyncTone = "ok" | "warn" | "ring" | "idle";
 export interface FooterInput {
   conflicts: number;
   offline: boolean;
+  /** The server asked to slow down: changes wait and sync tries again shortly. */
+  retrying: boolean;
   waiting: number;
   syncedAt: number | null;
   personal: boolean;
@@ -50,6 +52,14 @@ export function footerCopy(input: FooterInput): { tone: SyncTone; line: string; 
       tone: "ring",
       line: n === 0 ? "Offline" : `Offline · ${n} ${n === 1 ? "change" : "changes"} waiting`,
       text: "Saved on this computer. They sync when you’re back online.",
+    };
+  }
+  if (input.retrying && input.waiting > 0) {
+    const n = input.waiting;
+    return {
+      tone: "ring",
+      line: `${n} ${n === 1 ? "change" : "changes"} waiting`,
+      text: "The server is busy. Saved on this computer; sync tries again in a moment.",
     };
   }
   return {

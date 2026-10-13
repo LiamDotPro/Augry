@@ -33,6 +33,7 @@ import {
   lastMemberCounts,
   loadIndex,
   rememberMemberCount,
+  removeIndex,
   saveIndex,
   teamFolderFor,
 } from "./store";
@@ -55,6 +56,8 @@ export interface SyncRoot {
 export interface RowMark {
   text: string;
   tone: "muted" | "warn";
+  /** Why, for the mark's tooltip: the reason a note stays on this computer. */
+  reason?: string;
 }
 
 export interface NotesSyncValue {
@@ -105,7 +108,7 @@ export function NotesSyncProvider({ children }: { children: ReactNode }) {
   const actions = useAppActions();
 
   const engine = useMemo(
-    () => new NotesSyncEngine(notesIO, syncApi, { load: loadIndex, save: saveIndex }),
+    () => new NotesSyncEngine(notesIO, syncApi, { load: loadIndex, save: saveIndex, remove: removeIndex }),
     [],
   );
   const snapshot = useSyncExternalStore(
@@ -176,6 +179,8 @@ export function NotesSyncProvider({ children }: { children: ReactNode }) {
   onlineRef.current = cloud.online;
   const markSyncedRef = useRef(cloud.markSynced);
   markSyncedRef.current = cloud.markSynced;
+  const refreshTeamsRef = useRef(cloud.refreshTeams);
+  refreshTeamsRef.current = cloud.refreshTeams;
 
   const run = useCallback(() => {
     void engine.sync(onlineRef.current).catch((error) => console.warn("notes sync", error));
@@ -209,6 +214,8 @@ export function NotesSyncProvider({ children }: { children: ReactNode }) {
         return current.conflict !== null || current.saveState === "dirty" || current.saveState === "saving" || current.saveState === "error";
       },
       onSynced: (space, at) => markSyncedRef.current(space === PERSONAL ? "notes:personal" : `notes:${space}`, at),
+      // Left or deleted: the teams list catches up, and the team drops out of what syncs.
+      onGone: () => void refreshTeamsRef.current().catch(() => {}),
     });
     run();
   }, [engine, layout, userId, root, run]);
@@ -281,7 +288,6 @@ export function NotesSyncProvider({ children }: { children: ReactNode }) {
     const teamRoots = roots.filter((r) => r.kind === "team");
     const unsyncedFolders = layout.teamFolders.filter((folder) => !teamRoots.some((r) => r.folder === folder));
     const waiting = new Set(snapshot.waiting);
-    const refused = new Set(snapshot.refused);
 
     const rootOf = (relPath: string) => {
       const team = teamRoots.find((r) => relPath === r.folder || relPath.startsWith(`${r.folder}/`));
@@ -301,6 +307,7 @@ export function NotesSyncProvider({ children }: { children: ReactNode }) {
       footer: footerCopy({
         conflicts: snapshot.conflicts.length,
         offline,
+        retrying: snapshot.retrying,
         waiting: snapshot.waitingCount,
         syncedAt: snapshot.syncedAt,
         personal,
@@ -311,12 +318,15 @@ export function NotesSyncProvider({ children }: { children: ReactNode }) {
       markOf: (node, selected) => {
         if (selected) return null;
         if (snapshot.conflicts.some((c) => c.copyPath === node.relPath)) return { text: "conflict", tone: "warn" };
-        if (refused.has(node.relPath)) return { text: "not synced", tone: "muted" };
-        if (offline && waiting.has(node.relPath)) return { text: "waiting", tone: "warn" };
+        const reason = snapshot.reasons[node.relPath];
+        if (reason) return { text: "not synced", tone: "muted", reason };
+        if ((offline || snapshot.retrying) && waiting.has(node.relPath)) return { text: "waiting", tone: "warn" };
         const { root: where } = rootOf(node.relPath);
         const syncs = where.kind === "team" || personal;
         if (!syncs) return null;
-        if (node.kind === "file" && !isSyncableNote(node.name)) return { text: "not synced", tone: "muted" };
+        if (node.kind === "file" && !isSyncableNote(node.name)) {
+          return { text: "not synced", tone: "muted", reason: "Stays on this computer: only notes ending in .md sync." };
+        }
         // A team folder that doesn't sync stays on this computer.
         if (where.kind === "personal" && node.kind === "folder" && unsyncedFolders.includes(node.relPath)) {
           return { text: "not synced", tone: "muted" };
