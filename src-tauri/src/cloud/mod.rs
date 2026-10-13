@@ -16,11 +16,18 @@ use tauri_plugin_opener::OpenerExt;
 use crate::error::{AppError, Result};
 use crate::AppState;
 
-/// Where the API runs. `AUGRY_CLOUD_URL` overrides it at run time or at build
-/// time, for a local server (http://localhost:8080).
-const DEFAULT_BASE_URL: &str = "https://augry-api.fly.dev";
+/// Where the API runs. Debug builds (`tauri dev`) use the local production
+/// stack (`npx nx run api:stack` in Terminal-Grid-Cloud); release builds use
+/// production. `AUGRY_CLOUD_URL` overrides either at run time or build time.
+const DEFAULT_BASE_URL: &str = if cfg!(debug_assertions) {
+    "http://localhost:8080"
+} else {
+    "https://api.augry.dev"
+};
 const KEYCHAIN_SERVICE: &str = "app.augry.cloud";
-const KEYCHAIN_USER: &str = "session";
+/// Debug builds keep their own session so signing in locally never replaces
+/// the installed app's production session.
+const KEYCHAIN_USER: &str = if cfg!(debug_assertions) { "session-dev" } else { "session" };
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 /// Only these hosts may be opened from the sign-in screens.
 const OPENABLE: [&str; 3] = ["https://github.com/", "https://augry.dev/", "https://augry.app/"];
