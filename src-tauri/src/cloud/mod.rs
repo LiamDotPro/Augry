@@ -23,7 +23,7 @@ const KEYCHAIN_SERVICE: &str = "app.augry.cloud";
 const KEYCHAIN_USER: &str = "session";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 /// Only these hosts may be opened from the sign-in screens.
-const OPENABLE: [&str; 2] = ["https://github.com/", "https://augry.app/"];
+const OPENABLE: [&str; 3] = ["https://github.com/", "https://augry.dev/", "https://augry.app/"];
 
 pub const DEEP_LINK_EVENT: &str = "cloud://deep-link";
 
@@ -265,7 +265,7 @@ pub async fn cloud_sign_out(app: AppHandle) -> Result<()> {
     crate::blocking(move || cloud(&app2).set_token(None)).await?
 }
 
-/// Opens a GitHub or augry.app page in the browser.
+/// Opens a GitHub or augry.dev page in the browser.
 #[tauri::command]
 pub fn cloud_open_url(app: AppHandle, url: String) -> Result<()> {
     open_allowed(&app, &url)

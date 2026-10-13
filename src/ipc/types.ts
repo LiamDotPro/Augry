@@ -335,7 +335,7 @@ export interface Commands {
   /** On 200 the token is stored and left out of the body. */
   cloud_device_poll: { in: { handle: string }; out: { status: number; body: unknown } };
   cloud_sign_out: { in: Record<string, never>; out: void };
-  /** github.com and augry.app pages only. */
+  /** github.com and augry.dev (or augry.app) pages only. */
   cloud_open_url: { in: { url: string }; out: void };
   cloud_take_deep_links: { in: Record<string, never>; out: string[] };
 

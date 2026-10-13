@@ -1,10 +1,13 @@
 /**
  * The secret check run before a process goes to a team (Process board 11,
  * share-blocked). Team processes can't hold keys or tokens; the server scans
- * every definition with these same rule ids and refuses a match with a 422
- * ("definition_contains_secret: <rule> at <json path>"). Running it here
- * first shows the dialog without a round trip, and the server's message is
- * parsed into the same shape when it still finds something.
+ * every definition and refuses a match with a 422
+ * ("definition_contains_secret: <rule> at <json path>"). This is the server's
+ * scan, rule for rule (Terminal-Grid-Cloud apps/api/internal/processes/
+ * secrets.go): the same patterns in the same order, every string value and
+ * every object key, keys in sorted order, and the same paths. So the dialog
+ * shows what the server would refuse, before anything is sent, and nothing
+ * it would accept.
  */
 
 export type SecretRule =
@@ -27,23 +30,30 @@ interface RuleDef {
   what: string;
 }
 
-// Order matters: the more specific rules come first, so an Anthropic key is
-// never reported as an OpenAI one.
+// The server's rules, in its order: the first match is the one it reports.
 const RULES: RuleDef[] = [
+  { id: "github-token", pattern: /\b(?:ghp|gho|ghu|ghs|ghr)_[0-9A-Za-z]{36}\b/, prefix: /^gh[pousr]_/, what: "a GitHub token" },
+  { id: "github-fine-grained-pat", pattern: /\bgithub_pat_\w{82}\b/, prefix: /^github_pat_/, what: "a GitHub token" },
+  { id: "anthropic-api-key", pattern: /\bsk-ant-(?:api|admin)\d{2}-[A-Za-z0-9_-]{80,}/, prefix: /^sk-ant-(?:api|admin)\d{2}-/, what: "an Anthropic API key" },
+  {
+    id: "openai-api-key",
+    pattern: /\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{40,}|\bsk-[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20}\b/,
+    prefix: /^sk-(?:proj-|svcacct-|admin-)?/,
+    what: "an OpenAI API key",
+  },
+  { id: "slack-token", pattern: /\bxox[bpsar]-\d{8,}-[0-9A-Za-z-]{10,}|\bxoxe(?:\.xox[bp])?-\d-[A-Za-z0-9]{100,}/, prefix: /^xox[a-z.]*-/, what: "a Slack token" },
+  { id: "slack-webhook", pattern: /hooks\.slack\.com\/(?:services|workflows|triggers)\/[A-Za-z0-9+/]{43,56}/, prefix: /^hooks\.slack\.com\/[a-z]+\//, what: "a Slack webhook" },
+  { id: "aws-access-key-id", pattern: /\b(?:AKIA|ASIA)[A-Z2-7]{16}\b/, prefix: /^[A-Z]{4}/, what: "an AWS access key" },
+  { id: "stripe-live-key", pattern: /\b(?:sk|rk)_live_[0-9A-Za-z]{24,99}\b/, prefix: /^[sr]k_live_/, what: "a Stripe live key" },
   { id: "private-key", pattern: /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----/, prefix: /^-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----/, what: "a private key" },
-  { id: "github-fine-grained-pat", pattern: /\bgithub_pat_[A-Za-z0-9_]{22,}/, prefix: /^github_pat_/, what: "a GitHub token" },
-  { id: "github-token", pattern: /\bgh[pousr]_[A-Za-z0-9]{30,}/, prefix: /^gh[pousr]_/, what: "a GitHub token" },
-  { id: "anthropic-api-key", pattern: /\bsk-ant-[A-Za-z0-9_-]{20,}/, prefix: /^sk-ant-(?:[a-z]+\d*-)?/, what: "an Anthropic API key" },
-  { id: "openai-api-key", pattern: /\bsk-(?!ant-)(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}/, prefix: /^sk-(?:proj-|svcacct-|admin-)?/, what: "an OpenAI API key" },
-  { id: "slack-webhook", pattern: /https:\/\/hooks\.slack\.com\/(?:services|workflows|triggers)\/[A-Za-z0-9_/-]{10,}/, prefix: /^https:\/\/hooks\.slack\.com\/[a-z]+\//, what: "a Slack webhook" },
-  { id: "slack-token", pattern: /\bxox[abposre]-[A-Za-z0-9-]{10,}/, prefix: /^xox[a-z]-/, what: "a Slack token" },
-  { id: "aws-access-key-id", pattern: /\b(?:AKIA|ASIA|ABIA|ACCA)[A-Z0-9]{16}\b/, prefix: /^[A-Z]{4}/, what: "an AWS access key" },
-  { id: "stripe-live-key", pattern: /\b(?:sk|rk)_live_[A-Za-z0-9]{16,}/, prefix: /^[sr]k_live_/, what: "a Stripe live key" },
 ];
 
 export interface SecretFinding {
   rule: SecretRule;
-  /** Where it is, as the server writes it without the leading "$.": lanes[2].steps[1].env.GH_TOKEN */
+  /**
+   * Where it is, as the server writes it without the leading "$" or "$.":
+   * steps[1].env.GH_TOKEN, or steps[1].env["<redacted key>"] for a key.
+   */
   path: string;
   /** The token with all but its prefix hidden: ghp_•••••••••••• */
   masked: string;
@@ -63,13 +73,16 @@ export function secretWhat(rule: string): string {
   return RULES.find((r) => r.id === rule)?.what ?? "a key or token";
 }
 
-const IDENT = /^[A-Za-z_$][\w$]*$/;
+/** Characters that make the server quote a key: `["a b"]` rather than `.ab`. */
+const QUOTE = /[.[\]"' $\\]/;
 
-function child(path: string, key: string | number): string {
-  if (typeof key === "number") return `${path}[${key}]`;
-  if (IDENT.test(key)) return path ? `${path}.${key}` : key;
-  return `${path}[${JSON.stringify(key)}]`;
+/** The server's keyPath: `$.key`, or `$["a key"]` when it needs quoting. */
+function keyPath(path: string, key: string): string {
+  return key !== "" && !QUOTE.test(key) ? `${path}.${key}` : `${path}[${JSON.stringify(key)}]`;
 }
+
+/** "$.steps[1].run" as the dialog shows it: "steps[1].run". */
+const shortPath = (path: string) => path.replace(/^\$\.?/, "");
 
 /** The first rule a string breaks, with the matching token. */
 export function matchSecret(text: string): { rule: SecretRule; token: string } | null {
@@ -80,20 +93,34 @@ export function matchSecret(text: string): { rule: SecretRule; token: string } |
   return null;
 }
 
-/** Every string in `value` that looks like a key or token, in document order. */
+/** Every key or token in `value`, in the order the server finds them. */
 export function scanSecrets(value: unknown): SecretFinding[] {
   const out: SecretFinding[] = [];
-  const walk = (v: unknown, path: string) => {
-    if (typeof v === "string") {
-      const hit = matchSecret(v);
-      if (hit) out.push({ rule: hit.rule, path, masked: maskSecret(hit.rule, hit.token) });
-    } else if (Array.isArray(v)) {
-      v.forEach((x, i) => walk(x, child(path, i)));
-    } else if (v && typeof v === "object") {
-      for (const [k, x] of Object.entries(v)) walk(x, child(path, k));
+  const match = (text: string, path: string) => {
+    for (const r of RULES) {
+      const m = text.match(r.pattern);
+      if (m) out.push({ rule: r.id, path, masked: maskSecret(r.id, m[0]) });
     }
   };
-  walk(value, "");
+  const walk = (v: unknown, path: string) => {
+    if (typeof v === "string") match(v, shortPath(path));
+    else if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`));
+    else if (v && typeof v === "object") {
+      const entries = v as Record<string, unknown>;
+      for (const key of Object.keys(entries).sort()) {
+        let p = keyPath(path, key);
+        const before = out.length;
+        match(key, shortPath(p));
+        if (out.length > before) {
+          // A secret used as a key is still a secret: the path doesn't echo it.
+          p = `${path}["<redacted key>"]`;
+          for (let i = before; i < out.length; i++) out[i] = { ...out[i]!, path: shortPath(p) };
+        }
+        walk(entries[key], p);
+      }
+    }
+  };
+  walk(value, "$");
   return out;
 }
 
@@ -102,20 +129,24 @@ export function scanSecrets(value: unknown): SecretFinding[] {
  * $.lanes[0].steps[0].prompt", as a rule and a path without the "$.".
  */
 export function parseSecretError(message: string): { rule: string; path: string } | null {
-  const m = message.match(/^definition_contains_secret:\s*([\w-]+)\s+at\s+(\S+)/);
+  // The path runs to the end: a redacted key's path has a space in it.
+  const m = message.match(/^definition_contains_secret:\s*([\w-]+)\s+at\s+(.+)$/);
   if (!m) return null;
   return { rule: m[1]!, path: m[2]!.replace(/^\$\.?/, "") };
 }
 
-/** Splits a path into its keys: `steps[1].env["X-Y"]` → ["steps", 1, "env", "X-Y"]. */
+/**
+ * Splits a path, as the server writes it, into its keys:
+ * `steps[1].env["X Y"].1st` → ["steps", 1, "env", "X Y", "1st"].
+ */
 export function pathKeys(path: string): (string | number)[] {
   const keys: (string | number)[] = [];
-  const re = /([A-Za-z_$][\w$-]*)|\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]/g;
+  const re = /\[(\d+)\]|\[("(?:[^"\\]|\\.)*")\]|\.?([^.[\]"' $\\]+)/g;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(path))) {
-    if (m[1] !== undefined) keys.push(m[1]);
-    else if (m[2] !== undefined) keys.push(Number(m[2]));
-    else keys.push(JSON.parse(m[3]!) as string);
+  while ((m = re.exec(path.replace(/^\$/, "")))) {
+    if (m[1] !== undefined) keys.push(Number(m[1]));
+    else if (m[2] !== undefined) keys.push(JSON.parse(m[2]) as string);
+    else if (m[3] !== undefined) keys.push(m[3]);
   }
   return keys;
 }

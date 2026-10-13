@@ -1,20 +1,20 @@
 /**
  * The cloud's process format, `schemaVersion: 1` with lanes of ordered agent
- * and shell steps (Terminal-Grid-Cloud, ProcessDefinitionV1), as an
- * `augry/process@1` process the editor can draw. Templates come from the
+ * and shell steps (Terminal-Grid-Cloud, ProcessDefinitionV1), as a process
+ * in the shared format (schemaVersion 2) the editor can draw. Templates come from the
  * server in this form. Each lane becomes a terminal row, its stages run in
  * order, and each step waits for the one before it in its lane.
  */
 
 import { validateProcess } from "./json";
-import { PROCESS_SCHEMA, type Process, type Stage, type Step, type Surface } from "./types";
+import { PROCESS_FORMAT, type Process, type Stage, type Step, type Surface } from "./types";
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const str = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v : undefined);
 
 /** Is this the lanes format rather than our own? */
 export function isV1(definition: unknown): boolean {
-  return isObj(definition) && definition.schemaVersion === 1 && Array.isArray(definition.lanes) && !("$schema" in definition);
+  return isObj(definition) && definition.schemaVersion === 1 && Array.isArray(definition.lanes);
 }
 
 /** The V1 agent names as this app's rows name them. */
@@ -80,7 +80,7 @@ export function processFromV1(definition: unknown, meta: V1Meta): Process | null
   }
 
   const process: Process = {
-    $schema: PROCESS_SCHEMA,
+    schemaVersion: PROCESS_FORMAT,
     id: meta.id,
     name: str(d.name) ?? meta.id,
     version: 1,

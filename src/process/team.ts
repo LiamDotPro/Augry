@@ -7,7 +7,7 @@
  */
 
 import type { Member, ProcessPage, ProcessVersionInfo, TeamProcess } from "../cloud/types";
-import { hashOf, validateProcess } from "./json";
+import { hashOf, upgradeProcess, validateProcess } from "./json";
 import { whenLabel } from "./runs";
 import { isV1, processFromV1 } from "./v1";
 import type { Process, ProcessRecord, ProcessVersion } from "./types";
@@ -68,11 +68,12 @@ export async function readFeed(list: (since: number) => Promise<ProcessPage>, si
 
 /**
  * A team process's definition as the Process the views draw, or null when
- * it isn't a usable `augry/process@1` file. `version` is the server's, so the
+ * it isn't a usable process in the shared format. `version` is the server's, so the
  * editor, versions and diffs number it the way the team sees it.
  */
 export function definitionToProcess(definition: unknown, version: number, fallbackId: string): Process | null {
   if (!definition || typeof definition !== "object" || Array.isArray(definition)) return null;
+  definition = upgradeProcess(definition);
   // Starter templates installed from the server are in the cloud's lanes format.
   if (isV1(definition)) {
     const converted = processFromV1(definition, { id: fallbackId });
@@ -181,4 +182,29 @@ export function savedAgo(ts: number, now: number): string {
 /** A card's status line: "Maya Chen saved v3 · 2h ago", "You saved v2 · 3 days ago". */
 export function savedLine(who: string, version: number, at: number, now: number): string {
   return `${who} saved v${version} · ${savedAgo(at, now)}`;
+}
+
+/**
+ * A team write the server refused for what was sent, in our words, or null
+ * when it wasn't that (offline, a conflict, a secret: those are worded
+ * elsewhere). The 422 messages are the envelope checks of the server's
+ * processes package; 400 is its limit of 500 processes per team.
+ */
+export function refusalOf(status: number, message: string, name: string, team: string): string | null {
+  if (status === 400 && /500 processes/.test(message)) return `${team} already has 500 processes, the most a team can keep. Delete one to add ${name}.`;
+  if (status !== 422) return null;
+  const code = message.split(":")[0]!.trim();
+  switch (code) {
+    case "name_invalid":
+      return `${name || "This process"} wasn't saved to ${team}: its name needs 1 to 120 characters.`;
+    case "definition_too_large":
+      return `${name} wasn't saved to ${team}: it's over 256 KB, the most a team process can be.`;
+    case "schema_version_invalid":
+    case "schema_version_unsupported":
+      return `${name} wasn't saved to ${team}: the server doesn't take this format yet. It may need updating.`;
+    case "definition_not_object":
+      return `${name} wasn't saved to ${team}: it isn't a process file.`;
+    default:
+      return null;
+  }
 }

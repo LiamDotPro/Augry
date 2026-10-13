@@ -62,7 +62,7 @@ describe("processFromV1", () => {
   });
 
   it("leaves our own format and broken definitions alone", () => {
-    expect(isV1({ $schema: "augry/process@1", schemaVersion: 1, lanes: [] })).toBe(false);
+    expect(isV1({ schemaVersion: 2, name: "x", lanes: [] })).toBe(false);
     expect(processFromV1({ schemaVersion: 1, name: "x", lanes: [{ id: "a" }] }, { id: "x" })).toBeNull();
     expect(processFromV1({ name: "x" }, { id: "x" })).toBeNull();
   });

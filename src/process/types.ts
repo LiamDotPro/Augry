@@ -1,12 +1,17 @@
 /**
- * The `augry/process@1` file: one JSON file per process, at
- * `.augry/processes/<id>.json`. Every Process tab view (lanes, runbook, the
- * JSON panel, version diffs) is drawn from this one object, so the types
- * follow the file exactly. Unknown keys are kept: the side panel writes a few
- * optional settings (doneWhen, notify…) straight into the step.
+ * A process definition, `schemaVersion: 2`: the one format the app and the
+ * cloud share (ProcessDefinitionV2 in Terminal-Grid-Cloud's openapi.yaml).
+ * The same object is a process file on disk (src-tauri/src/processes) and a
+ * team process's definition on the server. Every Process tab view (lanes,
+ * runbook, the JSON panel, version diffs) is drawn from it, so the types
+ * follow the format exactly. Unknown keys are kept: the side panel writes a
+ * few optional settings (doneWhen, notify…) straight into the step. Version
+ * 1 is the cloud's lanes format, which only templates use (v1.ts).
  */
 
-export const PROCESS_SCHEMA = "augry/process@1";
+export const PROCESS_FORMAT = 2;
+/** The largest name the server takes, in characters (runes). */
+export const MAX_NAME = 120;
 
 /** What starts a run. `as` names the values steps can use (ticket.title, file.path). */
 export type StartKind = "ticket" | "webhook" | "manual" | "schedule" | "branch" | "notes" | "folder";
@@ -94,7 +99,8 @@ export interface ProcessEnd {
 }
 
 export interface Process {
-  $schema: string;
+  schemaVersion: typeof PROCESS_FORMAT;
+  /** This app's own id for it; the server ignores it and keeps its own. */
   id: string;
   name: string;
   version: number;

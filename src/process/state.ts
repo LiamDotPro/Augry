@@ -12,7 +12,7 @@
 import { CONNECTIONS } from "./connections";
 import type { DiskProblem } from "./disk";
 import { blankProcess } from "./examples";
-import { cloneProcess, hashOf } from "./json";
+import { cloneProcess, fitName, hashOf } from "./json";
 import { uniqueId } from "./model";
 import { approveRun, decideNoRun, sendBackRun, skipRun, stopRun } from "./runs";
 import type { ProcessPage, TeamProcess } from "../cloud/types";
@@ -325,7 +325,7 @@ export function reducer(state: ProcessState, action: Action): ProcessState {
       const record = recordOf(state, action.processId);
       if (!record) return state;
       const source = working(record);
-      const copy = { ...cloneProcess(source), name: `${source.name} copy`, from: `process:${source.id}@${latest(record).version}` };
+      const copy = { ...cloneProcess(source), name: fitName(`${source.name} copy`), from: `process:${source.id}@${latest(record).version}` };
       return addRecord(state, copy, `Copied from ${source.name}`, action.now).state;
     }
 

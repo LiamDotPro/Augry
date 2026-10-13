@@ -6,7 +6,7 @@
  */
 
 import { cloneProcess } from "./json";
-import { PROCESS_SCHEMA, type Process, type Surface } from "./types";
+import { PROCESS_FORMAT, type Process, type Surface } from "./types";
 
 /** The five rows every new process starts with. */
 export const STANDARD_SURFACES: Surface[] = [
@@ -20,7 +20,7 @@ export const STANDARD_SURFACES: Surface[] = [
 const surfaces = () => cloneProcess(STANDARD_SURFACES);
 
 export const FEATURE_DELIVERY: Process = {
-  $schema: PROCESS_SCHEMA,
+  schemaVersion: PROCESS_FORMAT,
   id: "feature-delivery",
   name: "Feature delivery",
   version: 7,
@@ -49,7 +49,7 @@ export const FEATURE_DELIVERY: Process = {
 };
 
 export const BUG_FIX: Process = {
-  $schema: PROCESS_SCHEMA,
+  schemaVersion: PROCESS_FORMAT,
   id: "bug-fix",
   name: "Bug fix",
   version: 3,
@@ -149,8 +149,8 @@ export function featureDeliveryHistory(): Process[] {
 
 // More examples ---------------------------------------------------------------------
 
-const base = (id: string, name: string, start: Process["start"]): Pick<Process, "$schema" | "id" | "name" | "version" | "start" | "surfaces"> => ({
-  $schema: PROCESS_SCHEMA,
+const base = (id: string, name: string, start: Process["start"]): Pick<Process, "schemaVersion" | "id" | "name" | "version" | "start" | "surfaces"> => ({
+  schemaVersion: PROCESS_FORMAT,
   id,
   name,
   version: 1,
@@ -234,7 +234,7 @@ export const EXAMPLES: Process[] = [FEATURE_DELIVERY, BUG_FIX, PARALLEL, DEPENDE
 /** A new, empty process: one stage, one step, started by hand. */
 export function blankProcess(id: string, name: string): Process {
   return {
-    $schema: PROCESS_SCHEMA,
+    schemaVersion: PROCESS_FORMAT,
     id,
     name,
     version: 1,

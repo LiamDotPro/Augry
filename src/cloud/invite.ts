@@ -3,13 +3,14 @@ const CODE_CHARS = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const CODE = new RegExp(`^[${CODE_CHARS}]{10}$`);
 
 /**
- * The invite code in whatever was pasted: a full augry.app/join/… link, an
+ * The invite code in whatever was pasted: a full augry.dev/join/… link (or
+ * the older augry.app one), an
  * augry://join/… link, or the bare code with or without the hyphen, any case.
  * Returns it as XXXXX-XXXXX, or null when there isn't one.
  */
 export function parseInviteCode(input: string): string | null {
   let text = input.trim();
-  const link = /(?:augry\.app\/join\/|augry:\/\/join\/)([^/?#\s]+)/i.exec(text);
+  const link = /(?:augry\.(?:dev|app)\/join\/|augry:\/\/join\/)([^/?#\s]+)/i.exec(text);
   if (link) text = decodeURIComponent(link[1]!);
   const bare = text.replace(/[\s-]/g, "").toUpperCase();
   if (!CODE.test(bare)) return null;

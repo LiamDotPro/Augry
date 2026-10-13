@@ -4,7 +4,7 @@
  * records has to write. Pure, so it is tested on its own (disk.test.ts).
  */
 
-import { formatProcess, hashOf, validateProcess } from "./json";
+import { formatProcess, hashOf, upgradeProcess, validateProcess } from "./json";
 import type { Process, ProcessRecord, ProcessVersion } from "./types";
 import { latest, withDraft } from "./versions";
 
@@ -28,6 +28,8 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 const usable = (v: unknown): v is Process => validateProcess(v).length === 0;
 
 function asVersion(value: unknown): ProcessVersion | null {
+  if (!isObj(value)) return null;
+  value = { ...value, process: upgradeProcess(value.process) };
   if (!isObj(value) || typeof value.version !== "number" || !usable(value.process)) return null;
   return {
     version: value.version,
@@ -49,7 +51,9 @@ function asVersion(value: unknown): ProcessVersion | null {
 export function recordsFromDisk(stored: StoredProcess[], now: number): { records: ProcessRecord[]; problems: DiskProblem[] } {
   const records: ProcessRecord[] = [];
   const problems: DiskProblem[] = [];
-  for (const entry of stored) {
+  for (const stored0 of stored) {
+    // Files written before the shared format are read as it.
+    const entry = { ...stored0, draft: upgradeProcess(stored0.draft), file: upgradeProcess(stored0.file) };
     const versions = entry.versions
       .map(asVersion)
       .filter((v): v is ProcessVersion => v !== null)
@@ -59,7 +63,7 @@ export function recordsFromDisk(stored: StoredProcess[], now: number): { records
       versions.push({ version: 1, message: "Found in the processes folder", by: "You", at: now, hash: hashOf(process), process });
     }
     if (!versions.length) {
-      problems.push({ id: entry.id, message: entry.problem ?? "It isn't an augry/process@1 file" });
+      problems.push({ id: entry.id, message: entry.problem ?? "It isn't a process file Augry can read" });
       continue;
     }
     if (entry.problem) problems.push({ id: entry.id, message: entry.problem });

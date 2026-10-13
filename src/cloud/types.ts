@@ -79,7 +79,7 @@ export interface SessionCreated {
   user: User;
 }
 
-/** A team process. `definition` is the augry/process@1 file, byte for byte. */
+/** A team process. `definition` is the shared format (schemaVersion 2), or 1 for a template's lanes. */
 export interface TeamProcess {
   id: string;
   teamId: string;

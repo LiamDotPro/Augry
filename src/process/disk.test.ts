@@ -38,6 +38,15 @@ describe("recordsFromDisk", () => {
     expect(records[0]!.versions[0]!.at).toBe(9);
   });
 
+  it("reads files written before the shared format", () => {
+    const { schemaVersion: _v, ...graph } = { ...BUG_FIX, version: 1 };
+    const old = { $schema: "augry/process@1", ...graph };
+    const { records, problems } = recordsFromDisk([stored({ versions: [{ ...v1, process: old }], file: old })], 9);
+    expect(problems).toEqual([]);
+    expect(records[0]!.versions[0]!.process.schemaVersion).toBe(2);
+    expect(records[0]!.draft).toBeNull();
+  });
+
   it("leaves out what can't be read and says why", () => {
     const { records, problems } = recordsFromDisk(
       [stored({ id: "broken", versions: [{ nope: true }], file: { name: "x" }, problem: "broken.json: bad" })],

@@ -43,7 +43,7 @@ export function JoinTeamDialog({ code, errorStatus }: { code?: string; errorStat
       <TeamDialogHead tile={<PersonTile />} title="Join a team" onClose={cloud.closeDialog} />
       <div className="cloud-dialog__body">
         <p className="cloud-dialog__text">
-          Paste the invite link or the code someone sent you. Opening an augry.app/join link fills this in for you.
+          Paste the invite link or the code someone sent you. Opening an augry.dev/join link fills this in for you.
         </p>
         <div className="cloud-field">
           <label className="cloud-field__label" htmlFor="team-join-code">

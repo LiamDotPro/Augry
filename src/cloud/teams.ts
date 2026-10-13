@@ -178,7 +178,7 @@ export function inviteSummary(invite: Pick<Invite, "role" | "expiresAt">, now: D
   return `Works once · joins as ${roleLabel(invite.role)} · expires ${formatShortDate(invite.expiresAt, now)}`;
 }
 
-/** The link as the card shows it, without the scheme: augry.app/join/K7M2P-9XQ4R. */
+/** The link as the card shows it, without the scheme: augry.dev/join/K7M2P-9XQ4R. */
 export function displayInviteUrl(url: string): string {
   return url.replace(/^https?:\/\//i, "");
 }

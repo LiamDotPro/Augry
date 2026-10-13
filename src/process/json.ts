@@ -1,12 +1,12 @@
 /**
  * The process file as text: formatting (short objects stay on one line, like a
  * formatter would), tokens for the highlighted JSON panel, parsing with the
- * line of the first error, a structural check of `augry/process@1`, and the
+ * line of the first error, a structural check of the format (schemaVersion 2), and the
  * content hash that versions and runs record.
  */
 
 import { isRepeat, list } from "./model";
-import { PROCESS_SCHEMA, type Process } from "./types";
+import { MAX_NAME, PROCESS_FORMAT, type Process } from "./types";
 
 const WIDTH = 96;
 
@@ -137,6 +137,7 @@ export function parseProcess(text: string): ParseResult {
     const short = message.replace(/^JSON\.parse: /, "").replace(/\s*in JSON at position \d+(\s*\(line \d+ column \d+\))?/, "");
     return { ok: false, error: short, line: errorLine(message, text) };
   }
+  value = upgradeProcess(value);
   const problems = validateProcess(value);
   if (problems.length) {
     const first = problems[0]!;
@@ -156,13 +157,43 @@ export interface Problem {
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const quoted = (id: string) => `"id": ${JSON.stringify(id)}`;
 
-/** Structural checks of `augry/process@1`. Empty when the process is usable. */
+/** The old marker, `"$schema": "augry/process@1"`, of files written before schemaVersion 2. */
+const OLD_MARKER = "augry/process@1";
+
+/**
+ * A process in the shared format. Files from before schemaVersion 2 carry the
+ * same graph under `"$schema": "augry/process@1"`; they are upgraded as they
+ * are read. Anything else is returned as it was.
+ */
+export function upgradeProcess(value: unknown): unknown {
+  if (!isObj(value) || value.schemaVersion !== undefined || value.$schema !== OLD_MARKER) return value;
+  const { $schema: _old, ...rest } = value;
+  return { schemaVersion: PROCESS_FORMAT, ...rest };
+}
+
+/** A name the server takes: 1 to 120 characters, counted as it counts them. */
+export function nameProblem(name: unknown): string | null {
+  if (typeof name !== "string") return "name must be a string";
+  const length = [...name].length;
+  if (length === 0) return "name can't be empty";
+  if (length > MAX_NAME) return `name is ${length} characters; ${MAX_NAME} at most`;
+  return null;
+}
+
+/** Cuts a name to the longest the server takes, by characters. */
+export function fitName(name: string): string {
+  const chars = [...name];
+  return chars.length > MAX_NAME ? chars.slice(0, MAX_NAME).join("").trimEnd() : name;
+}
+
+/** Structural checks of the format (schemaVersion 2). Empty when the process is usable. */
 export function validateProcess(value: unknown): Problem[] {
   const out: Problem[] = [];
   if (!isObj(value)) return [{ message: "A process is a JSON object" }];
-  if (value.$schema !== PROCESS_SCHEMA) out.push({ message: `$schema must be "${PROCESS_SCHEMA}"`, near: '"$schema"' });
+  if (value.schemaVersion !== PROCESS_FORMAT) out.push({ message: `schemaVersion must be ${PROCESS_FORMAT}`, near: '"schemaVersion"' });
   if (typeof value.id !== "string" || !value.id) out.push({ message: "id must be a string", near: '"id"' });
-  if (typeof value.name !== "string") out.push({ message: "name must be a string", near: '"name"' });
+  const badName = nameProblem(value.name);
+  if (badName) out.push({ message: badName, near: '"name"' });
   if (typeof value.version !== "number") out.push({ message: "version must be a number", near: '"version"' });
   if (!isObj(value.start) || typeof value.start.on !== "string") out.push({ message: "start needs an `on`", near: '"start"' });
   for (const key of ["surfaces", "stages", "steps"] as const) {

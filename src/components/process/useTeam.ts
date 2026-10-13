@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch } from
 import * as api from "../../cloud/api";
 import { useCloud } from "../../cloud/CloudProvider";
 import type { Member, Team, TeamProcess } from "../../cloud/types";
-import { cloneProcess } from "../../process/json";
+import { cloneProcess, fitName } from "../../process/json";
 import { parseSecretError, scanSecrets, secretWhat } from "../../process/secrets";
 import { recordOf, teamOf, type Action, type ProcessState } from "../../process/state";
-import { fetchedVersion, firstName, memberNames, readFeed, type TeamCache } from "../../process/team";
+import { fetchedVersion, firstName, memberNames, readFeed, refusalOf, type TeamCache } from "../../process/team";
 import type { Process } from "../../process/types";
 import { latest, working } from "../../process/versions";
 import { useAppState } from "../../state/AppProvider";
@@ -225,7 +225,9 @@ export function useTeam(state: ProcessState, dispatch: Dispatch<Action>): TeamAp
     const failed = (error: unknown, name: string) => {
       if (api.isCloudError(error) && error.offline) return; // The offline banner says it.
       const secret = api.isCloudError(error, 422) ? parseSecretError(error.message) : null;
+      const refused = api.isCloudError(error) ? refusalOf(error.status, error.message, name, team.name) : null;
       if (secret) note(`${name} wasn't saved to ${team.name}: it has what looks like ${secretWhat(secret.rule)} at ${secret.path}. Team processes can't contain keys or tokens.`);
+      else if (refused) note(refused);
       else if (api.isCloudError(error, 404)) {
         note(`${name} is no longer in ${team.name}.`);
         void load(team.id);
@@ -317,7 +319,7 @@ export function useTeam(state: ProcessState, dispatch: Dispatch<Action>): TeamAp
         const record = recordOf(stateRef.current, processId);
         if (!record) return;
         const source = working(record);
-        await create({ ...cloneProcess(source), name: `${source.name} copy`, from: `process:${source.id}@${latest(record).version}` });
+        await create({ ...cloneProcess(source), name: fitName(`${source.name} copy`), from: `process:${source.id}@${latest(record).version}` });
       },
 
       remove: async (processId) => {

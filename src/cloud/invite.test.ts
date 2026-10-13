@@ -9,6 +9,7 @@ describe("parseInviteCode", () => {
   });
 
   it("takes the code out of a link", () => {
+    expect(parseInviteCode("https://augry.dev/join/K7M2P-9XQ4R")).toBe("K7M2P-9XQ4R");
     expect(parseInviteCode("https://augry.app/join/K7M2P-9XQ4R")).toBe("K7M2P-9XQ4R");
     expect(parseInviteCode("augry.app/join/k7m2p9xq4r?ref=x")).toBe("K7M2P-9XQ4R");
     expect(parseInviteCode("augry://join/K7M2P-9XQ4R")).toBe("K7M2P-9XQ4R");

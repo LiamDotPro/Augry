@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BUG_FIX, FEATURE_DELIVERY } from "./examples";
-import { errorLine, formatProcess, hashOf, parseProcess, stepAtLine, stepLineRange, tokenize, validateProcess } from "./json";
+import { errorLine, formatProcess, hashOf, parseProcess, stepAtLine, stepLineRange, tokenize, validateProcess, upgradeProcess, nameProblem, fitName } from "./json";
 
 describe("formatProcess", () => {
   it("keeps short objects on one line and round-trips", () => {
@@ -67,7 +67,7 @@ describe("parseProcess", () => {
 
 describe("validateProcess", () => {
   it("catches the wrong schema, unknown rows and circles", () => {
-    expect(validateProcess({ ...FEATURE_DELIVERY, $schema: "x" })[0]!.message).toContain("$schema");
+    expect(validateProcess({ ...FEATURE_DELIVERY, schemaVersion: 1 })[0]!.message).toContain("schemaVersion");
     const offRow = { ...FEATURE_DELIVERY, steps: [{ ...FEATURE_DELIVERY.steps[0]!, on: "robot" }] };
     expect(validateProcess(offRow)[0]!.message).toContain("not a row");
     const loop = {
@@ -101,5 +101,30 @@ describe("hardening", () => {
     const lines = formatProcess(process).split("\n");
     const range = stepLineRange(lines, "approve")!;
     expect(lines.slice(range[0], range[1] + 1).join("\n")).toContain('"name": "Approve plan"');
+  });
+});
+
+describe("the shared format", () => {
+  it("upgrades a file from before schemaVersion 2 and leaves others alone", () => {
+    const { schemaVersion: _v, ...graph } = FEATURE_DELIVERY;
+    const old = { $schema: "augry/process@1", ...graph };
+    const upgraded = upgradeProcess(old) as Record<string, unknown>;
+    expect(upgraded.schemaVersion).toBe(2);
+    expect("$schema" in upgraded).toBe(false);
+    expect(validateProcess(upgraded)).toEqual([]);
+    expect(upgradeProcess(FEATURE_DELIVERY)).toBe(FEATURE_DELIVERY);
+    const lanes = { schemaVersion: 1, name: "x", lanes: [] };
+    expect(upgradeProcess(lanes)).toBe(lanes);
+  });
+
+  it("holds names to the server's 1 to 120 characters", () => {
+    expect(nameProblem("")).toContain("empty");
+    expect(nameProblem("a".repeat(120))).toBeNull();
+    expect(nameProblem("a".repeat(121))).toContain("121");
+    // Counted as characters, as the server counts runes.
+    expect(nameProblem("🙂".repeat(120))).toBeNull();
+    expect(validateProcess({ ...FEATURE_DELIVERY, name: "" })[0]!.message).toContain("empty");
+    expect([...fitName(`${"a".repeat(118)} copy`)]).toHaveLength(120);
+    expect(fitName("Bug fix copy")).toBe("Bug fix copy");
   });
 });

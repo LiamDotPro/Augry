@@ -4,7 +4,7 @@ import { Sheet } from "./Sheet";
 import { useProcess } from "./store";
 
 /**
- * Import JSON: paste a process file. It is checked against augry/process@1
+ * Import JSON: paste a process file. It is checked against the shared format (schemaVersion 2)
  * and, if it is usable, starts a new process at version 1. With a team
  * selected it becomes the team's.
  */
@@ -41,7 +41,7 @@ export function ImportSheet() {
           className="process-input process-import"
           spellCheck={false}
           aria-label="Process JSON"
-          placeholder='{ "$schema": "augry/process@1", … }'
+          placeholder='{ "schemaVersion": 2, "name": "…", … }'
           value={text}
           onChange={(e) => {
             setText(e.target.value);

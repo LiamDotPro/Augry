@@ -5,6 +5,7 @@ import { BUG_FIX, FEATURE_DELIVERY, CRASH_REPORT } from "./examples";
 import { cloneProcess } from "./json";
 import { connectionsUsed, connectionRefs } from "./share";
 import {
+  refusalOf,
   applyPage,
   definitionToProcess,
   EMPTY_TEAM_CACHE,
@@ -155,5 +156,20 @@ describe("connectionsUsed", () => {
     expect(used.map((c) => c.label)).toEqual(["GitHub Issues", "PostgreSQL · staging", "sentry"]);
     expect(used[1]!.kind).toBe("postgresql");
     expect(used[2]!.local).toBeUndefined();
+  });
+});
+
+describe("refusalOf", () => {
+  it("words what the server refused about the process itself", () => {
+    expect(refusalOf(422, "name_invalid", "", "Northwind")).toBe("This process wasn't saved to Northwind: its name needs 1 to 120 characters.");
+    expect(refusalOf(422, "definition_too_large", "Bug fix", "Northwind")).toContain("over 256 KB");
+    expect(refusalOf(422, "schema_version_unsupported", "Bug fix", "Northwind")).toContain("doesn't take this format");
+    expect(refusalOf(400, "this team already has 500 processes", "Bug fix", "Northwind")).toContain("already has 500 processes");
+  });
+
+  it("leaves other failures to their own wording", () => {
+    expect(refusalOf(422, "definition_contains_secret: github-token at $.x", "Bug fix", "Northwind")).toBeNull();
+    expect(refusalOf(409, "conflict", "Bug fix", "Northwind")).toBeNull();
+    expect(refusalOf(400, "bad request", "Bug fix", "Northwind")).toBeNull();
   });
 });
