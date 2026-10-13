@@ -23,6 +23,7 @@ import type {
   Session,
   TerminalId,
   TerminalInfo,
+  TriggersStatus,
 } from "../ipc/types";
 import type { TerminalState } from "./model";
 
@@ -42,6 +43,7 @@ export const DEFAULT_CONFIG: Config = {
   compactLayout: false,
   focusColor: null,
   finishedColor: null,
+  triggers: { enabled: false, armed: [] },
 };
 
 export type SaveState = "clean" | "dirty" | "saving" | "saved" | "error";
@@ -100,6 +102,13 @@ export interface NoteToast {
   at: number;
 }
 
+/** A neutral message toast, such as "Trigger fs.file-saved fired for ...". */
+export interface Notice {
+  message: string;
+  /** Epoch ms when it was raised; a repeat of the same text restarts the timer. */
+  at: number;
+}
+
 export interface AppState {
   ready: boolean;
   /** Launch is over: config and notes are loaded and the saved panes restored. */
@@ -130,6 +139,9 @@ export interface AppState {
   hotkeysOpen: boolean;
   busy: boolean;
   error: string | null;
+  notice: Notice | null;
+  /** Process triggers: what Settings shows. Null until the first status arrives. */
+  triggers: { status: TriggersStatus | null };
   /** Wall clock, advanced by a 1 s tick while the window is visible. */
   now: number;
 }
@@ -168,6 +180,8 @@ export const initialState: AppState = {
   hotkeysOpen: false,
   busy: false,
   error: null,
+  notice: null,
+  triggers: { status: null },
   now: Date.now(),
 };
 
@@ -186,6 +200,8 @@ export type Action =
   | { type: "ui/hotkeys"; open: boolean }
   | { type: "ui/busy"; busy: boolean }
   | { type: "ui/error"; message: string | null }
+  | { type: "ui/notice"; notice: Notice | null }
+  | { type: "triggers/status"; status: TriggersStatus }
   | { type: "tick"; now: number; activity: Record<TerminalId, number> }
   /** `after` places the new pane right behind that one instead of at the end. */
   | { type: "terminal/added"; info: TerminalInfo; focus: boolean; after?: TerminalId | null }
@@ -306,6 +322,12 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case "ui/error":
       return { ...state, error: action.message };
+
+    case "ui/notice":
+      return { ...state, notice: action.notice };
+
+    case "triggers/status":
+      return { ...state, triggers: { status: action.status } };
 
     case "tick": {
       let terminals = state.terminals;

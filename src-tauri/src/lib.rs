@@ -12,6 +12,7 @@ pub mod pty;
 pub mod state;
 #[cfg(target_os = "macos")]
 mod traffic_lights;
+pub mod triggers;
 
 pub use error::AppError;
 
@@ -44,6 +45,7 @@ pub struct AppState {
     pub agent: agent::AgentWatcher,
     pub notes: notes::NotesService,
     pub state: state::StateService,
+    pub triggers: triggers::TriggerService,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -75,6 +77,7 @@ pub fn run() {
                 .clone()
                 .unwrap_or_else(notes::NotesService::default_root);
 
+            let triggers = triggers::TriggerService::new(config_dir.join("processes"));
             let pty = pty::PtyManager::new(config_dir);
             agent::task::clear_task_dir(&pty.tasks_dir());
 
@@ -84,6 +87,7 @@ pub fn run() {
                 agent: agent::AgentWatcher::new(),
                 notes: notes::NotesService::new(notes_root),
                 state: state_service,
+                triggers,
             };
 
             // A missing or unwritable notes folder must not stop the app.
@@ -99,6 +103,7 @@ pub fn run() {
                 eprintln!("terminal-grid: notes watcher unavailable: {error}");
             }
             start_git_sweep(handle.clone());
+            triggers::start(&handle);
 
             #[cfg(target_os = "macos")]
             if let Some(window) = app.get_webview_window("main") {
@@ -155,6 +160,11 @@ pub fn run() {
             state::config_set,
             state::session_get,
             state::session_set,
+            // triggers
+            triggers::triggers_catalogue,
+            triggers::triggers_check,
+            triggers::triggers_status,
+            triggers::triggers_arm,
             // window
             glass::set_window_glass,
         ])

@@ -2,7 +2,7 @@
 id: T38
 epic: 001-trigger-core
 title: Add the trigger actions, the fired event and the notice toast
-status: todo
+status: done
 depends_on: [T37]
 size: S
 model: haiku
@@ -162,3 +162,5 @@ import { firedNotice, NOTICE_MS } from "../lib/triggers";
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

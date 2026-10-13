@@ -2,7 +2,7 @@
 id: T37
 epic: 001-trigger-core
 title: Add triggers to the reducer, the Config type and the helpers
-status: todo
+status: done
 depends_on: [T36]
 size: M
 model: haiku
@@ -303,3 +303,5 @@ describe("triggers and notices", () => {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (npm test 174 passed, triggers.test 8, reducer.test 40; npm run build exit 0; first build caught a missing TriggersConfig interface, added)
+- 2026-10-12 checker: pass

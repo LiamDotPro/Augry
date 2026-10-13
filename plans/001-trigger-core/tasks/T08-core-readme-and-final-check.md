@@ -2,7 +2,7 @@
 id: T08
 epic: 001-trigger-core
 title: Finish the trigger-core README and run the full check
-status: todo
+status: done
 depends_on: [T09]
 size: S
 model: haiku
@@ -97,3 +97,5 @@ From the repo root: `node plans/_tools/check-crates.mjs`.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

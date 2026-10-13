@@ -1,0 +1,11 @@
+[package]
+name = "trigger-hub"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Runs trigger sources: rule registry, apply, cool down and fan out of fired events"
+
+[dependencies]
+trigger-core = { path = "../trigger-core" }
+serde.workspace = true
+serde_json.workspace = true

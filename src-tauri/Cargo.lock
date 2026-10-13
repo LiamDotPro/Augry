@@ -346,6 +346,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6bb31b46c14244e20ee9984b11bf5c992b91fb6939fea616e3512c8baecdbe5f"
+dependencies = [
+ "memchr",
+ "serde_core",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1508,6 +1518,19 @@ name = "glob"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
+
+[[package]]
+name = "globset"
+version = "0.4.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07c34a9410465b45bd9787443bc7370f37735bad04b0f0cd57ff1a3186c98988"
+dependencies = [
+ "aho-corasick",
+ "bstr",
+ "log",
+ "regex-automata",
+ "regex-syntax",
+]
 
 [[package]]
 name = "gobject-sys"
@@ -4460,12 +4483,14 @@ dependencies = [
  "base64 0.23.1",
  "dirs 7.0.0",
  "futures-util",
+ "globset",
  "notify",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
  "portable-pty",
  "progenitor-client",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -4477,6 +4502,9 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "trash",
+ "trigger-core",
+ "trigger-fs",
+ "trigger-hub",
  "uuid",
  "window-vibrancy",
 ]
@@ -4860,6 +4888,36 @@ dependencies = [
  "serde",
  "thiserror 2.0.20",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "trigger-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "trigger-fs"
+version = "0.1.0"
+dependencies = [
+ "globset",
+ "notify",
+ "serde",
+ "serde_json",
+ "trigger-core",
+ "uuid",
+]
+
+[[package]]
+name = "trigger-hub"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "trigger-core",
 ]
 
 [[package]]

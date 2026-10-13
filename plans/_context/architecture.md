@@ -72,7 +72,7 @@ process definition (local file, later synced)      ${variables} filled in
 
 | Epic | What | Status |
 |---|---|---|
-| 001-trigger-core | workspace, contract, hub, `trigger-fs`, app wiring, Settings switch | draft |
-| 002-trigger-internal | triggers from inside the app | draft |
+| 001-trigger-core | workspace, contract, hub, `trigger-fs`, app wiring, Settings switch | done |
+| 002-trigger-internal | the `tg` source inside the app: agent finished, command failed or slow, output matched, bell, task reported, pane opened in a repo, worktrees, review staged, note saved, focus, app started; plus the shell integration fixes and the marks scanner it needed | done |
 | 003 to 015 | one crate per integration, all depending on 001 only | draft |
 | later | process editor, run engine, trigger picker UI, team sync of definitions | not planned |

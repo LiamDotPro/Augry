@@ -1,0 +1,4 @@
+# Terminal Grid bash wrapper. Launched as `bash --rcfile <this file> -i`, which would
+# skip the user's own ~/.bashrc, so it runs that first and then the integration.
+if [ -f "$HOME/.bashrc" ]; then . "$HOME/.bashrc"; fi
+. "$(dirname "${BASH_SOURCE[0]}")/shell-integration.sh"

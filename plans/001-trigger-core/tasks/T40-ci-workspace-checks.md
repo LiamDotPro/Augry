@@ -2,7 +2,7 @@
 id: T40
 epic: 001-trigger-core
 title: Run fmt, clippy, workspace tests, crate checks and live tests in CI
-status: todo
+status: done
 depends_on: [T29, T17]
 size: S
 model: haiku
@@ -105,3 +105,5 @@ and replace it with all of the following (the file ends after it). Keep the two 
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (js-yaml check ok, fmt/clippy/workspace tests/check-crates exit 0; live tests not run locally, first CI run is the proof)
+- 2026-10-12 checker: pass

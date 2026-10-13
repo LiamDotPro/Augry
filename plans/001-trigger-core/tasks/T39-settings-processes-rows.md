@@ -2,7 +2,7 @@
 id: T39
 epic: 001-trigger-core
 title: Add the Processes rows to the Settings dialog
-status: todo
+status: done
 depends_on: [T38]
 size: S
 model: haiku
@@ -161,3 +161,5 @@ import { processStatusLine } from "../lib/triggers";
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

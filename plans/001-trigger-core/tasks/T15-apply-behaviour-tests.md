@@ -2,7 +2,7 @@
 id: T15
 epic: 001-trigger-core
 title: Test apply restart, stop and failing start with FakeSource
-status: todo
+status: done
 depends_on: [T14]
 size: S
 model: haiku
@@ -192,3 +192,5 @@ mod lifecycle_tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (8 lifecycle tests; check-crates warns tests.rs 497 lines, exit 0)
+- 2026-10-12 checker: pass

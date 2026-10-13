@@ -2,7 +2,7 @@
 id: T16
 epic: 001-trigger-core
 title: Test a source firing through the hub to a subscriber
-status: todo
+status: done
 depends_on: [T15]
 size: S
 model: haiku
@@ -134,3 +134,5 @@ mod end_to_end_tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (5 end_to_end_tests pass; hub suite 38 pass; clippy and fmt clean; check-crates exit 0 with the accepted tests.rs size warning at 581 lines)
+- 2026-10-12 checker: pass

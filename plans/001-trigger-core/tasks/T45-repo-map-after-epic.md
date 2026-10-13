@@ -2,7 +2,7 @@
 id: T45
 epic: 001-trigger-core
 title: Update the repo map for the workspace and the trigger crates
-status: todo
+status: done
 depends_on: [T39, T40]
 size: S
 model: haiku
@@ -122,3 +122,5 @@ To add a source: `node plans/_tools/new-trigger-crate.mjs <name> "<summary>"`, f
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

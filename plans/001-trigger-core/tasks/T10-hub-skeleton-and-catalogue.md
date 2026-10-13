@@ -2,7 +2,7 @@
 id: T10
 epic: 001-trigger-core
 title: Add the trigger-hub crate with its types and catalogue
-status: todo
+status: done
 depends_on: [T08]
 size: S
 model: haiku
@@ -236,3 +236,5 @@ From the repo root: `node plans/_tools/check-crates.mjs`.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed
+- 2026-10-12 checker: pass

@@ -7,10 +7,14 @@ Source id `{{name}}`. One crate, one source: everything it fires starts with
 
 ## Kinds
 
-<!-- kinds -->
 Generated from `KINDS` in `src/lib.rs`. Refresh with
-`cargo run -p trigger-{{name}} --example readme` and paste the output here;
-`tests/readme.rs` fails while this table is stale.
+`cargo run -p trigger-{{name}} --example readme` and paste the output between
+the markers; `tests/readme.rs` fails while this table is stale.
+
+<!-- kinds -->
+| Kind | Title | Platforms | Permission | When | Payload |
+| --- | --- | --- | --- | --- | --- |
+| {{name}}.example | Example | macOS, Windows, Linux | none | example* | example |
 <!-- /kinds -->
 
 ## Rule fields

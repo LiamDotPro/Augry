@@ -2,7 +2,7 @@
 id: T06
 epic: 001-trigger-core
 title: Add the testkit module with RecordingSink and rule()
-status: todo
+status: done
 depends_on: [T05]
 size: S
 model: haiku
@@ -166,3 +166,5 @@ mod recording_tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (cargo test trigger-core 17 passed, clippy and fmt --check exit 0, check-crates exit 0 with the known 400-line warning)
+- 2026-10-12 checker: pass

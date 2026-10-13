@@ -2,7 +2,7 @@
 id: T33
 epic: 001-trigger-core
 title: Add the app dependencies on the crates and the rule planner
-status: todo
+status: done
 depends_on: [T32, T17, T29]
 size: M
 model: haiku
@@ -271,3 +271,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7 warnings before the change, 7 after; triggers::rules 7 ok; workspace tests ok; fmt, no-default-features check and trigger-crate clippy ok)
+- 2026-10-12 checker: pass

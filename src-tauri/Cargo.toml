@@ -4,6 +4,19 @@ version = "0.5.0"
 description = "Terminal grid with git labels, worktree view and markdown notes"
 edition = "2021"
 
+[workspace]
+members = ["crates/*"]
+default-members = [".", "crates/*"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+notify = "8.2"
+uuid = { version = "1", features = ["v4"] }
+globset = "0.4.20"
+regex = "1.13"
+
 [lib]
 name = "terminal_grid_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
@@ -11,7 +24,14 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+default = ["trigger-fs"]
+trigger-fs = ["dep:trigger-fs"]
+
 [dependencies]
+trigger-core = { path = "crates/trigger-core" }
+trigger-hub = { path = "crates/trigger-hub" }
+trigger-fs = { path = "crates/trigger-fs", optional = true }
 tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
@@ -25,6 +45,8 @@ serde_json = "1"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 dirs = "7"
+globset = { workspace = true }
+regex = { workspace = true }
 # Cloud API client (src/cloud). generated.rs needs these; keep progenitor-client
 # on the version tools/api-codegen generates with.
 progenitor-client = "=0.15.0"

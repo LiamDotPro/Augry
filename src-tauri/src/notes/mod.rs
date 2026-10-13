@@ -465,9 +465,11 @@ pub async fn notes_write(
     expected_mtime_ms: Option<u64>,
 ) -> Result<WriteResult> {
     crate::blocking(move || {
-        app.state::<crate::AppState>()
-            .notes
-            .write(&rel_path, &content, expected_mtime_ms)
+        let state = app.state::<crate::AppState>();
+        let result = state.notes.write(&rel_path, &content, expected_mtime_ms)?;
+        let signal = crate::triggers::feeds::note_saved(&state.notes.root(), &rel_path);
+        crate::triggers::feeds::publish(&app, signal);
+        Ok(result)
     })
     .await?
 }

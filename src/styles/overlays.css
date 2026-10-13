@@ -170,6 +170,33 @@
   line-height: 1.4;
 }
 
+/* Process triggers list ------------------------------------------------ */
+
+.process {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 6px;
+}
+
+.process__armed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-85);
+}
+
+.process__armed input {
+  accent-color: var(--accent);
+}
+
+.process .row__hint {
+  margin-top: 0;
+  overflow-wrap: anywhere;
+}
+
 /* Segmented choice ----------------------------------------------------- */
 
 .color-picks {
@@ -372,4 +399,16 @@
 
 .toast__dismiss:hover {
   background: rgb(var(--ink-rgb) / 0.14);
+}
+
+/* Notice toast: the same toast in neutral colours, for things that are not errors. */
+.toast--notice {
+  background: var(--glass-sheet);
+  border-color: var(--edge-strong);
+  color: var(--text-90);
+}
+
+/* Sits above the error toast when both are showing. */
+.toast--raised {
+  bottom: 76px;
 }

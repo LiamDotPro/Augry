@@ -2,7 +2,7 @@
 id: T34
 epic: 001-trigger-core
 title: Add the status types and the fired payload
-status: todo
+status: done
 depends_on: [T33]
 size: M
 model: haiku
@@ -333,3 +333,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline for terminal-grid was 7 warnings, still 7; 5 triggers::status tests ok)
+- 2026-10-12 checker: pass

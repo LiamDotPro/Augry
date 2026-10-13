@@ -2,7 +2,7 @@
 id: T29
 epic: 001-trigger-core
 title: Write the trigger-fs README and run the full check
-status: todo
+status: done
 depends_on: [T28]
 size: S
 model: haiku
@@ -192,3 +192,5 @@ events that caused it.
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed. Kinds table matched the example output, no step 2 edit needed. Checker 0 errors, 2 accepted size warnings (trigger-fs logic/tests.rs 477 lines, trigger-hub tests.rs 581 lines); template-text warning gone. Live tests passed first run.
+- 2026-10-12 checker: pass

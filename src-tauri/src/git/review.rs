@@ -15,6 +15,7 @@ use tauri::{AppHandle, Manager};
 use super::cli;
 use crate::error::{AppError, Result};
 use crate::pty::TerminalId;
+use crate::triggers::feeds;
 
 /// Reading a blob or staging a large file may take longer than a label lookup.
 const TIMEOUT: Duration = Duration::from_secs(15);
@@ -572,8 +573,13 @@ pub async fn review_file(
 #[tauri::command]
 pub async fn review_stage(app: AppHandle, id: TerminalId, paths: Vec<String>) -> Result<()> {
     crate::blocking(move || {
-        stage(&cwd_of(&app, &id)?, &paths)?;
+        let cwd = cwd_of(&app, &id)?;
+        stage(&cwd, &paths)?;
         refresh_labels(&app, &id);
+        let state = app.state::<crate::AppState>();
+        if let Some(repo) = feeds::repo_root_of(&state, &cwd) {
+            feeds::publish(&app, feeds::review_staged(&repo, paths.len()));
+        }
         Ok(())
     })
     .await?

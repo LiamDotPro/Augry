@@ -65,6 +65,9 @@ terminal-grid/
         mod.rs              # PtyManager, Session, spawn/write/resize/close
         shell.rs            # shell discovery and integration script generation
         reader.rs           # reader thread, chunk coalescing, event emission
+        marks.rs            # Scanner: OSC 133 marks, bell and printable lines from a shell's bytes (pure, tested)
+        tap.rs              # CommandClock and Tap: marks to InternalSignals for the tg source
+        shell/live.rs       # pty tests that start the real zsh and bash (unix only)
       git/
         mod.rs              # GitInfo model, GitService (cache + refresh)
         cli.rs              # subprocess wrapper with CREATE_NO_WINDOW
@@ -76,9 +79,23 @@ terminal-grid/
         paths.rs            # root sandboxing and validation
       state/
         mod.rs              # Config + Session persistence (app config dir)
+      triggers/
+        mod.rs              # TriggerService: the hub, refresh(), the forward thread, the four triggers_* commands
+        store.rs            # local process definitions, one JSON file each in <app config dir>/processes/
+        variables.rs        # ${home}, ${downloads}, ${notes.root}, ${screenshots}, ${repo.root}
+        rules.rs            # definitions + armed list + open repositories -> the rules the hub runs
+        status.rs           # the triggers_status answer and the trigger://fired payload
+        feeds.rs            # publish() and the small builders the feed points call (9.2)
+        internal/           # the tg source: mod.rs, kinds.rs, rule.rs, logic.rs, README.md (9.2)
+    crates/                 # trigger crates, one per integration, all built from plans/_templates/trigger-crate
+      trigger-core/         # the contract (Source, Rule, Event, KindInfo) and the test kit
+      trigger-hub/          # registry, rule checks, cool down, one stream of Fired events
+      trigger-fs/           # the reference source: fs.file-saved, fs.file-created, fs.file-removed, fs.file-renamed, fs.download-finished
     resources/
       shell-integration.ps1 # bundled, copied to app data dir on first run
       shell-integration.sh
+      bashrc                # wrapper for bash --rcfile, installed beside the scripts
+      zsh/                  # .zshenv .zprofile .zshrc .zlogin, the ZDOTDIR wrapper (4.5)
 ```
 
 Cargo.toml dependencies:
@@ -103,6 +120,33 @@ tauri-build = { version = "2", features = [] }
 ```
 
 Windows only dependency for process creation flags is already in std (`std::os::windows::process::CommandExt`).
+
+`src-tauri` is a Cargo workspace. The app crate `terminal-grid` is the root package; every folder under `crates/` is a member. Shared dependency versions live in `[workspace.dependencies]` and the crates use them with `{ workspace = true }`:
+
+```toml
+[workspace]
+members = ["crates/*"]
+default-members = [".", "crates/*"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+notify = "8.2"
+uuid = { version = "1", features = ["v4"] }
+globset = "0.4.20"
+
+[features]
+default = ["trigger-fs"]
+trigger-fs = ["dep:trigger-fs"]
+
+[dependencies]
+trigger-core = { path = "crates/trigger-core" }
+trigger-hub = { path = "crates/trigger-hub" }
+trigger-fs = { path = "crates/trigger-fs", optional = true }
+```
+
+A trigger crate depends on `trigger-core` and on outside crates only, never on another trigger crate, on `tauri` or on the app. `node plans/_tools/check-crates.mjs` checks this. The app wires each source in through one line in `sources()` in `src-tauri/src/triggers/mod.rs`, behind its own cargo feature. The rules for crates are in `docs/process-triggers.md` Part 2.
 
 ---
 
@@ -139,6 +183,7 @@ pub struct AppState {
     pub agent: AgentWatcher,      // handle to the polling thread + shared status map
     pub notes: NotesService,      // Arc<RwLock<NotesConfig>>
     pub config: Arc<RwLock<Config>>,
+    pub triggers: TriggerService, // the trigger hub and the rules worked out from process definitions
 }
 ```
 
@@ -148,6 +193,9 @@ Threads:
 - One waiter thread per session (`child.wait()`), emits exit.
 - One AgentWatcher thread (1 s tick).
 - One optional `notify` watcher thread for the notes root.
+- One `trigger-hub` thread: drains events from the trigger sources, applies the two second cool down per rule, and publishes `Fired`.
+- One `trigger-forward` thread: turns each `Fired` into the `trigger://fired` event and one log line (ids and the kind only, never the payload).
+- One thread per running trigger source (for `trigger-fs`, named `trigger-fs` and `trigger-fs-watch`, which owns the `notify` watcher). `TriggerService::refresh()` starts and stops them whenever the rules change; it is cheap when nothing changed, so it runs after every pane change and config save.
 - Git commands run on Tauri's async command pool (`#[tauri::command] async fn`) so they never block the main thread.
 
 ---
@@ -203,6 +251,10 @@ app.emit_to("main", "terminal://output", OutputEvent { id, data_b64 })
 
 Backpressure: if a single session emits more than 4 MiB in one second (a runaway `cat`), the reader inserts a 20 ms sleep per chunk. This keeps the UI responsive without dropping bytes.
 
+Marks and the tap: after a chunk is queued for the window, the reader thread also gives the same bytes to the session's `tap::Tap` (`pty/tap.rs`), so the screen is never delayed. A `Tap` owns a `marks::Scanner` (`pty/marks.rs`), a pure byte state machine that carries its state across chunks, so a read that ends inside an escape sequence gives the same result as one that does not. The scanner reports `Mark::PromptStart` (`OSC 133;A`), `Mark::CommandEnd { exit }` (`OSC 133;D;<code>`, no code means 0), `Mark::Bell` (a BEL that does not end an OSC string) and, only while `TriggerService::wants_output()` is true, the complete printable lines with CSI, OSC and two byte escapes removed. Nothing is scanned for lines in a grid without an armed `tg.output-matched` rule. The tap turns marks into `InternalSignal`s (`CommandEnded` with a duration, `Bell`, `OutputLine` cut to 200 characters) and the reader thread hands each to `TriggerService::publish_internal` (9.2). The call runs inside `catch_unwind`: if the tap ever panics, that pane stops being tapped and its output keeps flowing. The webview keeps its own OSC parsing; nothing in the frontend changed.
+
+Command timing is measured in Rust by a `CommandClock` shared by the reader thread and `PtyManager::write`. A command starts at the first `write` containing `\r` after a prompt mark (or after the last command end) and ends at the next `CommandEnd`. `write` locks the clock while it holds the sessions lock, so the reader thread locks the clock for one statement at a time and never while it asks for the sessions lock (it needs the working directory of the pane for the signal).
+
 Exit: the waiter thread emits `terminal://exit { id, code }`. The session stays in the map with `child` exited so the frontend can show the exit and offer restart; `close_terminal` removes it.
 
 ### 4.4 Commands
@@ -220,7 +272,7 @@ Exit: the waiter thread emits `terminal://exit { id, code }`. The session stays 
 
 ### 4.5 Shell integration
 
-The app writes `shell-integration.ps1` (and `.sh`) into `app_data_dir()` on startup and launches the shell with it. PowerShell launch:
+The app writes `shell-integration.ps1` and `shell-integration.sh` into `app_data_dir()` on startup, together with the wrapper files `bashrc` and `zsh/.zshenv`, `zsh/.zprofile`, `zsh/.zshrc`, `zsh/.zlogin`, and launches the shell with them. The scripts are copied from the bundled `resources/` folder. The wrapper files are compiled into the binary with `include_str!` and written by the same `install_scripts` function, because Tauri's `resources/*` glob skips folders. Each file is removed before it is rewritten. The `Shell` struct that `resolve` returns has `program`, `kind`, `args` and `env`; `env` holds the variables the integration needs, and `PtyManager::spawn` sets them on the child. PowerShell launch:
 
 ```
 pwsh.exe -NoLogo -NoExit -Command ". '<app_data>\shell-integration.ps1'"
@@ -231,9 +283,18 @@ The script dot sources the user's `$PROFILE` first if it exists, then wraps `pro
 ```powershell
 $global:__tg_original_prompt = $function:prompt
 $global:__tg_last_history_id = -1
+$global:__tg_last_error = $null
 
 function global:prompt {
-    $exit = if ($?) { 0 } else { 1 }
+    # Read $? and $LASTEXITCODE first: any other statement changes them.
+    $ok = $?
+    $native = $global:LASTEXITCODE
+    # A failed native command sets $LASTEXITCODE and adds no error record. A
+    # failed cmdlet adds one, and then a stale $LASTEXITCODE must not be reported.
+    $lastError = if ($global:Error.Count -gt 0) { $global:Error[0] } else { $null }
+    $newError = -not [object]::ReferenceEquals($lastError, $global:__tg_last_error)
+    $global:__tg_last_error = $lastError
+    $exit = if ($ok) { 0 } elseif (-not $newError -and $native -is [int] -and $native -ne 0) { $native } else { 1 }
     $esc = [char]27; $bel = [char]7
     # Command finished (OSC 133;D) with exit code and last command text (custom OSC 7777)
     $h = Get-History -Count 1
@@ -254,13 +315,29 @@ function global:prompt {
 }
 ```
 
+The exit code in `OSC 133;D` is the native command's `$LASTEXITCODE` when the last command was a native program that failed, and 1 for any other failure, so a trigger rule with `exit_code = 2` can match on PowerShell. This was never run on macOS or Linux; the Rust test `powershell_script_reports_the_native_exit_code` only reads the script.
+
 The frontend registers OSC handlers on xterm's parser:
 
 - `7` → `set_terminal_cwd` is not called; instead the frontend calls `report_cwd { id, cwd }` which updates the session and triggers a git refresh.
 - `133` → `A/B/D` drive the fallback agent state machine (section 5).
 - `7777` → last command text, used to decide whether the finished command was an agent.
 
-For bash/zsh the `.sh` file does the same with `PROMPT_COMMAND` / `precmd`. cmd.exe gets no integration; the process tree watcher still works there, cwd stays whatever was set at creation unless the user changes it from the pane header.
+For bash and zsh the `.sh` file does the same with `PROMPT_COMMAND` / `precmd_functions`. How each shell loads it:
+
+| Shell | Launch | How the script is loaded |
+|---|---|---|
+| zsh | `zsh -i`, with `ZDOTDIR=<app_data>/zsh`, `TG_USER_ZDOTDIR` (the user's own `ZDOTDIR`, or `$HOME`) and `TG_SHELL_INTEGRATION` (path of the script) set in the child's environment | The VS Code approach. The four wrapper files `.zshenv`, `.zprofile`, `.zshrc` and `.zlogin` each source the user's own file of the same name with `ZDOTDIR` pointing at the user's folder, then put `ZDOTDIR` back. `.zshrc` then sources the script. A user `.zshenv` that moves `ZDOTDIR` is followed. The last wrapper step hands `ZDOTDIR` back to the user. zsh is not started as a login shell |
+| bash | `bash --rcfile <app_data>/bashrc -i` | The wrapper `bashrc` sources `~/.bashrc` when it exists, then the script. `-i` is needed because `--rcfile` is only read by interactive shells |
+| sh | no arguments | No integration. `sh` is classed as bash for the frontend, but it may be dash, which has no `--rcfile` |
+| PowerShell | as above | The script dot sources the profile, then wraps `prompt` |
+| cmd.exe | none | No integration |
+
+Until this change bash and zsh integration never ran. The old launch was `-c '. script; exec <shell> -i'`, and `exec` replaced the shell that had sourced the script with a fresh one, so the functions and hooks the script defined were gone. Now the script is loaded by the shell that stays, and a pty test per shell (`pty/shell/live.rs`) starts the real zsh or bash with the real arguments and variables in a fake home, and asserts that `OSC 133;D` appears and that a variable set in the user's own rc file is visible. A shell that is not installed makes its test skip.
+
+The script reports a command once per command, by history number and not by command text, so running `make` twice reports twice. zsh compares `$HISTCMD`. bash cannot: `$HISTCMD` reads `1` inside `PROMPT_COMMAND` on the bash 3.2 that macOS ships, so bash compares the number that `history 1` prints. The first prompt only records the number, because the history file was loaded and nothing ran. After each reported command the script prints `OSC 7777` (the command text in base64), `OSC 133;D;<code>`, then at every prompt `OSC 7` and `OSC 133;A`. Commands the shell does not record in its history are not reported; see 9.2.
+
+cmd.exe gets no integration; the process tree watcher still works there, cwd stays whatever was set at creation unless the user changes it from the pane header.
 
 ---
 
@@ -281,11 +358,11 @@ A minimum running time of 1500 ms filters out `claude --version` style invocatio
 
 ### 5.2 Secondary: shell integration
 
-On `OSC 133;D` the frontend checks the last command (from `OSC 7777`) against the same patterns. If it matches and the process watcher has not already reported `finished` in the last 5 s, treat it as finished. Covers the case where the agent exits so quickly between ticks that the watcher misses it.
+On `OSC 133;D` the frontend checks the last command (from `OSC 7777`) against the same patterns. If it matches and the process watcher has not already reported `finished` in the last 5 s, treat it as finished. Covers the case where the agent exits so quickly between ticks that the watcher misses it. The Rust side also reads `OSC 133;D` (4.3), but only to publish `tg.command-failed` and `tg.command-slow` (9.2); agent detection does not use it.
 
 ### 5.3 Tertiary: BEL
 
-`term.onBell` while the pane is not focused → finished. Claude Code emits a bell when `preferredNotifChannel` is set to `terminal_bell`; document this in the README as an optional one liner. Codex and others may also ring.
+`term.onBell` while the pane is not focused → finished. Claude Code emits a bell when `preferredNotifChannel` is set to `terminal_bell`; document this in the README as an optional one liner. Codex and others may also ring. The Rust scanner also sees every bell and publishes `tg.bell` (9.2) for any pane, focused or not.
 
 ### 5.4 Idle fallback for shells without integration
 
@@ -516,7 +593,8 @@ Two files in `app.path().app_config_dir()` (`%APPDATA%\com.liamread.terminalgrid
   "fontFamily": null,
   "fontSize": 14,
   "scrollback": 10000,
-  "restoreSessionOnLaunch": true
+  "restoreSessionOnLaunch": true,
+  "triggers": { "enabled": false, "armed": [] }
 }
 ```
 
@@ -540,6 +618,60 @@ On launch, if `restoreSessionOnLaunch` is true, the frontend calls `create_termi
 
 Commands: `config_get`, `config_set { patch }`, `session_get`, `session_set { session }`.
 
+### 9.1 Process definitions and arming
+
+`config.json` has a `triggers` block: `enabled` is the master switch (off by default) and `armed` lists the ids of the process definitions the user has armed. It is local only and never goes in `session.json` or to the cloud.
+
+Local process definitions are JSON files in `processes/` inside the same folder, one per process; the file name without `.json` is the process id. The folder is created on first use. Only the fields triggers need are read, the rest of the file is left alone:
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "Keep the docs tidy",
+  "triggers": [
+    { "id": "saved", "kind": "fs.file-saved", "when": { "path": "${notes.root}", "glob": "**/*.md" } }
+  ]
+}
+```
+
+A file is usable when it is a JSON object with `schemaVersion` 1 and a non empty `name`, and `triggers`, when present, is an array of `{ id, kind, when }` with unique ids. A file that is not usable is still listed by `triggers_status`, with a `problem` text, and has no rules. Files over 1 MB are not read.
+
+Strings in `when` may use `${home}`, `${downloads}`, `${notes.root}`, `${screenshots}` and `${repo.root}`. `${repo.root}` makes one rule per distinct repository root among the open panes. A rule whose variable has no value on this machine is `skipped` with a reason. Rule ids are `<processId>/<triggerId>`, with `#<n>` added (n from 1) when `${repo.root}` produced several.
+
+### 9.2 Internal triggers (`tg`)
+
+Things the app already sees become triggers with no new crate, because only the app sees them and a crate would need the app to feed it. The source lives in `src-tauri/src/triggers/internal/`: `mod.rs` (`InternalSource`, source id `tg`, and the `InternalSignal` enum), `kinds.rs` (`KINDS`), `rule.rs` (parsing a rule's `when` per kind), `logic.rs` (the pure `step(&[Armed], &InternalSignal)`, tested in `logic/tests.rs`) and a `README.md` with the same sections as a crate. The catalogue and the editor see it like any other source. `triggers/feeds.rs` holds the helpers the feed points call.
+
+`InternalSource` is cloneable (an `Arc` inside). `sources()` boxes one clone for the hub and `TriggerService` keeps another. `start` stores the parsed rules and the sink, and dropping the handle clears them. The app feeds it with `TriggerService::publish_internal(signal)`, which runs `logic::step` and sends an event for every rule that matches. `TriggerService::wants_output()` reads an `AtomicBool` that is true only while a `tg.output-matched` rule is armed, so the reader thread skips line assembly otherwise.
+
+| Kind | Signal | Fed from |
+|---|---|---|
+| `tg.agent-finished` | `AgentFinished` | `agent/mod.rs`, after the finished event is emitted (starts publish nothing) |
+| `tg.command-failed`, `tg.command-slow` | `CommandEnded` | the reader thread tap, on `OSC 133;D` (4.3) |
+| `tg.output-matched` | `OutputLine` | the reader thread tap, only while a rule is armed |
+| `tg.bell` | `Bell` | the reader thread tap |
+| `tg.task-reported` | `TaskReported` | `agent/task.rs`, when a new task line is read (emptying the file publishes nothing) |
+| `tg.pane-opened-in-repo` | `PaneOpened` | `create_terminal`, on a spawned blocking thread after the spawn and a refresh; the repository root comes from the git cache and a pane outside a repository fires nothing |
+| `tg.worktree-created`, `tg.worktree-removed` | `WorktreeCreated`, `WorktreeRemoved` | `git/worktree.rs`, after git succeeded |
+| `tg.review-staged` | `ReviewStaged` | `git/review.rs`, `review_stage`, after `git add` succeeded |
+| `tg.note-saved` | `NoteSaved` | `notes_write`, after the write returned Ok |
+| `tg.focus-entered` | `FocusEntered` | `set_focused_terminal`, only when focus moves onto a different pane |
+| `tg.app-started` | `AppStarted` | `triggers::start`, once, after the first refresh has armed the rules |
+
+Feeds publish after the work they report has succeeded. The pane-opened feed checks that process triggers are switched on before its git lookup, so nothing runs while the feature is off.
+
+Payloads carry `pane`, `cwd`, `repo`, `agent`, `exit_code`, `duration_ms`, `line`, `path`, `relative`, `branch` and `files` as each signal has them, never the full output. The `when` fields per kind: `agent` (glob) for `tg.agent-finished`; `exit_code` for `tg.command-failed` (default: any non zero); `longer_than_ms` (required) and `exit_code` for `tg.command-slow`; `pattern` (required) for `tg.output-matched`, a `regex` 1.13 expression, case insensitive, with a 256 KiB size limit, compiled once when the rule starts; `repo` (absolute path) on every pane, worktree and review kind except `tg.bell`, where pane kinds match it against the pane's working directory; `glob` (relative to the notes root) for `tg.note-saved`. Unknown fields are a rule error. `tg.agent-waiting`, `tg.note-tagged`, `tg.file-dropped`, `tg.file-opened` and `tg.tray-menu` do not exist yet.
+
+Known limits:
+
+- Commands the shell does not record in its history are not reported, so `tg.command-failed` and `tg.command-slow` miss them: bash with `HISTCONTROL=ignoredups` or `ignorespace`, and zsh with `HIST_IGNORE_DUPS`, `HIST_IGNORE_SPACE` and the other `HIST_IGNORE_*` options. The script reports a command only when the history number changed (4.5).
+- `tg.output-matched` can match the echoed command line the shell prints back as the user types, not only the command's own output.
+- A rule sees at most 200 characters of a line, and the scanner keeps at most 1024 bytes of one line.
+- An `OSC 133;D` with no code counts as exit 0.
+- A command's duration starts at the first Enter after a prompt mark (or after the last command end); later Enters typed into a running program do not restart it. A shell with no marks (cmd.exe, `sh`) reports no command ends at all.
+- zsh runs with `-i` and is not a login shell, so the user's `.zprofile` and `.zlogin` do not run for a pane.
+- Each rule has the hub's two second cool down, and rules run on the thread that publishes the signal, so a pattern is matched on the terminal reader thread. The reader thread guards the tap with `catch_unwind`: if the tap panics, that pane stops being tapped and its output keeps flowing.
+
 ---
 
 ## 10. IPC contract summary
@@ -556,8 +688,20 @@ Events (Rust → frontend), all emitted to the `main` window:
 | `terminal://stats` | `{ id, cpuPercent, memBytes }` sampled on the AgentWatcher tick for the session process tree; the pane header renders it next to the agent badge |
 | `terminal://task` | `{ id, task: string \| null, updatedAtMs }` when a session's `TERMINAL_GRID_TASK_FILE` changes (section 5.5) |
 | `notes://changed` | `{ relPath, kind }` |
+| `trigger://fired` | `{ processId, processName, ruleId, kind, at, payload, coalesced }` a process trigger fired. `at` is epoch ms, `payload` holds the source's fields (for `trigger-fs`: path, name, relative, ext), `coalesced` counts events the 2 s cool down dropped since the last one for this rule |
 
-Frontend → Rust commands are listed in sections 4.4, 7 (review commands in 7.5), 8, 9. All commands return `Result<T, AppError>` where `AppError` serializes to `{ code: string, message: string, ...extra }`. Codes: `NotFound`, `SpawnFailed`, `Io`, `OutsideRoot`, `Conflict`, `InvalidName`, `GitTimeout`, `GitNotInstalled`.
+Frontend → Rust commands are listed in sections 4.4, 7 (review commands in 7.5), 8, 9 and the process trigger commands below. All commands return `Result<T, AppError>` where `AppError` serializes to `{ code: string, message: string, ...extra }`. Codes: `NotFound`, `SpawnFailed`, `Io`, `OutsideRoot`, `Conflict`, `InvalidName`, `GitTimeout`, `GitNotInstalled`.
+
+Process trigger commands (`src-tauri/src/triggers/`):
+
+| Command | In | Out |
+|---|---|---|
+| `triggers_catalogue` | `{}` | `SourceInfo[]`: every source with its kinds and availability |
+| `triggers_check` | `{ rule: { id, kind, when } }` | `{ ok: true }` or `{ ok: false, reason }`; the rule is checked as given, variables are not expanded |
+| `triggers_status` | `{}` | `{ enabled, processes: { id, name, armed, problem?, rules: { id, kind, state, reason? }[] }[] }`; recomputes first. `state` is `active`, `rejected`, `sourceFailed` or `skipped` |
+| `triggers_arm` | `{ processId, armed }` | `void`; `NotFound` when arming an id that has no definition file |
+
+Turning triggers on or off is a `config_set` patch: `{ triggers: { enabled } }`.
 
 Field naming: Rust structs use `#[serde(rename_all = "camelCase")]` so the frontend sees camelCase throughout. Command argument names are camelCase on the JS side and Tauri maps them to snake_case Rust parameters.
 
@@ -654,6 +798,26 @@ Unit tests in Rust:
 - `notes::paths::resolve` rejects `..`, absolute paths, reserved names, symlink escapes.
 - `agent::state` transitions with minimum running time and duplicate suppression.
 - `pty::reader` coalescing with a fake reader (size and time thresholds).
+
+Unit tests for process triggers, all run by `cargo test --workspace` offline and without a display:
+
+- `trigger-core`: the JSON the frontend sees (`Platforms`, `Permission`, `Event.at`), `kinds_markdown` against an exact table, the test kit (`RecordingSink`, `FixedClock`, `FakeSource`).
+- `trigger-hub`: apply, restart only the sources whose rules changed, rejected rules, a source whose start fails, the two second cool down and the `coalesced` count, using `FakeSource`.
+- `trigger-fs`: `rule.rs` parsing and `logic.rs` (globs and default ignores, settle and debounce, rename pairing, download finished) as pure tests over observed signals. No timers and no disk.
+- Each source crate's `tests/readme.rs` fails when the Kinds table in its README is stale. Refresh it with `cargo run -p trigger-<name> --example readme`.
+- The app side (`src-tauri/src/triggers/`): definition parsing, variable expansion with string level tests for `${screenshots}` on every OS, the rule planner, the status and `trigger://fired` JSON, and `TriggerService::refresh` applying only when the rules change, using a hub with no sources.
+- The internal source (`src-tauri/src/triggers/internal/`): `rule.rs` parsing per kind, `logic::step` over every kind (agent glob, exit code and duration filters, the 200 character cut, note glob, `repo`), `InternalSource` start, publish and drop, `sources()` and `publish_internal` with a `tg.bell` rule, and a unit test that fails while the Kinds table in its `README.md` is stale.
+- `pty::marks` and `pty::tap`: the scanner over escape sequences however the chunks are cut, bell versus the end of an OSC string, exit codes, line stripping, and the command clock (start at the first Enter after a prompt, end at the next command end).
+- Shell integration, in `src-tauri/src/pty/shell/live.rs` (unix only): the real zsh and the real bash are started under a pty with the app's real launch arguments and variables, in a fake home. The tests assert that `OSC 133;D` appears, that a variable set in the user's own rc file is visible, that a repeated command is reported each time, and that a failing command and an `echo` give the signals a rule would receive. A shell that is not installed makes its test skip. The PowerShell script cannot run on these machines, so a test only reads it.
+- The feed points: one end to end test in `triggers/feeds.rs` arms a rule for each kind the app feeds from its own code and checks each fires with its payload.
+
+Live tests, which watch the real file system, are `#[ignore]` in `tests/live.rs` of a crate and run with `cargo test -p trigger-fs -- --ignored --test-threads=1`. Each uses its own canonicalised temp directory, waits 400 ms after the watcher starts, and waits for events with a 10 second ceiling rather than a fixed sleep; a negative check first waits for an event on a sentinel file. CI runs them on macOS, Windows and Linux after the other checks.
+
+CI (`.github/workflows/ci.yml`) runs on each of the three systems: `npm test`, `npm run build`, `cargo fmt --check`, `cargo clippy` with `-D warnings` on the three trigger crates, `cargo test --workspace`, `node plans/_tools/check-crates.mjs` (crate isolation, README sections, file sizes) and the live tests.
+
+Manual check for triggers: in Settings switch on "Process triggers (experimental)", put a definition file in the `processes/` folder with a `fs.file-saved` trigger on a folder, tick "Armed", save a file in that folder, and confirm the toast "Trigger fs.file-saved fired for <name>" appears within a few seconds.
+
+Manual check for the internal source: in a process definition add a `tg.command-failed` trigger with no `when`, arm it, open a pane, run `false`, and confirm the same toast appears with the kind `tg.command-failed`. Do the same in a zsh pane and a bash pane.
 
 Unit tests in TypeScript:
 

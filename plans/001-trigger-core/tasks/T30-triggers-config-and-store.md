@@ -2,7 +2,7 @@
 id: T30
 epic: 001-trigger-core
 title: Add TriggersConfig and the local definition store
-status: todo
+status: done
 depends_on: [T08]
 size: M
 model: haiku
@@ -497,3 +497,5 @@ mod tests {
 ## Log
 
 <!-- one line per attempt: date, model, result, short note -->
+- 2026-10-12 haiku: built, acceptance passed (clippy baseline 7 warnings, after 7; state:: 13 ok; triggers::store 6 ok; fmt clean; workspace tests ok)
+- 2026-10-12 checker: pass
