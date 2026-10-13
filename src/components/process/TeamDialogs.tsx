@@ -4,10 +4,19 @@ import { useCloud } from "../../cloud/CloudProvider";
 import type { TeamConnection } from "../../cloud/types";
 import { cloneProcess } from "../../process/json";
 import { maskedAt, parseSecretError, scanSecrets, secretWhat, stepIndexOf } from "../../process/secrets";
-import { connectionsUsed } from "../../process/share";
+import { connectionsUsed, type UsedConnection } from "../../process/share";
 import { recordOf, type TeamDialog } from "../../process/state";
 import { firstName, parseTime } from "../../process/team";
-import { loadTeamConnections, teamConnectionOf, writeTeamConnection } from "../../process/teamConnections";
+import {
+  connectionErrorMessage,
+  connectionRef,
+  createTeamConnection,
+  loadTeamConnections,
+  MAX_LIVE_CONNECTIONS,
+  settingsProblem,
+  sharedSettings,
+  shareRowOf,
+} from "../../process/teamConnections";
 import { whenLabel } from "../../process/runs";
 import { working } from "../../process/versions";
 import { TeamTile } from "../Account";
@@ -126,21 +135,60 @@ function ShareDialog({ processId }: { processId: string }) {
   // Whether the team has each connection, and sharing yours with it, need team connections (cloud epic 005).
   const withConnections = cloud.has("connections");
   const [teamConnections, setTeamConnections] = useState<TeamConnection[] | null>(null);
+  /** Why the team's connections couldn't be loaded; none go with the process then. */
+  const [connectionsError, setConnectionsError] = useState<{ error: unknown } | null>(null);
   const [unticked, setUnticked] = useState<Set<string>>(() => new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Shared, but these connections weren't: the dialog stays to say so. */
+  const [notShared, setNotShared] = useState<{ label: string; why: string }[] | null>(null);
+  const teamName = team?.name ?? "the team";
+  const rowOf = (u: UsedConnection) => shareRowOf(u, withConnections ? teamConnections : null, team?.role ?? "member", teamName);
 
   useEffect(() => {
     setTeamConnections(null);
+    setConnectionsError(null);
     if (!withConnections || !teamId) return;
     let cancelled = false;
-    loadTeamConnections(teamId, true)
-      .then((list) => !cancelled && setTeamConnections(list))
-      .catch(() => {});
+    loadTeamConnections(teamId, true).then(
+      (list) => !cancelled && setTeamConnections(list),
+      (error: unknown) => !cancelled && setConnectionsError({ error }),
+    );
     return () => {
       cancelled = true;
     };
   }, [teamId, withConnections]);
+
+  /**
+   * Adds the ticked connections the team lacks, after the process is shared.
+   * Only settings go: this computer doesn't hold a password for the team, so
+   * someone sets it in Connections. Returns what didn't get added, and why.
+   */
+  const shareConnections = async (teamId: string, list: TeamConnection[]) => {
+    const left: { label: string; why: string }[] = [];
+    let live = list.length;
+    for (const u of used) {
+      const row = rowOf(u);
+      if (row.state !== "missing" || !row.canShare || !row.name || !u.local || !u.kind || unticked.has(u.ref)) continue;
+      const settings = sharedSettings(u.local);
+      const problem = settingsProblem(settings);
+      if (problem) {
+        left.push({ label: u.label, why: problem });
+        continue;
+      }
+      if (live >= MAX_LIVE_CONNECTIONS) {
+        left.push({ label: u.label, why: `${teamName} already has ${MAX_LIVE_CONNECTIONS} connections, the most a team can have.` });
+        continue;
+      }
+      try {
+        await createTeamConnection(teamId, true, { name: row.name, kind: u.kind, settings, editors: "admins" });
+        live += 1;
+      } catch (e) {
+        left.push({ label: u.label, why: connectionErrorMessage(e, { action: "create", teamName, name: row.name }) });
+      }
+    }
+    return left;
+  };
 
   const close = () => dispatch({ type: "team-dialog", dialog: null });
   if (!record || !process) return null;
@@ -157,15 +205,13 @@ function ShareDialog({ processId }: { processId: string }) {
     setError(null);
     try {
       const created = await api.createTeamProcess(team.id, definition);
-      if (withConnections && teamConnections) {
-        // Ticked connections the team lacks go with it. The password stays in this
-        // computer's credential store, so only the settings are copied.
-        for (const u of used) {
-          if (!u.local || !u.kind || unticked.has(u.ref) || teamConnectionOf(u.kind, teamConnections)) continue;
-          await writeTeamConnection(team.id, true, u.kind, null, { settings: u.local.settings, editors: "admins" }, teamConnections).catch(() => {});
-        }
-      }
+      // Ticked connections the team lacks go with it; a failure here never undoes the share.
+      const left = withConnections && teamConnections ? await shareConnections(team.id, teamConnections) : [];
       dispatch({ type: "team-saved", teamId: team.id, process: created });
+      if (left.length) {
+        setNotShared(left);
+        return;
+      }
       dispatch({ type: "team-dialog", dialog: null });
       // Shown straight away: the team's processes, with the new copy among them.
       cloud.selectSpace(team.id);
@@ -189,7 +235,45 @@ function ShareDialog({ processId }: { processId: string }) {
     dispatch({ type: "editor-ui", processId, patch: { json: true } });
   };
 
-  const teamName = team?.name ?? "the team";
+  if (notShared) {
+    const done = () => {
+      close();
+      if (team) cloud.selectSpace(team.id);
+    };
+    const one = notShared.length === 1;
+    return (
+      <Frame
+        key="not-shared"
+        label={`Shared ${process.name} with ${teamName}`}
+        tile={<TeamTile name={teamName} size={40} />}
+        title={`Shared ${process.name} with ${teamName}`}
+        text={`${teamName} has its copy, but ${one ? "one connection it uses wasn't" : "some connections it uses weren't"} added. Add ${one ? "it" : "them"} in ${teamName}'s Connections before the team runs it.`}
+        onClose={done}
+        onSubmit={done}
+        foot={
+          <>
+            <span className="cloud-dialog__spacer" />
+            <button type="button" className="cloud-btn cloud-btn--primary" data-primary onClick={done}>
+              Open {teamName}
+            </button>
+          </>
+        }
+      >
+        <div className="team-dialog__card">
+          <div className="team-dialog__label">Not added to {teamName}</div>
+          <div className="team-conns" role="alert">
+            {notShared.map((n) => (
+              <div key={n.label} className="team-conn team-conn--missing">
+                <span className="team-conn__name">{n.label}</span>
+                <div className="team-conn__note">{n.why}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Frame>
+    );
+  }
+
   return (
     <Frame
       label={`Share ${process.name} with ${teamName}`}
@@ -248,39 +332,40 @@ function ShareDialog({ processId }: { processId: string }) {
             <div className="team-dialog__label">Connections it uses</div>
             <div className="team-conns">
               {used.map((u) => {
-                if (!withConnections || !teamConnections) {
+                const row = rowOf(u);
+                if (row.state === "unknown") {
                   return (
                     <div key={u.ref} className="team-conn">
                       <span className="team-conn__name">{u.label}</span>
                     </div>
                   );
                 }
-                const has = !!u.kind && !!teamConnectionOf(u.kind, teamConnections);
-                if (has) {
+                if (row.state === "has") {
                   return (
                     <div key={u.ref} className="team-conn">
                       <span className="team-conn__name">{u.label}</span>
                       <span className="team-conn__has">
                         <Tick />
-                        {teamName} has this
+                        {teamName} has {row.connection.name}
                       </span>
                     </div>
                   );
                 }
-                const on = !unticked.has(u.ref);
+                const on = row.canShare && !unticked.has(u.ref);
                 return (
                   <div key={u.ref} className="team-conn team-conn--missing">
                     <div className="team-conn__top">
                       <span className="team-conn__name">{u.label}</span>
-                      <span className="team-conn__missing">{teamName} doesn’t have this</span>
+                      <span className="team-conn__missing">{row.name ? `${teamName} has no connection named ${row.name}` : `${teamName} doesn’t have this`}</span>
                     </div>
                     {u.local && (
                       <>
-                        <label className="team-conn__share">
+                        <label className={cx("team-conn__share", !row.canShare && "team-conn__share--off")}>
                           <input
                             type="checkbox"
                             className="team-check"
                             checked={on}
+                            disabled={!row.canShare}
                             onChange={() =>
                               setUnticked((s) => {
                                 const next = new Set(s);
@@ -293,7 +378,8 @@ function ShareDialog({ processId }: { processId: string }) {
                           Share my connection with {teamName}
                         </label>
                         <div className="team-conn__note">
-                          Its host, user and password are copied to {teamName}. Everyone in the team runs with them and can’t see the password.
+                          {row.why ??
+                            `Its settings are copied to ${teamName} as ${connectionRef(row.name!)}. The password or token isn’t: set it in ${teamName}’s Connections so everyone can run with it.`}
                         </div>
                       </>
                     )}
@@ -302,6 +388,9 @@ function ShareDialog({ processId }: { processId: string }) {
               })}
             </div>
             {!withConnections && <div className="team-conn__note">Teammates run it with their own connections of the same name.</div>}
+            {withConnections && connectionsError && (
+              <div className="team-conn__note">{connectionErrorMessage(connectionsError.error, { action: "load", teamName })} No connections go with it.</div>
+            )}
           </>
         )}
       </div>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canChangeRole,
   canRemove,
+  countLiveConnections,
   countLiveProcesses,
   displayInviteUrl,
   formatShortDate,
@@ -13,7 +14,7 @@ import {
   roleChoices,
   settingsErrorMessage,
 } from "./teams";
-import type { Member, ProcessPage, Role, TeamProcess } from "./types";
+import type { Member, ProcessPage, Role, TeamConnection, TeamConnectionPage, TeamProcess } from "./types";
 
 const member = (id: string, role: Role): Member => ({
   user: { id, login: id, name: id, avatarUrl: "" },
@@ -130,6 +131,40 @@ describe("countLiveProcesses", () => {
 
   it("handles an empty team", async () => {
     expect(await countLiveProcesses(async () => ({ processes: [], lastSeq: 0, hasMore: false }))).toBe(0);
+  });
+});
+
+describe("countLiveConnections", () => {
+  const user = { id: "u", login: "u", name: "u", avatarUrl: "" };
+  const connection = (id: string, seq: number, deleted = false): TeamConnection => ({
+    id,
+    teamId: "t",
+    name: id,
+    kind: "github",
+    settings: {},
+    hasSecret: false,
+    editors: "admins",
+    version: 1,
+    seq,
+    deleted,
+    createdBy: user,
+    createdAt: "2026-10-01T00:00:00.000Z",
+    updatedBy: user,
+    updatedAt: "2026-10-01T00:00:00.000Z",
+  });
+
+  it("pages through the feed and skips tombstones", async () => {
+    const pages: Record<number, TeamConnectionPage> = {
+      0: { connections: [connection("a", 1), connection("b", 2)], lastSeq: 4, hasMore: true },
+      2: { connections: [connection("c", 3), connection("b", 4, true)], lastSeq: 4, hasMore: false },
+    };
+    const asked: number[] = [];
+    const count = await countLiveConnections(async (since) => {
+      asked.push(since);
+      return pages[since]!;
+    });
+    expect(asked).toEqual([0, 2]);
+    expect(count).toBe(2);
   });
 });
 
