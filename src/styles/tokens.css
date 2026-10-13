@@ -224,6 +224,10 @@
   --glass-sheet: rgb(10 10 12 / 0.97);
   --glass-card: rgb(12 12 14 / 0.96);
   --header-wash: none;
+  /* Cloud dialogs and menus match the sheets: near black, not the dark navy. */
+  --cloud-dialog-bg: var(--glass-sheet);
+  --cloud-panel-bg: var(--glass-sheet);
+  --cloud-avatar-ring: #000;
 }
 
 /* Glass (macOS) --------------------------------------------------------- */
@@ -242,6 +246,9 @@
   --glass-card: rgb(var(--glass-rgb) / 0.5);
   --glass-blur: none;
   --shadow-k: 0.6;
+  /* Frosted like the other sheets, so the desktop shows through a little. */
+  --cloud-dialog-bg: rgb(var(--glass-rgb) / 0.78);
+  --cloud-panel-bg: rgb(var(--glass-rgb) / 0.72);
 }
 
 :root[data-theme="glass"] .chrome__pill-dot {
