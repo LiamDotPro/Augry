@@ -4504,6 +4504,7 @@ dependencies = [
  "trash",
  "trigger-core",
  "trigger-fs",
+ "trigger-git",
  "trigger-hub",
  "uuid",
  "window-vibrancy",
@@ -4901,6 +4902,18 @@ dependencies = [
 
 [[package]]
 name = "trigger-fs"
+version = "0.1.0"
+dependencies = [
+ "globset",
+ "notify",
+ "serde",
+ "serde_json",
+ "trigger-core",
+ "uuid",
+]
+
+[[package]]
+name = "trigger-git"
 version = "0.1.0"
 dependencies = [
  "globset",

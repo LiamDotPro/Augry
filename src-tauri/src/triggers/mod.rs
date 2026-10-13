@@ -39,6 +39,8 @@ fn sources(internal: &InternalSource) -> Vec<Box<dyn Source>> {
     list.push(Box::new(internal.clone()));
     #[cfg(feature = "trigger-fs")]
     list.push(Box::new(trigger_fs::FsSource));
+    #[cfg(feature = "trigger-git")]
+    list.push(Box::new(trigger_git::GitSource));
     list
 }
 
@@ -440,6 +442,25 @@ mod tests {
         assert!(service.has_definition("tidy"));
         assert!(!service.has_definition("nope"));
         cleanup(&dir);
+    }
+
+    fn source_ids() -> Vec<&'static str> {
+        sources(&InternalSource::default())
+            .iter()
+            .map(|source| source.id())
+            .collect()
+    }
+
+    #[cfg(feature = "trigger-git")]
+    #[test]
+    fn the_catalogue_lists_the_git_source() {
+        assert!(source_ids().contains(&"git"));
+    }
+
+    #[cfg(not(feature = "trigger-git"))]
+    #[test]
+    fn the_catalogue_has_no_git_source_without_the_feature() {
+        assert!(!source_ids().contains(&"git"));
     }
 
     #[test]
