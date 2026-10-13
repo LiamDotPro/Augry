@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUG_FIX, CRASH_REPORT, FEATURE_DELIVERY, TEMPLATES } from "./examples";
+import { BUG_FIX, CRASH_REPORT, EXAMPLES, FEATURE_DELIVERY } from "./examples";
 import { buildGraph } from "./graph";
 import { layoutLanes, miniBlocks, LANE_H, RULER_H } from "./layout";
 import { runbookRows } from "./runbook";
@@ -69,10 +69,10 @@ describe("layoutLanes", () => {
     expect(l.play).toBeNull();
   });
 
-  it("lays out every template without gaps", () => {
-    for (const t of TEMPLATES) {
-      const l = layoutLanes(t.process);
-      expect(l.blocks).toHaveLength(t.process.steps.length);
+  it("lays out every example without gaps", () => {
+    for (const process of EXAMPLES) {
+      const l = layoutLanes(process);
+      expect(l.blocks).toHaveLength(process.steps.length);
       expect(l.width).toBeGreaterThan(l.headW);
     }
     expect(miniBlocks(CRASH_REPORT)).toHaveLength(9);

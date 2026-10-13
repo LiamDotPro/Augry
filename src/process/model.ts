@@ -171,9 +171,9 @@ export function toneOfState(state: string): Tone {
   return "muted";
 }
 
-/** A file name for a process id. */
+/** Where a process of yours is saved, inside the app's folder (src-tauri/src/processes). */
 export function processFile(id: string): string {
-  return `.augry/processes/${id}.json`;
+  return `processes/${id}.json`;
 }
 
 /** A url-safe id from a name, unique among `taken`. */

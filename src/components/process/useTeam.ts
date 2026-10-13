@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch } from "react";
 import * as api from "../../cloud/api";
 import { useCloud } from "../../cloud/CloudProvider";
-import type { Member, Team, TeamProcess, Template } from "../../cloud/types";
-import { TEMPLATES } from "../../process/examples";
+import type { Member, Team, TeamProcess } from "../../cloud/types";
 import { cloneProcess } from "../../process/json";
 import { parseSecretError, scanSecrets, secretWhat } from "../../process/secrets";
 import { recordOf, teamOf, type Action, type ProcessState } from "../../process/state";
@@ -30,7 +29,8 @@ export interface TeamApi {
   restore(processId: string, version: number): Promise<void>;
   loadVersions(processId: string): void;
   create(process: Process, open?: "editor" | "start"): Promise<void>;
-  addTemplate(templateId: string): Promise<void>;
+  /** Installs a server template into the team by its slug. */
+  addTemplate(slug: string, name: string): Promise<void>;
   duplicate(processId: string): Promise<void>;
   remove(processId: string): Promise<void>;
 }
@@ -90,7 +90,6 @@ export function useTeam(state: ProcessState, dispatch: Dispatch<Action>): TeamAp
   const team = enabled ? cloud.selectedTeam : null;
   const teamId = team?.id ?? null;
   const [members, setMembers] = useState<Record<string, Member[]>>({});
-  const [templates, setTemplates] = useState<Template[] | null>(null);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -139,8 +138,7 @@ export function useTeam(state: ProcessState, dispatch: Dispatch<Action>): TeamAp
     }
   }, [teamIds, dispatch, load]);
 
-  // The selected team: its members and the server's templates, and a fresh load.
-  const hasTemplates = cloud.has("templates");
+  // The selected team: its members and a fresh load.
   useEffect(() => {
     if (!teamId) return;
     void load(teamId);
@@ -155,18 +153,10 @@ export function useTeam(state: ProcessState, dispatch: Dispatch<Action>): TeamAp
         setMembers((m) => ({ ...m, [teamId]: detail.members }));
       })
       .catch(() => {});
-    if (hasTemplates && templates === null) {
-      api
-        .listTemplates()
-        .then((list) => !cancelled && setTemplates(list))
-        .catch(() => {});
-    }
     return () => {
       cancelled = true;
     };
-    // Templates load once; members and processes on every selection.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamId, hasTemplates, load]);
+  }, [teamId, load]);
 
   // Poll while the Process tab shows the team, and catch up when back online.
   const online = cloud.online;
@@ -313,22 +303,14 @@ export function useTeam(state: ProcessState, dispatch: Dispatch<Action>): TeamAp
 
       create,
 
-      addTemplate: async (templateId) => {
-        const template = TEMPLATES.find((t) => t.id === templateId);
-        if (!template) return;
-        // The server's own template when it has one by that name; else a copy of ours.
-        const slug = templates?.find((t) => t.name.trim().toLowerCase() === template.name.toLowerCase())?.slug;
-        if (slug) {
-          try {
-            const installed = await api.installTemplate(slug, team.id);
-            note(null);
-            dispatch({ type: "team-saved", teamId: team.id, process: installed });
-            return;
-          } catch (error) {
-            if (!api.isCloudError(error, 404)) return failed(error, template.name);
-          }
+      addTemplate: async (slug, name) => {
+        try {
+          const installed = await api.installTemplate(slug, team.id);
+          note(null);
+          dispatch({ type: "team-saved", teamId: team.id, process: installed });
+        } catch (error) {
+          failed(error, name);
         }
-        await create({ ...cloneProcess(template.process), from: `template:${template.id}@${template.revision}` });
       },
 
       duplicate: async (processId) => {
@@ -355,5 +337,5 @@ export function useTeam(state: ProcessState, dispatch: Dispatch<Action>): TeamAp
         }
       },
     };
-  }, [team, online, teamMembers, names, me, cloud.lastSyncedAt, templates, dispatch, load, note, loadVersions]);
+  }, [team, online, teamMembers, names, me, cloud.lastSyncedAt, dispatch, load, note, loadVersions]);
 }

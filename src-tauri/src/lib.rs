@@ -8,6 +8,7 @@ mod glass;
 #[cfg(target_os = "macos")]
 mod menu;
 pub mod notes;
+pub mod processes;
 pub mod pty;
 pub mod state;
 #[cfg(target_os = "macos")]
@@ -45,6 +46,7 @@ pub struct AppState {
     pub notes: notes::NotesService,
     pub state: state::StateService,
     pub cloud: cloud::CloudService,
+    pub processes: processes::ProcessStore,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -83,6 +85,7 @@ pub fn run() {
                 .clone()
                 .unwrap_or_else(notes::NotesService::default_root);
 
+            let processes = processes::ProcessStore::new(config_dir.join("processes"));
             let pty = pty::PtyManager::new(config_dir);
             agent::task::clear_task_dir(&pty.tasks_dir());
 
@@ -93,6 +96,7 @@ pub fn run() {
                 notes: notes::NotesService::new(notes_root),
                 state: state_service,
                 cloud: cloud::CloudService::new(),
+                processes,
             };
 
             // A missing or unwritable notes folder must not stop the app.
@@ -175,6 +179,12 @@ pub fn run() {
             cloud::cloud_sign_out,
             cloud::cloud_open_url,
             cloud::cloud_take_deep_links,
+            // processes
+            processes::processes_load,
+            processes::process_save_version,
+            processes::process_save_draft,
+            processes::process_delete,
+            processes::process_open_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Terminal Grid");

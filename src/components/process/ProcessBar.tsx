@@ -5,7 +5,7 @@ import type { Run } from "../../process/types";
 import { working } from "../../process/versions";
 import { cx } from "../../lib/cx";
 import { ProcessIcon } from "./ProcessIcon";
-import { RUN_OFFLINE, useProcess } from "./store";
+import { useProcess } from "./store";
 import { useDismiss } from "./useDismiss";
 
 /** A small dropdown under a bar chip. */
@@ -88,8 +88,9 @@ export function EditBar({
   onJson?(): void;
   onRun(): void;
 }) {
-  const { dispatch, offline } = useProcess();
-  const cantRun = offline(processId);
+  const { dispatch, runBlocked } = useProcess();
+  const blocked = runBlocked(processId);
+  const cantRun = blocked !== null;
   return (
     <div className="process-bar">
       <div className="process-bar__group">
@@ -141,7 +142,7 @@ export function EditBar({
         className={cx("process-btn process-btn--primary process-bar__run", cantRun && "process-btn--offline")}
         aria-disabled={cantRun || undefined}
         onClick={() => !cantRun && onRun()}
-        title={cantRun ? RUN_OFFLINE : changes ? "Saves the draft as a new version, then runs it" : "Run this version"}
+        title={blocked ?? (changes ? "Saves the draft as a new version, then runs it" : "Run this version")}
       >
         <span className="process-btn__play" aria-hidden="true">▶</span>
         Run
@@ -155,8 +156,9 @@ export function EditBar({
  * view only", the run's status, Edit process and Stop run.
  */
 export function RunBar({ run, name }: { run: Run; name: string }) {
-  const { state, dispatch, now, runProcess, offline } = useProcess();
-  const cantRun = offline(run.processId);
+  const { state, dispatch, now, runProcess, runBlocked } = useProcess();
+  const blocked = runBlocked(run.processId);
+  const cantRun = blocked !== null;
   const siblings = state.runs.filter((r) => r.processId === run.processId);
   const live = run.status === "running" || run.status === "waiting";
   const sub = `${run.trigger} · ${clock(run.startedAt)}`;
@@ -237,7 +239,7 @@ export function RunBar({ run, name }: { run: Run; name: string }) {
           type="button"
           className={cx("process-btn process-btn--glass", cantRun && "process-btn--offline")}
           aria-disabled={cantRun || undefined}
-          title={cantRun ? RUN_OFFLINE : undefined}
+          title={blocked ?? undefined}
           onClick={() => !cantRun && runProcess(run.processId)}
         >
           Run again

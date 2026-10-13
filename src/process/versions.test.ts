@@ -1,10 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { FEATURE_DELIVERY, featureDeliveryV6 } from "./examples";
+import { BUG_FIX, FEATURE_DELIVERY, featureDeliveryHistory, featureDeliveryV6 } from "./examples";
 import { updateStep } from "./edit";
-import { initialState, reducer } from "./state";
+import { hashOf } from "./json";
+import { initialState, reducer, type ProcessState } from "./state";
+import type { ProcessRecord } from "./types";
 import { changeSentence, latest, summarizeChanges, versionDiff, versionTags, withDraft } from "./versions";
 
 const NOW = new Date(2026, 9, 11, 11, 0).getTime();
+
+/** Feature delivery with its seven versions, the way it would come off disk. */
+function featureDelivery(): ProcessRecord {
+  return {
+    id: "feature-delivery",
+    draft: null,
+    versions: featureDeliveryHistory().map((process, i) => ({
+      version: i + 1,
+      message: `v${i + 1}`,
+      by: "You",
+      at: NOW,
+      hash: hashOf(process),
+      process,
+      ...(i === 2 ? { note: "restored v1" } : {}),
+    })),
+  };
+}
+
+/** The tab after reading `records` from disk. */
+const loaded = (...records: ProcessRecord[]): ProcessState => reducer(initialState(), { type: "loaded", records, problems: [] });
 
 describe("summarizeChanges", () => {
   it("says what changed from v6 to v7, as the Compare chips do", () => {
@@ -35,15 +57,14 @@ describe("versionDiff", () => {
 
 describe("drafts and versions", () => {
   it("drops the draft when an edit goes back to the saved version", () => {
-    const state = initialState(NOW);
-    const record = state.records[0]!;
+    const record = featureDelivery();
     const edited = withDraft(record, updateStep(latest(record).process, "plan", { name: "Plan it" }));
     expect(edited.draft).not.toBeNull();
     expect(withDraft(edited, latest(record).process).draft).toBeNull();
   });
 
   it("saves a draft as the next version and restores old ones as new versions", () => {
-    let state = initialState(NOW);
+    let state = loaded(featureDelivery());
     const id = "feature-delivery";
     const current = latest(state.records[0]!).process;
     state = reducer(state, { type: "edit", processId: id, process: updateStep(current, "smoke", { name: "Settings check" }) });
@@ -60,63 +81,50 @@ describe("drafts and versions", () => {
     expect(record.versions).toHaveLength(9);
   });
 
-  it("tags versions with the runs that used them", () => {
-    const state = initialState(NOW);
-    const record = state.records[0]!;
-    const tags = (n: number) => versionTags(record, record.versions.find((v) => v.version === n)!, state.runs, 6).map((t) => t.text);
+  it("tags the current version, the compared one and restores", () => {
+    const record = featureDelivery();
+    const tags = (n: number) => versionTags(record, record.versions.find((v) => v.version === n)!, [], 6).map((t) => t.text);
     expect(tags(7)).toEqual(["current"]);
-    expect(tags(6)).toEqual(["run 4", "compared"]);
-    expect(tags(5)).toEqual(["runs 1–3"]);
+    expect(tags(6)).toEqual(["compared"]);
     expect(tags(3)).toEqual(["restored v1"]);
   });
 });
 
 describe("reducer", () => {
-  it("Run with a draft saves it first, then opens the run", () => {
-    let state = initialState(NOW);
-    const id = "bug-fix";
-    const current = latest(state.records[1]!).process;
-    state = reducer(state, { type: "edit", processId: id, process: updateStep(current, "fix", { name: "Fix it" }) });
-    state = reducer(state, { type: "run", processId: id, now: NOW });
-    const run = state.runs[0]!;
-    expect(run).toMatchObject({ processId: id, number: 13, version: 4 });
-    expect(state.route).toEqual({ view: "run", runId: run.id });
-    expect(state.records[1]!.draft).toBeNull();
+  it("starts empty and waits for the disk", () => {
+    const state = initialState();
+    expect(state.records).toEqual([]);
+    expect(state.runs).toEqual([]);
+    expect(state.disk.status).toBe("loading");
+    expect(state.connections.every((c) => !c.on && c.status === "Not set up")).toBe(true);
+    expect(loaded().disk.status).toBe("ready");
   });
 
-  it("Copy and run adds the template as version 1 and starts it", () => {
-    let state = initialState(NOW);
-    state = reducer(state, { type: "copy-template", templateId: "feature-delivery", run: true, trigger: "issue #139", now: NOW });
+  it("Use template saves the template as version 1 of yours and opens it", () => {
+    let state = loaded(featureDelivery());
+    state = reducer(state, { type: "use-template", process: { ...FEATURE_DELIVERY, from: "template:feature-delivery@3" }, name: "Feature delivery", now: NOW });
     const record = state.records[state.records.length - 1]!;
     expect(record.id).toBe("feature-delivery-2");
     expect(record.versions).toHaveLength(1);
-    expect(latest(record).process).toMatchObject({ version: 1, from: "template:feature-delivery@3" });
-    expect(state.runs[0]).toMatchObject({ processId: record.id, number: 1, trigger: "issue #139" });
-    expect(state.route).toEqual({ view: "run", runId: state.runs[0]!.id });
+    expect(latest(record)).toMatchObject({ message: "Created from the Feature delivery template", by: "You" });
+    expect(latest(record).process).toMatchObject({ id: "feature-delivery-2", version: 1, from: "template:feature-delivery@3" });
+    expect(state.route).toEqual({ view: "editor", processId: record.id });
   });
 
-  it("Approve and Send back change the waiting run", () => {
-    let state = initialState(NOW);
-    state = reducer(state, { type: "approve", runId: "feature-delivery#4", stepId: "review", now: NOW });
-    const run = state.runs.find((r) => r.id === "feature-delivery#4")!;
-    expect(run.steps.review!.state).toBe("done");
-    expect(run.steps.pr!.state).toBe("running");
-    expect(run.status).toBe("running");
+  it("adds, copies and deletes processes", () => {
+    let state = loaded();
+    state = reducer(state, { type: "new-process", now: NOW });
+    state = reducer(state, { type: "import", process: BUG_FIX, now: NOW });
+    expect(state.records.map((r) => r.id)).toEqual(["new-process", "bug-fix"]);
+    state = reducer(state, { type: "duplicate", processId: "bug-fix", now: NOW });
+    expect(state.records.map((r) => r.id)).toEqual(["new-process", "bug-fix", "bug-fix-2"]);
+    state = reducer(state, { type: "delete", processId: "new-process" });
+    expect(state.records.map((r) => r.id)).toEqual(["bug-fix", "bug-fix-2"]);
+    expect(state.route).toEqual({ view: "home" });
   });
 
-  it("a file arriving starts the watched-folder process and says so", () => {
-    let state = initialState(NOW);
-    state = reducer(state, { type: "file-arrived", processId: "crash-report", now: NOW });
-    expect(state.runs[0]).toMatchObject({ processId: "crash-report", number: 4, trigger: "folder", detail: "crash-2026-10-11.log" });
-    expect(state.notice).toMatchObject({ title: "Crash report started", folder: "~/crash-dumps" });
-  });
-
-  it("tests and saves a connection", () => {
-    let state = initialState(NOW);
-    state = reducer(state, { type: "connection-test", id: "mysql" });
-    expect(state.connections.find((c) => c.id === "mysql")!.test).toEqual({ ok: false, text: "Add a host and port first" });
-    state = reducer(state, { type: "connection-set", id: "mysql", key: "host", value: "localhost:3306" });
-    state = reducer(state, { type: "connection-save", id: "mysql" });
-    expect(state.connections.find((c) => c.id === "mysql")).toMatchObject({ on: true, status: "Connected · localhost:3306" });
+  it("says when the processes folder couldn't be read", () => {
+    const state = reducer(initialState(), { type: "load-failed", error: "permission denied" });
+    expect(state.disk).toEqual({ status: "failed", problems: [], error: "permission denied" });
   });
 });

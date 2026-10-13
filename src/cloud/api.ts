@@ -220,6 +220,8 @@ export const restoreTeamProcess = (teamId: string, id: string, version: number, 
 export async function listTemplates(): Promise<Template[]> {
   return (await request<{ templates: Template[] }>("GET", "/v1/templates")).templates;
 }
+/** One template with its definition, in the cloud's lanes format (schemaVersion 1). */
+export const getTemplate = (slug: string) => request<Template & { definition: unknown }>("GET", `/v1/templates/${enc(slug)}`);
 export const installTemplate = (slug: string, teamId: string) =>
   request<TeamProcess>("POST", `/v1/templates/${enc(slug)}/install`, { teamId });
 

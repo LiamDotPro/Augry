@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { isCloudError } from "../../cloud/api";
 import { useCloud } from "../../cloud/CloudProvider";
 import type { PublicUser, TeamConnection } from "../../cloud/types";
-import { connectionFields, testConnection } from "../../process/connections";
+import { connectionFields } from "../../process/connections";
 import { savedAgo } from "../../process/team";
 import {
   canEdit,
@@ -16,7 +16,7 @@ import {
 } from "../../process/teamConnections";
 import { cx } from "../../lib/cx";
 import { TeamTile } from "../Account";
-import { ConnectionCard, GROUP_NAME, SetupPanel, Tile } from "./ConnectionsView";
+import { ComingNote, ConnectionCard, GROUP_NAME, Tile } from "./ConnectionsView";
 import { InspectorField, type Field } from "./InspectorField";
 import { useProcess } from "./store";
 import type { TeamApi } from "./useTeam";
@@ -63,19 +63,14 @@ export function TeamConnectionsView() {
   if (!team) return null;
 
   const q = query.trim().toLowerCase();
-  const local = state.connections.find((c) => c.id === state.connection) ?? null;
   const openCard = openKind ? sections.flatMap((s) => s.cards).find((c) => !c.mine && c.local.icon === openKind) ?? null : null;
-  const pickLocal = (id: string | null) => {
-    setOpenKind(null);
-    dispatch({ type: "connection-open", id });
-  };
   const pickTeam = (kind: string | null) => {
     dispatch({ type: "connection-open", id: null });
     setOpenKind(kind);
   };
 
   return (
-    <div className={cx("process-connections", (local || openCard) && "process-connections--panel")}>
+    <div className={cx("process-connections", openCard && "process-connections--panel")}>
       <div className="process-home__main process-connections__main" ref={scroll.ref} onScroll={scroll.onScroll}>
         <div className="process-home__head process-connections__head">
           <div className="process-home__titles">
@@ -106,6 +101,7 @@ export function TeamConnectionsView() {
             </button>
           )}
         </div>
+        {!enabled && <ComingNote />}
         {sections.map((section) => {
           const cards = section.cards.filter((c) => !q || `${c.local.name} ${c.local.desc}`.toLowerCase().includes(q));
           if (!cards.length) return null;
@@ -121,9 +117,10 @@ export function TeamConnectionsView() {
                     <ConnectionCard
                       key={card.local.id}
                       connection={card.local}
-                      picked={card.local.id === state.connection}
-                      onOpen={() => pickLocal(card.local.id)}
-                      view={{ on: card.on, status: card.status, used: card.used, action: card.on ? "Manage" : "Set up" }}
+                      picked={false}
+                      onOpen={() => {}}
+                      // Your own connections can't be set up yet either.
+                      view={{ on: false, status: "Not set up", used: card.used, action: null }}
                     />
                   ) : (
                     <ConnectionCard
@@ -141,7 +138,6 @@ export function TeamConnectionsView() {
           );
         })}
       </div>
-      {local && <SetupPanel connection={local} onClose={() => pickLocal(null)} />}
       {openCard && list && (
         <TeamSetupPanel
           key={openCard.local.icon}
@@ -232,10 +228,8 @@ function TeamSetupPanel({
     ? ` Added by ${addedBy(existing.createdBy)}${existing.version > 1 ? ` · changed by ${addedBy(existing.updatedBy)} ${savedAgo(Date.parse(existing.updatedAt), now)}` : ""}.`
     : "";
 
-  const test = () => {
-    const outcome = testConnection({ ...c, settings });
-    setResult(outcome.ok ? { ok: true, text: `${outcome.text} · from this computer` } : outcome);
-  };
+  // Nothing can reach a database or tracker from the app yet.
+  const test = () => setResult({ ok: false, text: "Testing a connection isn’t available yet." });
 
   const failed = (error: unknown) => {
     if (isCloudError(error, 409)) {

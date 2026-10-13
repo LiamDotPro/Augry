@@ -1,8 +1,9 @@
 /**
  * Connections: what processes start from and what their steps can reach. A
  * process refers to a connection by name and never holds a secret, so the
- * settings here keep everything but passwords and tokens, which the real app
- * puts in the system credential store. Test connection is simulated.
+ * settings here keep everything but passwords and tokens, which belong in the
+ * system credential store. None of them is connected to anything yet: they
+ * all show as not set up, and setting one up comes in a later step.
  */
 
 import type { Connection, ConnectionGroup } from "./types";
@@ -28,7 +29,7 @@ const DATABASE: ConnectionField[] = [
   { key: "host", label: "Host and port", type: "text", mono: true },
   { key: "database", label: "Database", type: "text", mono: true },
   { key: "user", label: "User", type: "text", mono: true },
-  { key: "password", label: "Password", type: "secret", mono: true, hint: "Stored in Windows Credential Manager." },
+  { key: "password", label: "Password", type: "secret", mono: true, hint: "Kept in your system’s credential store." },
   { key: "access", label: "Steps can", type: "segmented", options: ["Read only", "Read and write"] },
   { key: "rowTrigger", label: "Start a run when a row changes", type: "switch" },
   { key: "showResults", label: "Show query results in Review changes", type: "switch" },
@@ -37,7 +38,7 @@ const DATABASE: ConnectionField[] = [
 const TRACKER: ConnectionField[] = [
   { key: "name", label: "Name", type: "text" },
   { key: "account", label: "Account or workspace", type: "text", mono: true },
-  { key: "token", label: "Token", type: "secret", mono: true, hint: "Stored in Windows Credential Manager." },
+  { key: "token", label: "Token", type: "secret", mono: true, hint: "Kept in your system’s credential store." },
   { key: "access", label: "Steps can", type: "segmented", options: ["Read only", "Comment and update"] },
 ];
 
@@ -63,47 +64,33 @@ export function connectionFields(connection: Connection): ConnectionField[] {
   return LOCAL[connection.icon] ?? [];
 }
 
-const conn = (
-  group: ConnectionGroup,
-  icon: string,
-  name: string,
-  on: boolean,
-  status: string,
-  desc: string,
-  used: string,
-  settings: Record<string, string> = {},
-): Connection => ({ id: icon, group, icon, name, on, status, desc, used, settings });
+const notSetUp = (group: ConnectionGroup, icon: string, name: string, desc: string): Connection => ({
+  id: icon,
+  group,
+  icon,
+  name,
+  on: false,
+  status: "Not set up",
+  desc,
+  used: "",
+  settings: {},
+});
 
-export function seedConnections(): Connection[] {
-  return [
-    conn("work", "github", "GitHub Issues", true, "Connected · liam-dev", "Start from issues, comment, and open linked PRs.", "Used by Feature delivery", {
-      name: "GitHub", account: "liam-dev", access: "Comment and update",
-    }),
-    conn("work", "linear", "Linear", true, "Connected · Augry workspace", "Start from issues and move them through your workflow states.", "Not used yet", {
-      name: "Linear", account: "augry", access: "Read only",
-    }),
-    conn("work", "jira", "Jira", false, "Not set up", "Start from issues and update their status. Cloud or Data Center.", "", { name: "Jira", access: "Read only" }),
-    conn("work", "gitlab", "GitLab", false, "Not set up", "Issues and merge requests for GitLab projects.", "", { name: "GitLab", access: "Read only" }),
-    conn("local", "folder", "Folders", true, "1 watched · ~/crash-dumps", "Start when a file is added to or changed in a folder.", "Used by Crash report", {
-      folders: "~/crash-dumps", settle: "on",
-    }),
-    conn("local", "schedule", "Schedule", true, "On · uses this computer’s clock", "Start at set times, like weekdays at 09:00.", "Used by Dependency update", {
-      zone: "Europe/London", missed: "Skip it",
-    }),
-    conn("local", "branch", "Git", true, "3 local repos", "Start on commit, push or branch change in a local repo.", "Not used yet", {
-      repos: "~/code/augry\n~/code/site\n~/code/notes",
-    }),
-    conn("local", "webhook", "Local webhook", true, "Listening · localhost:4319", "Accept requests from tools on this computer, or through the relay.", "Used by Bug fix", {
-      port: "4319", reach: "Relay",
-    }),
-    conn("systems", "postgresql", "PostgreSQL", true, "Connected · localhost:5432", "Query a database in a step, or start when a row changes.", "Used by Bug fix", {
-      name: "Local dev database", host: "localhost:5432", database: "terminal_grid_dev", user: "liam", access: "Read only", rowTrigger: "off", showResults: "on",
-    }),
-    conn("systems", "mysql", "MySQL", false, "Not set up", "Query MySQL or MariaDB, local or remote.", "", { access: "Read only" }),
-    conn("systems", "sqlite", "SQLite", false, "Not set up", "Point at a database file, like an app’s local data.", "", { access: "Read only" }),
-    conn("systems", "redis", "Redis", false, "Not set up", "Read keys, or start when a message is published.", "", { access: "Read only" }),
-  ];
-}
+/** Every kind of connection the app knows. None is set up yet. */
+export const CONNECTIONS: Connection[] = [
+  notSetUp("work", "github", "GitHub Issues", "Start from issues, comment, and open linked PRs."),
+  notSetUp("work", "linear", "Linear", "Start from issues and move them through your workflow states."),
+  notSetUp("work", "jira", "Jira", "Start from issues and update their status. Cloud or Data Center."),
+  notSetUp("work", "gitlab", "GitLab", "Issues and merge requests for GitLab projects."),
+  notSetUp("local", "folder", "Folders", "Start when a file is added to or changed in a folder."),
+  notSetUp("local", "schedule", "Schedule", "Start at set times, like weekdays at 09:00."),
+  notSetUp("local", "branch", "Git", "Start on commit, push or branch change in a local repo."),
+  notSetUp("local", "webhook", "Local webhook", "Accept requests from tools on this computer, or through the relay."),
+  notSetUp("systems", "postgresql", "PostgreSQL", "Query a database in a step, or start when a row changes."),
+  notSetUp("systems", "mysql", "MySQL", "Query MySQL or MariaDB, local or remote."),
+  notSetUp("systems", "sqlite", "SQLite", "Point at a database file, like an app’s local data."),
+  notSetUp("systems", "redis", "Redis", "Read keys, or start when a message is published."),
+];
 
 /** Brand colours of the connection tiles (the design's, for the dark theme). */
 export const CONNECTION_COLORS: Record<string, string> = {
@@ -116,30 +103,3 @@ export const CONNECTION_COLORS: Record<string, string> = {
   sqlite: "#78c0e8",
   redis: "#ff5f52",
 };
-
-/**
- * The simulated Test connection. A database or tracker needs its address (and
- * for a tracker, an account) filled in; local connections always pass.
- */
-export function testConnection(connection: Connection): { ok: boolean; text: string } {
-  const s = connection.settings;
-  if (connection.group === "systems") {
-    if (!s.host?.trim()) return { ok: false, text: "Add a host and port first" };
-    if (!/^[\w.-]+:\d+$/.test(s.host.trim())) return { ok: false, text: `Could not reach ${s.host.trim()}` };
-    const label = connection.icon === "postgresql" ? "PostgreSQL 16.2" : connection.name;
-    return { ok: true, text: `Connected · ${label} · 38 ms` };
-  }
-  if (connection.group === "work") {
-    if (!s.account?.trim()) return { ok: false, text: "Add an account or workspace first" };
-    return { ok: true, text: `Connected · ${s.account.trim()}` };
-  }
-  return { ok: true, text: "Working · nothing leaves this computer" };
-}
-
-/** The card's status line once a test has passed and the connection is saved. */
-export function connectedStatus(connection: Connection): string {
-  const s = connection.settings;
-  if (connection.group === "systems") return `Connected · ${s.host ?? ""}`;
-  if (connection.group === "work") return `Connected · ${s.account ?? ""}`;
-  return connection.status;
-}

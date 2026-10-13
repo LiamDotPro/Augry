@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TeamProcess } from "../cloud/types";
 import { BUG_FIX } from "./examples";
 import { cloneProcess } from "./json";
-import { initialState, recordOf, reducer, spaceRecords, spaceRuns, teamOf, type Action, type ProcessState } from "./state";
+import { initialState, recordOf, reducer, spaceRecords, teamOf, type Action, type ProcessState } from "./state";
 import { latest } from "./versions";
 
 const NOW = new Date(2026, 9, 12, 12, 0).getTime();
@@ -24,19 +24,17 @@ function tp(id: string, seq: number, version: number, name = "Fix a GitHub issue
 const run = (state: ProcessState, ...actions: Action[]) => actions.reduce(reducer, state);
 
 function withTeam(): ProcessState {
-  return run(initialState(NOW), { type: "team-page", teamId: "t1", page: { processes: [tp("p1", 1, 3), tp("p2", 2, 5, "Release")], lastSeq: 2, hasMore: false } });
+  return run(initialState(), { type: "loaded", records: [], problems: [] }, { type: "team-page", teamId: "t1", page: { processes: [tp("p1", 1, 3), tp("p2", 2, 5, "Release")], lastSeq: 2, hasMore: false } });
 }
 
 describe("team spaces", () => {
-  it("shows the selected space's processes and runs", () => {
-    let state = withTeam();
-    expect(spaceRecords(state).map((r) => r.id)).toEqual(["feature-delivery", "bug-fix", "crash-report"]);
-    state = run(state, { type: "space", space: "t1" }, { type: "run", processId: "p1", now: NOW });
+  it("shows the selected space's processes", () => {
+    let state = run(withTeam(), { type: "new-process", now: NOW }, { type: "navigate", route: { view: "home" } });
+    expect(spaceRecords(state).map((r) => r.id)).toEqual(["new-process"]);
+    state = run(state, { type: "space", space: "t1" });
     expect(spaceRecords(state).map((r) => r.id)).toEqual(["p1", "p2"]);
     expect(teamOf(state, "p1")).toBe("t1");
-    expect(spaceRuns(state).map((r) => r.processId)).toEqual(["p1"]);
-    state = run(state, { type: "space", space: "personal" });
-    expect(spaceRuns(state).every((r) => teamOf(state, r.processId) === null)).toBe(true);
+    expect(teamOf(state, "new-process")).toBeNull();
   });
 
   it("goes home when the open process belongs to the other space", () => {
@@ -47,15 +45,14 @@ describe("team spaces", () => {
     expect(state.route).toEqual({ view: "connections" });
   });
 
-  it("runs a team process's saved version and never saves a team draft locally", () => {
+  it("never saves a team draft as a local version", () => {
     let state = run(withTeam(), { type: "space", space: "t1" });
     const record = recordOf(state, "p1")!;
     state = run(state, { type: "edit", processId: "p1", process: { ...latest(record).process, name: "Mine" } });
-    state = run(state, { type: "save", processId: "p1", message: "x", now: NOW }, { type: "run", processId: "p1", now: NOW });
+    // Team saves go to the server (ProcessView); the reducer's local save leaves a team record alone.
     const after = recordOf(state, "p1")!;
     expect(after.versions.map((v) => v.version)).toEqual([3]);
     expect(after.draft?.name).toBe("Mine");
-    expect(state.runs[0]!.version).toBe(3);
   });
 });
 
@@ -83,11 +80,10 @@ describe("team writes", () => {
     expect(state.teamDialog).toBeNull();
   });
 
-  it("a tombstone or delete drops the process and its runs", () => {
-    let state = run(withTeam(), { type: "space", space: "t1" }, { type: "run", processId: "p2", now: NOW });
+  it("a tombstone or delete drops the process", () => {
+    let state = run(withTeam(), { type: "space", space: "t1" });
     state = run(state, { type: "team-page", teamId: "t1", page: { processes: [{ ...tp("p2", 6, 5), deleted: true }], lastSeq: 6, hasMore: false } });
     expect(recordOf(state, "p2")).toBeUndefined();
-    expect(state.runs.some((r) => r.processId === "p2")).toBe(false);
     state = run(state, { type: "team-removed", teamId: "t1", processId: "p1" });
     expect(spaceRecords(state)).toEqual([]);
   });

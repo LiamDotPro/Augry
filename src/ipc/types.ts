@@ -3,6 +3,7 @@
 // Rust structs use serde(rename_all = "camelCase"); command arguments are camelCase on this side.
 
 import type { CloudSession } from "../cloud/types";
+import type { StoredProcess } from "../process/disk";
 
 export type TerminalId = string;
 
@@ -337,6 +338,17 @@ export interface Commands {
   /** github.com and augry.app pages only. */
   cloud_open_url: { in: { url: string }; out: void };
   cloud_take_deep_links: { in: Record<string, never>; out: string[] };
+
+  // processes (src-tauri/src/processes): your processes as files; see src/process/disk.ts.
+  processes_load: { in: Record<string, never>; out: StoredProcess[] };
+  /** Appends a saved version and makes it `<id>.json`; clears the draft. */
+  process_save_version: { in: { id: string; version: unknown }; out: void };
+  /** Keeps unsaved edits, or clears them with null. */
+  process_save_draft: { in: { id: string; draft: unknown | null }; out: void };
+  /** Moves the process's files to the trash. */
+  process_delete: { in: { id: string }; out: void };
+  /** Opens `<id>.json` in the system's app for JSON. */
+  process_open_file: { in: { id: string }; out: void };
 }
 
 export type CommandName = keyof Commands;

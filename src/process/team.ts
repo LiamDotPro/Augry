@@ -9,6 +9,7 @@
 import type { Member, ProcessPage, ProcessVersionInfo, TeamProcess } from "../cloud/types";
 import { hashOf, validateProcess } from "./json";
 import { whenLabel } from "./runs";
+import { isV1, processFromV1 } from "./v1";
 import type { Process, ProcessRecord, ProcessVersion } from "./types";
 import { latest } from "./versions";
 
@@ -72,6 +73,11 @@ export async function readFeed(list: (since: number) => Promise<ProcessPage>, si
  */
 export function definitionToProcess(definition: unknown, version: number, fallbackId: string): Process | null {
   if (!definition || typeof definition !== "object" || Array.isArray(definition)) return null;
+  // Starter templates installed from the server are in the cloud's lanes format.
+  if (isV1(definition)) {
+    const converted = processFromV1(definition, { id: fallbackId });
+    return converted && { ...converted, version };
+  }
   const d = definition as Record<string, unknown>;
   const process = { ...d, id: typeof d.id === "string" && d.id ? d.id : fallbackId, version } as unknown as Process;
   return validateProcess(process).length ? null : process;

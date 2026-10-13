@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TeamConnection } from "../cloud/types";
-import { seedConnections } from "./connections";
+import { CONNECTIONS } from "./connections";
 import { canEdit, connectionName, loadTeamConnections, referenceOf, teamConnectionSections } from "./teamConnections";
 
 vi.mock("../cloud/api", () => ({
@@ -29,7 +29,7 @@ describe("teamConnectionSections", () => {
       conn("redis", { host: "cache.northwind.dev:6379" }, me),
       conn("linear", { account: "gone" }, maya, { deleted: true }),
     ];
-    const [work, systems, local] = teamConnectionSections(seedConnections(), team, "Northwind", addedBy);
+    const [work, systems, local] = teamConnectionSections(CONNECTIONS, team, "Northwind", addedBy);
     expect(work!.hint).toBe("Shared with Northwind · one sign-in for the whole team");
     expect(work!.cards.map((c) => c.status)).toEqual(["Shared · northwind-bot", "Not set up for the team", "Not set up for the team", "Not set up for the team"]);
     expect(work!.cards[0]!.used).toBe("Added by Maya Chen");
@@ -46,7 +46,7 @@ describe("teamConnectionSections", () => {
   });
 
   it("reads every shared kind as not set up without the feature", () => {
-    const sections = teamConnectionSections(seedConnections(), null, "Northwind", addedBy);
+    const sections = teamConnectionSections(CONNECTIONS, null, "Northwind", addedBy);
     expect(sections[0]!.cards.every((c) => !c.on && c.status === "Not set up for the team")).toBe(true);
     expect(sections[2]!.cards.every((c) => c.mine)).toBe(true);
   });

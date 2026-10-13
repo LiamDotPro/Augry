@@ -1,11 +1,12 @@
 /**
- * The processes and templates the design shows (Components.dc.html,
- * Process Tab.dc.html), as `augry/process@1` objects. Until the backend reads
- * `.augry/processes/`, these are the tab's data.
+ * The processes the design shows (Components.dc.html, Process Tab.dc.html),
+ * as `augry/process@1` objects, used by the tests. The app's own data is your
+ * processes on disk and the server's templates; only blankProcess and
+ * STANDARD_SURFACES are used by the app itself.
  */
 
 import { cloneProcess } from "./json";
-import { PROCESS_SCHEMA, type Process, type StartKind, type Surface } from "./types";
+import { PROCESS_SCHEMA, type Process, type Surface } from "./types";
 
 /** The five rows every new process starts with. */
 export const STANDARD_SURFACES: Surface[] = [
@@ -146,19 +147,7 @@ export function featureDeliveryHistory(): Process[] {
   return [v1, v2, v3, v4, v5, v6, cloneProcess(FEATURE_DELIVERY)];
 }
 
-// Templates ------------------------------------------------------------------------
-
-export interface Template {
-  id: string;
-  name: string;
-  desc: string;
-  /** What the chip says: "Ticket", "Weekly", "On push". */
-  chip: string;
-  start: StartKind;
-  /** Template revision, recorded as `from` on copies. */
-  revision: number;
-  process: Process;
-}
+// More examples ---------------------------------------------------------------------
 
 const base = (id: string, name: string, start: Process["start"]): Pick<Process, "$schema" | "id" | "name" | "version" | "start" | "surfaces"> => ({
   $schema: PROCESS_SCHEMA,
@@ -239,32 +228,8 @@ const RELEASE: Process = {
   ends: [{ after: "ship", name: "Released" }],
 };
 
-export const TEMPLATES: Template[] = [
-  {
-    id: "feature-delivery", name: "Feature delivery", desc: "Plan, build, check, review, then open a PR.", chip: "Ticket",
-    start: "ticket", revision: 3, process: { ...cloneProcess(FEATURE_DELIVERY), version: 1 },
-  },
-  {
-    id: "bug-fix", name: "Bug fix", desc: "Reproduce with failing tests, fix each one, check the page.", chip: "Webhook",
-    start: "webhook", revision: 2, process: { ...cloneProcess(BUG_FIX), version: 1 },
-  },
-  {
-    id: "parallel-attempts", name: "Parallel attempts", desc: "One task to Claude Code and Codex in two worktrees. You keep the better one.",
-    chip: "Manual", start: "manual", revision: 1, process: PARALLEL,
-  },
-  {
-    id: "dependency-update", name: "Dependency update", desc: "Update packages, run checks, open a PR only if everything passes.",
-    chip: "Weekly", start: "schedule", revision: 1, process: DEPENDENCIES,
-  },
-  {
-    id: "visual-check", name: "Visual check", desc: "Screenshot the key pages and compare them with main.", chip: "On push",
-    start: "branch", revision: 1, process: VISUAL,
-  },
-  {
-    id: "release", name: "Release", desc: "Bump the version, write the changelog, tag and build.", chip: "Manual",
-    start: "manual", revision: 1, process: RELEASE,
-  },
-];
+/** Every example process, for tests that check something holds for all of them. */
+export const EXAMPLES: Process[] = [FEATURE_DELIVERY, BUG_FIX, PARALLEL, DEPENDENCIES, VISUAL, RELEASE];
 
 /** A new, empty process: one stage, one step, started by hand. */
 export function blankProcess(id: string, name: string): Process {

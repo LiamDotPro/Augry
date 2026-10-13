@@ -1,7 +1,8 @@
 import { useCallback, useState, type KeyboardEvent } from "react";
 import { addSurface, insertStep, removeStep, updateStart, type StepKind } from "../../process/edit";
-import { defaultStart } from "../../process/model";
-import { editorUi, recordOf, type Selection } from "../../process/state";
+import { call } from "../../ipc/client";
+import { defaultStart, processFile } from "../../process/model";
+import { editorUi, recordOf, teamOf, type Selection } from "../../process/state";
 import type { Process } from "../../process/types";
 import { changeSentence, latest, summarizeChanges, working } from "../../process/versions";
 import { cx } from "../../lib/cx";
@@ -120,7 +121,15 @@ export function ProcessEditor({ processId }: { processId: string }) {
         <AddStep open={palette} onOpen={() => setPalette(true)} onClose={closePalette} onAdd={add} after={selectedStep?.name ?? null} />
       </div>
       {side === "json" && (
-        <JsonPanel process={process} version={saved.version} selection={selection} onSelect={(s) => dispatch({ type: "select", processId, selection: s })} onChange={edit} />
+        <JsonPanel
+          process={process}
+          file={teamOf(state, processId) ? null : processFile(processId)}
+          version={saved.version}
+          selection={selection}
+          onSelect={(s) => dispatch({ type: "select", processId, selection: s })}
+          onChange={edit}
+          onOpenFile={teamOf(state, processId) ? undefined : () => call("process_open_file", { id: processId })}
+        />
       )}
       {side === "panel" && selection && <Inspector process={process} selection={selection} onChange={edit} onSelect={select} />}
     </div>

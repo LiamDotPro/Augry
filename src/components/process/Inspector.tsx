@@ -8,15 +8,15 @@ import { InspectorField, type Field } from "./InspectorField";
 import { ProcessIcon } from "./ProcessIcon";
 import { useProcess } from "./store";
 
-/** Sample values a starting point passes to steps, for "Steps can use". */
-const SAMPLES: Record<string, [string, string][]> = {
-  ticket: [["title", "Settings: font size doesn’t apply to new panes"], ["number", "142"], ["url", "github.com/liam-dev/augry/issues/142"]],
-  webhook: [["title", "TypeError in parseDate"], ["url", "localhost:5173/reports"], ["stack", "12 frames"]],
-  folder: [["path", "C:\\Users\\liam\\crash-dumps\\crash-2026-10-11.log"], ["name", "crash-2026-10-11.log"], ["size", "48 KB"]],
+/** What each starting point passes to steps, for "Steps can use". */
+const VALUES: Record<string, [string, string][]> = {
+  ticket: [["title", "The issue’s title"], ["number", "Its number"], ["url", "Its link"]],
+  webhook: [["title", "The request’s title"], ["url", "The page it came from"], ["body", "The request body"]],
+  folder: [["path", "The file’s full path"], ["name", "Its name"], ["size", "Its size"]],
   manual: [["text", "What you typed when you started it"]],
-  schedule: [["time", "Mon 09:00"]],
-  branch: [["branch", "main"], ["sha", "9f3c1a2"]],
-  notes: [["path", "~/notes/inbox/idea.md"], ["text", "The note’s text"]],
+  schedule: [["time", "When it was due"]],
+  branch: [["branch", "The branch"], ["sha", "The commit"]],
+  notes: [["path", "The note’s path"], ["text", "The note’s text"]],
 };
 
 /**
@@ -331,8 +331,7 @@ function StepPanel({ process, step, onChange, onSelect }: { process: Process; st
 }
 
 function StartPanel({ process, onChange, onClose }: { process: Process; onChange(p: Process): void; onClose(): void }) {
-  const { state, dispatch } = useProcess();
-  const [result, setResult] = useState<string | null>(null);
+  const { state } = useProcess();
   const start = process.start;
   const info = startKindInfo(start.on);
   const as = start.as ?? info.kind;
@@ -341,20 +340,16 @@ function StartPanel({ process, onChange, onClose }: { process: Process; onChange
     for (const [k, v] of Object.entries(patch)) if (v === undefined) delete next[k];
     onChange(updateStart(process, next));
   };
-  useEffect(() => setResult(null), [start.on]);
-
   const uses: Field = {
     type: "table",
     label: "Steps can use",
-    rows: (SAMPLES[start.on] ?? []).map(([k, v]) => ({ k: `${as}.${k}`, v, mono: true })),
+    rows: (VALUES[start.on] ?? []).map(([k, v]) => ({ k: `${as}.${k}`, v, mono: true })),
   };
   const fields: Field[] = [];
-  let foot: ReactNode = null;
 
   switch (start.on) {
     case "webhook":
       fields.push(
-        { type: "select", label: "Listens on", icon: "webhook", tone: "ok", value: "POST localhost:4319", detail: String(start.path ?? "") },
         { type: "text", label: "Path", mono: true, value: String(start.path ?? ""), onChange: (v) => set({ path: v }) },
         {
           type: "segmented",
@@ -373,11 +368,6 @@ function StartPanel({ process, onChange, onClose }: { process: Process; onChange
             { label: "Ask me first", on: !!start.confirm, onChange: (on) => set({ confirm: on ? true : undefined }) },
           ],
         },
-      );
-      foot = (
-        <button type="button" className="process-btn process-btn--solid process-btn--grow" onClick={() => setResult(`200 OK · ${as}.title = “TypeError in parseDate”. A run would start.`)}>
-          Send test request
-        </button>
       );
       break;
     case "folder": {
@@ -411,12 +401,6 @@ function StartPanel({ process, onChange, onClose }: { process: Process; onChange
         },
         uses,
       );
-      foot = (
-        <button type="button" className="process-btn process-btn--grow" onClick={() => dispatch({ type: "file-arrived", processId: process.id, now: Date.now() })}>
-          <ProcessIcon name="folder" size={14} stroke={1.8} />
-          Test with the newest file
-        </button>
-      );
       break;
     }
     case "ticket": {
@@ -427,8 +411,8 @@ function StartPanel({ process, onChange, onClose }: { process: Process; onChange
           type: "select",
           label: "From",
           icon: source?.icon ?? "ticket",
-          value: source?.name ?? "GitHub Issues",
-          detail: source?.status.replace("Connected · ", ""),
+          value: source?.name ?? "No connection set up",
+          detail: source?.status,
           options: sources.map((c) => ({ value: c.name, detail: c.status })),
           onChange: (v) => set({ source: sources.find((c) => c.name === v)?.icon }),
         },
@@ -492,16 +476,12 @@ function StartPanel({ process, onChange, onClose }: { process: Process; onChange
       onClose={onClose}
       fields={fields}
       foot={
-        foot || result ? (
-          <>
-            {result && (
-              <div className="process-panel__result process-panel__result--ok" role="status">
-                {result}
-              </div>
-            )}
-            {foot && <div className="process-panel__buttons">{foot}</div>}
-          </>
-        ) : undefined
+        start.on === "manual" ? undefined : (
+          // Nothing watches for this yet; say so rather than look armed.
+          <div className="process-panel__result" role="note">
+            Starting by itself isn’t connected yet. What you set here is saved with the process.
+          </div>
+        )
       }
     />
   );

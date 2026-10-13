@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatProcess, parseProcess, stepAtLine, stepLineRange } from "../../process/json";
-import { processFile } from "../../process/model";
+import { errorMessage } from "../../lib/appError";
 import type { Selection } from "../../process/state";
 import type { Process } from "../../process/types";
 import { cx } from "../../lib/cx";
@@ -17,16 +17,22 @@ const LINE_H = 21;
  */
 export function JsonPanel({
   process,
+  file,
   version,
   selection,
   onSelect,
   onChange,
+  onOpenFile,
 }: {
   process: Process;
+  /** Where the process lives on disk, or null for a team process (it lives in the cloud). */
+  file: string | null;
   version: number;
   selection: Selection;
   onSelect(selection: Selection): void;
   onChange(process: Process): void;
+  /** Opens the saved file in the system's editor; absent for a team process. */
+  onOpenFile?: () => Promise<void>;
 }) {
   const [text, setText] = useState(() => formatProcess(process));
   const [error, setError] = useState<{ message: string; line: number | null } | null>(null);
@@ -91,7 +97,7 @@ export function JsonPanel({
     <div className="process-code process-json">
       <div className="process-code__head">
         <ProcessIcon name="braces" size={16} stroke={1.6} className="process-code__headicon" />
-        <span className="process-code__file">{processFile(process.id)}</span>
+        <span className="process-code__file">{file ?? `${process.name}.json`}</span>
         <span className="process-code__ver">v{version}</span>
         <span className="process-code__fill" />
         {error ? (
@@ -132,7 +138,7 @@ export function JsonPanel({
             autoCapitalize="off"
             autoCorrect="off"
             wrap="off"
-            aria-label={`${processFile(process.id)}, process JSON`}
+            aria-label={`${file ?? process.name}, process JSON`}
             onChange={(e) => edit(e.target.value)}
             onClick={caretMoved}
             onKeyUp={(e) => (e.key.startsWith("Arrow") || e.key === "PageUp" || e.key === "PageDown") && caretMoved()}
@@ -159,9 +165,20 @@ export function JsonPanel({
         <button type="button" className="process-btn process-btn--outline" onClick={copy}>
           Copy
         </button>
-        <button type="button" className="process-btn process-btn--outline" onClick={() => setNote("Opens in your editor once process files are on disk")}>
-          Open in editor
-        </button>
+        {onOpenFile && (
+          <button
+            type="button"
+            className="process-btn process-btn--outline"
+            title="Opens the saved version in the app your computer uses for JSON"
+            onClick={() =>
+              void onOpenFile()
+                .then(() => setNote("Opened the saved version. Changes made there show here as a draft the next time Augry starts."))
+                .catch((error) => setNote(`Couldn’t open it: ${errorMessage(error)}`))
+            }
+          >
+            Open in editor
+          </button>
+        )}
         <span className="process-code__fill" />
         <span className="process-code__hint" role="status">
           {note ?? "Edits update the lanes as you type"}

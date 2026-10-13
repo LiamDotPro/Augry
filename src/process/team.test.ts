@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ProcessPage, TeamProcess } from "../cloud/types";
-import { seedConnections } from "./connections";
+import { CONNECTIONS } from "./connections";
 import { BUG_FIX, FEATURE_DELIVERY, CRASH_REPORT } from "./examples";
 import { cloneProcess } from "./json";
 import { connectionsUsed, connectionRefs } from "./share";
@@ -139,7 +139,7 @@ describe("names and times", () => {
 });
 
 describe("connectionsUsed", () => {
-  const local = seedConnections();
+  const local = CONNECTIONS;
 
   it("finds the tracker a ticket start reads and gh commands", () => {
     expect(connectionsUsed(FEATURE_DELIVERY, local).map((c) => c.label)).toEqual(["GitHub Issues"]);
