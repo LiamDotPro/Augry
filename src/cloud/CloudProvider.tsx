@@ -29,8 +29,6 @@ export type CloudDialog =
   | { kind: "joined"; team: Team }
   /** team-create. */
   | { kind: "create-team" }
-  /** team-settings. */
-  | { kind: "team-settings"; teamId: string }
   /** notes-sync-setup. */
   | { kind: "notes-sync-setup" };
 

@@ -22,15 +22,15 @@ function BrandMark() {
   return (
     <svg
       className="chrome__mark"
-      width="15"
-      height="15"
-      viewBox="0 0 15 15"
+      width="14"
+      height="13"
+      viewBox="0 0 14 13"
       aria-hidden="true"
       focusable="false"
     >
-      <rect x="7" y="0" width="7" height="11" rx="2" fill="#8b6cff" />
-      <rect x="3.5" y="2" width="7" height="11" rx="2" fill="#3fc8ff" />
-      <rect x="0" y="4" width="7" height="11" rx="2" fill="#eaf8ff" />
+      <rect x="7" y="0" width="7" height="9" rx="2" fill="#8b6cff" />
+      <rect x="3.5" y="2" width="7" height="9" rx="2" fill="#3fc8ff" />
+      <rect x="0" y="4" width="7" height="9" rx="2" fill="#eaf8ff" />
     </svg>
   );
 }
@@ -112,7 +112,9 @@ export function Chrome({ frame }: { frame: WindowFrame }) {
   const actions = useAppActions();
   const scheme = useHotkeyScheme();
   const pages = totalPages(state);
-  const isTerminals = state.activeTab === "terminals";
+  // Settings is a page in place of the tab: no tab is selected under it.
+  const settings = state.settingsOpen;
+  const isTerminals = state.activeTab === "terminals" && !settings;
   const inFocus = isTerminals && state.focusMode;
   const showPager = isTerminals && pages > 1 && !inFocus;
   const fullscreen = frame === "fullscreen";
@@ -135,8 +137,8 @@ export function Chrome({ frame }: { frame: WindowFrame }) {
               key={tab}
               type="button"
               role="tab"
-              aria-selected={state.activeTab === tab}
-              className={cx("tabs__item", state.activeTab === tab && "tabs__item--active")}
+              aria-selected={!settings && state.activeTab === tab}
+              className={cx("tabs__item", !settings && state.activeTab === tab && "tabs__item--active")}
               onClick={() => actions.setTab(tab)}
             >
               {label}
@@ -223,8 +225,9 @@ export function Chrome({ frame }: { frame: WindowFrame }) {
 
         <button
           type="button"
-          className="btn btn--quiet"
-          title="Settings"
+          className={cx("btn", "btn--quiet", "chrome__settings", settings && "chrome__settings--active")}
+          title={`Settings (${shortcutLabel(scheme, "settings")})`}
+          aria-pressed={settings}
           onClick={() => actions.setSettingsOpen(true)}
         >
           Settings

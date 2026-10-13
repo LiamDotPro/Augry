@@ -541,6 +541,31 @@ describe("tabs, setup and the cloud account", () => {
     expect(restored.cloud).toEqual({ user: null, teams: [], selectedSpace: "personal", notesSync: null });
   });
 
+  it("opens Settings at a section over the tab it returns to", () => {
+    let state = reducer(initialState, { type: "tab/set", tab: "notes" });
+    state = reducer(state, { type: "ui/settings", open: true, page: { page: "team", teamId: "t1" } });
+    expect(state.settingsOpen).toBe(true);
+    expect(state.activeTab).toBe("notes");
+    expect(state.settingsPage).toEqual({ page: "team", teamId: "t1" });
+
+    // Opening again without a section keeps the one it was on.
+    state = reducer(state, { type: "ui/settings", open: false });
+    state = reducer(state, { type: "ui/settings", open: true });
+    expect(state.settingsPage).toEqual({ page: "team", teamId: "t1" });
+  });
+
+  it("leaves Settings for a tab, or back to its own tab on toggle", () => {
+    const open = reducer(reducer(initialState, { type: "tab/set", tab: "process" }), { type: "ui/settings", open: true });
+
+    const picked = reducer(open, { type: "tab/set", tab: "notes" });
+    expect(picked.settingsOpen).toBe(false);
+    expect(picked.activeTab).toBe("notes");
+
+    const toggled = reducer(open, { type: "tab/toggle" });
+    expect(toggled.settingsOpen).toBe(false);
+    expect(toggled.activeTab).toBe("process");
+  });
+
   it("ignores a tab it does not know", () => {
     const session = { ...toSession(initialState), activeTab: "settings" as never };
     expect(reducer(initialState, { type: "ready", config: initialState.config, session }).activeTab).toBe("terminals");

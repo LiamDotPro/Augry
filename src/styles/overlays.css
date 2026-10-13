@@ -76,57 +76,6 @@
   box-shadow: var(--shadow-sheet);
 }
 
-.sheet__head {
-  display: flex;
-  align-items: center;
-  padding: 18px 22px 14px;
-  border-bottom: 1px solid var(--hair);
-  flex: none;
-}
-
-.sheet__title {
-  font-size: 16px;
-  font-weight: 600;
-  flex: 1;
-  margin: 0;
-}
-
-.sheet__close {
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  color: rgb(var(--text-rgb) / 0.6);
-  font-size: 15px;
-  line-height: 1;
-}
-
-.sheet__close:hover {
-  background: var(--fill-hover);
-  color: var(--text-strong);
-}
-
-.sheet__body {
-  padding: 8px 22px 6px;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-}
-
-.sheet__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 14px 22px 18px;
-  border-top: 1px solid var(--hair);
-  background: rgb(var(--ink-rgb) / 0.03);
-  flex: none;
-}
-
 /* Settings rows -------------------------------------------------------- */
 
 .row {
@@ -145,31 +94,10 @@
   border-bottom: 0;
 }
 
-.row--top {
-  align-items: start;
-  padding: 12px 0;
-}
-
-.row__label {
-  font-size: 13px;
-  color: var(--text-85);
-}
-
-.row--top .row__label {
-  padding-top: 7px;
-}
-
 .row__note {
   font-size: 12.5px;
   line-height: 1.45;
   color: var(--text-70);
-}
-
-.row__hint {
-  font-size: 11px;
-  color: var(--text-50);
-  margin-top: 2px;
-  line-height: 1.4;
 }
 
 /* Segmented choice ----------------------------------------------------- */

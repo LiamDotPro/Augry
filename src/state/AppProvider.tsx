@@ -55,7 +55,15 @@ import { matchesAgentPattern } from "../terminals/osc";
 import { terminalRegistry } from "../terminals/registry";
 import { closeUnownedTerminals } from "./orphans";
 import type { WorktreeChip } from "./model";
-import { initialState, reducer, toSession, type Action, type AppState, type ReviewComment } from "./reducer";
+import {
+  initialState,
+  reducer,
+  toSession,
+  type Action,
+  type AppState,
+  type ReviewComment,
+  type SettingsPage,
+} from "./reducer";
 
 const AUTOSAVE_DELAY_MS = 600;
 const SESSION_DEBOUNCE_MS = 1000;
@@ -79,7 +87,8 @@ export interface AppActions {
   setLayoutMode(mode: LayoutMode): void;
   cycleLayoutMode(): void;
   setHotkeysOpen(open: boolean): void;
-  setSettingsOpen(open: boolean): void;
+  /** Opens the Settings page, at `page` when given, or closes it. */
+  setSettingsOpen(open: boolean, page?: SettingsPage): void;
   dismissError(): void;
 
   /** Folder picker; the pane goes after the focused one. */
@@ -636,7 +645,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPage: (page) => dispatch({ type: "page/set", page }),
       stepPage: (delta) => dispatch({ type: "page/step", delta }),
       setHotkeysOpen: (open) => dispatch({ type: "ui/hotkeys", open }),
-      setSettingsOpen: (open) => dispatch({ type: "ui/settings", open }),
+      setSettingsOpen: (open, page) => dispatch({ type: "ui/settings", open, page }),
       dismissError: () => dispatch({ type: "ui/error", message: null }),
 
       newTerminal: () => openFrom(null, "pick-folder"),

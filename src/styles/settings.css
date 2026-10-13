@@ -1,0 +1,502 @@
+/*
+ * The Settings page (App Shell board 03): a left column of sections and a
+ * panel, in place of the current tab. Every control saves as it changes.
+ */
+
+.settings-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  padding: 4px 12px 12px;
+}
+
+/* Left column ------------------------------------------------------------ */
+
+.settings-nav {
+  width: 288px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  border-radius: 16px;
+  background: rgb(var(--glass-rgb) / 0.66);
+  border: 1px solid rgb(var(--ink-rgb) / 0.12);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 rgb(var(--ink-rgb) / 0.08);
+  overflow-y: auto;
+}
+
+.settings-nav__back {
+  height: 36px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--text-78);
+  text-align: left;
+}
+
+.settings-nav__back:hover {
+  background: rgb(var(--ink-rgb) / 0.07);
+  color: var(--text-strong);
+}
+
+.settings-nav__key {
+  margin-left: auto;
+  padding: 1px 6px;
+  border: 1px solid rgb(var(--ink-rgb) / 0.14);
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-55);
+}
+
+.settings-nav__rule {
+  height: 1px;
+  flex: none;
+  margin: 8px 4px;
+  background: rgb(var(--ink-rgb) / 0.08);
+}
+
+.settings-nav__item {
+  min-height: 44px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  color: var(--text-78);
+  font-weight: 500;
+  text-align: left;
+}
+
+.settings-nav__item:hover {
+  background: rgb(var(--ink-rgb) / 0.07);
+  color: var(--text-strong);
+}
+
+.settings-nav__item--active,
+.settings-nav__item--active:hover {
+  background: rgb(var(--ink-rgb) / 0.1);
+  color: var(--text-strong);
+  font-weight: 600;
+}
+
+.settings-nav__glyph {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: rgb(var(--ink-rgb) / 0.07);
+}
+
+.settings-nav__item .cloud-team-tile {
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.settings-nav__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-nav__label {
+  font-size: 13px;
+}
+
+.settings-nav__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-50);
+}
+
+.settings-nav__group {
+  padding: 14px 10px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-50);
+}
+
+.settings-nav__spacer {
+  flex: 1;
+}
+
+.settings-nav__saved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  font-size: 12px;
+  color: var(--text-55);
+}
+
+/* Panel ------------------------------------------------------------------ */
+
+.settings-panel {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  border-radius: 16px;
+  background: rgb(var(--glass-rgb) / 0.5);
+  border: 1px solid rgb(var(--ink-rgb) / 0.1);
+  backdrop-filter: var(--glass-blur);
+}
+
+.settings-panel__content {
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 44px 56px;
+}
+
+.settings-heading__title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.settings-heading__sub {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-65);
+}
+
+/* Rows (General) --------------------------------------------------------- */
+
+.settings-rows {
+  border-top: 1px solid rgb(var(--ink-rgb) / 0.08);
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  align-items: center;
+  gap: 20px;
+  min-height: 60px;
+  padding: 14px 0;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid rgb(var(--ink-rgb) / 0.06);
+}
+
+.settings-row--top {
+  align-items: start;
+}
+
+.settings-row--top .settings-row__label {
+  padding-top: 6px;
+}
+
+.settings-row__label {
+  font-size: 13.5px;
+  color: rgb(var(--text-rgb) / 0.88);
+}
+
+.settings-row__hint {
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-50);
+}
+
+.settings-row__control {
+  min-width: 0;
+}
+
+.settings-control--md {
+  max-width: 440px;
+}
+
+.settings-control--lg {
+  max-width: 560px;
+}
+
+.settings-row .field,
+.settings-row .tokens {
+  min-height: 34px;
+  border-radius: 9px;
+}
+
+.settings-row .field {
+  height: 34px;
+  font-size: 12.5px;
+}
+
+.settings-row .tokens {
+  padding: 5px 6px;
+}
+
+.settings-segmented .segmented__item {
+  height: 28px;
+  padding: 0 14px;
+}
+
+.settings-font {
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 8px;
+}
+
+.settings-folder {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.settings-button {
+  height: 34px;
+}
+
+/* Sections (Account, team) ----------------------------------------------- */
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 22px;
+  border-top: 1px solid rgb(var(--ink-rgb) / 0.08);
+}
+
+.settings-section__title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.settings-section__count {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-50);
+}
+
+.settings-footnote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-50);
+}
+
+.settings-account {
+  gap: 22px;
+}
+
+.settings-account__notice {
+  font-size: 13px;
+  color: var(--cloud-warn-text);
+}
+
+.settings-account__who {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-account__mark {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgb(var(--ink-rgb) / 0.08);
+}
+
+.settings-account__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-account__name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-account__detail {
+  margin-top: 3px;
+  font-size: 13px;
+  color: rgb(var(--text-rgb) / 0.6);
+}
+
+.settings-account__columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 40px;
+}
+
+.settings-account__column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-account__column-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgb(var(--text-rgb) / 0.88);
+}
+
+.settings-perk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: rgb(var(--text-rgb) / 0.86);
+}
+
+.settings-perk__mark {
+  width: 18px;
+  flex: none;
+  text-align: center;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.settings-perk__mark--ok {
+  color: var(--ok);
+}
+
+/* A line with a tile or dot, text and a button: notes sync, a device. */
+.settings-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-line__tile {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgb(var(--ink-rgb) / 0.07);
+  color: var(--text-78);
+}
+
+.settings-line > .cloud-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.settings-line__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-line__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.settings-line__detail {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-55);
+}
+
+.settings-device__pill {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: rgb(var(--accent-rgb) / 0.14);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cloud-cyan-text);
+}
+
+/* Team ------------------------------------------------------------------- */
+
+.settings-team__head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-team__head .cloud-team-tile {
+  border-radius: 12px;
+  font-size: 20px;
+}
+
+.settings-team__heading {
+  min-width: 0;
+}
+
+.settings-team__sub {
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: var(--text-65);
+}
+
+.settings-team__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.settings-team__grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.settings-team__main {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.settings-team__main .cloud-field__input {
+  height: 40px;
+  border-radius: 10px;
+}
+
+.settings-team__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-team__delete {
+  border-color: rgb(255 138 138 / 0.35);
+  color: var(--cloud-error-text);
+}
+
+.settings-team__delete:hover:not(:disabled) {
+  background: rgb(255 138 138 / 0.1);
+  color: var(--cloud-error-text);
+}
+
+
+/* In the page the invite column sits under a rule, not beside one. */
+.settings-page .team-invite {
+  padding: 18px 0 0;
+  border-left: 0;
+  border-top: 1px solid rgb(var(--ink-rgb) / 0.08);
+  background: none;
+}

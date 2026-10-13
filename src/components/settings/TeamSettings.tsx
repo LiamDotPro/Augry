@@ -19,8 +19,10 @@ import {
 } from "../../cloud/teams";
 import type { Invite, Member, Role, TeamDetail } from "../../cloud/types";
 import { cx } from "../../lib/cx";
-import { initialOf } from "../Account";
-import { TeamDialog, TeamFieldError } from "./TeamDialog";
+import { useAppActions } from "../../state/AppProvider";
+import { initialOf, TeamTile } from "../Account";
+import { TeamFieldError } from "../cloud/TeamDialog";
+import { processCount } from "../cloud/accountText";
 
 type InviteRole = Invite["role"];
 
@@ -36,13 +38,15 @@ async function confirmAction(message: string, title: string, okLabel: string, ca
 const statusOf = (error: unknown) => (api.isCloudError(error) ? error.status : -1);
 
 /**
- * team-settings (App Shell board 08): rename, members and their roles, invite
- * someone, leave or delete. Members (not admins or owners) see the list
- * read-only and no invite column. Every change goes straight to the API;
- * there is no draft to save.
+ * Settings → a team (App Shell board 03, `settings-team`): rename, members
+ * and their roles, invite someone, leave or delete. Members (not admins or
+ * owners) see it read-only, without invites. Every change goes straight to
+ * the API; there is no draft to save. Pending invites need cloud epic 006
+ * (listing and revoking invites), so they aren't shown yet.
  */
-export function TeamSettingsDialog({ teamId }: { teamId: string }) {
+export function TeamSettings({ teamId }: { teamId: string }) {
   const cloud = useCloud();
+  const appActions = useAppActions();
   const known = cloud.teams.find((team) => team.id === teamId) ?? null;
   const [detail, setDetail] = useState<TeamDetail | null>(null);
   /** Why loading the members failed, by status; null when it didn't. */
@@ -173,7 +177,7 @@ export function TeamSettingsDialog({ teamId }: { teamId: string }) {
   const forget = async () => {
     await cloud.refreshTeams().catch(() => {});
     if (cloud.selectedSpace === teamId) cloud.selectSpace("personal");
-    cloud.closeDialog();
+    appActions.setSettingsOpen(true, { page: "account" });
   };
 
   const leave = async () => {
@@ -209,23 +213,31 @@ export function TeamSettingsDialog({ teamId }: { teamId: string }) {
   const members = detail?.members ?? [];
   const choices = roleChoices(myRole);
 
+  const processes = cloud.processCounts[teamId];
+  const summary = [
+    "Team",
+    `you're ${roleNoun(myRole)}`,
+    ...(detail
+      ? [
+          processes === undefined
+            ? `${detail.members.length} ${detail.members.length === 1 ? "member" : "members"}`
+            : `${detail.members.length} ${detail.members.length === 1 ? "member shares" : "members share"} ${processCount(processes)}`,
+        ]
+      : []),
+  ].join(" · ");
+
   return (
-    <TeamDialog label={`${name || "Team"} settings`} width={800} className="team-settings" onClose={cloud.closeDialog}>
-      <div className="team-settings__head">
-        <span className="cloud-dialog__tile team-dialog__tile--team" aria-hidden="true">
-          {initialOf(name)}
-        </span>
-        <div className="team-settings__heading">
-          <h2 className="team-settings__title">{name || "Team settings"}</h2>
-          <div className="team-settings__sub">Team settings · you're {roleNoun(myRole)}</div>
+    <>
+      <div className="settings-team__head">
+        <TeamTile name={name || "Team"} size={48} />
+        <div className="settings-team__heading">
+          <h1 className="settings-heading__title">{name || "Team"}</h1>
+          <div className="settings-team__sub">{summary}</div>
         </div>
-        <button type="button" className="team-settings__close" aria-label="Close" onClick={cloud.closeDialog}>
-          ×
-        </button>
       </div>
 
-      <div className={cx("team-settings__grid", !managing && "team-settings__grid--single")}>
-        <div className="team-settings__main">
+      <div className={cx("settings-team__grid", !managing && "settings-team__grid--single")}>
+        <div className="settings-team__main">
           <div className="cloud-field">
             <label className="cloud-field__label" htmlFor="team-settings-name">
               Name
@@ -329,6 +341,27 @@ export function TeamSettingsDialog({ teamId }: { teamId: string }) {
             Owners and admins can invite, rename and change roles. Only an owner can make someone an owner. A team
             always keeps at least one owner.
           </p>
+
+          <div className="settings-team__actions">
+            <button
+              type="button"
+              className="cloud-btn cloud-btn--small"
+              disabled={!myId || busy !== null || offline}
+              onClick={() => void leave()}
+            >
+              Leave team
+            </button>
+            {myRole === "owner" && (
+              <button
+                type="button"
+                className="cloud-btn cloud-btn--small settings-team__delete"
+                disabled={busy !== null || offline}
+                onClick={() => void deleteTeam()}
+              >
+                Delete team
+              </button>
+            )}
+          </div>
         </div>
 
         {managing && (
@@ -407,31 +440,6 @@ export function TeamSettingsDialog({ teamId }: { teamId: string }) {
           </div>
         )}
       </div>
-
-      <div className="team-settings__foot">
-        <button
-          type="button"
-          className="team-settings__btn"
-          disabled={!myId || busy !== null || offline}
-          onClick={() => void leave()}
-        >
-          Leave team
-        </button>
-        {myRole === "owner" && (
-          <button
-            type="button"
-            className="team-settings__btn team-settings__btn--danger"
-            disabled={busy !== null || offline}
-            onClick={() => void deleteTeam()}
-          >
-            Delete team
-          </button>
-        )}
-        <span className="cloud-dialog__spacer" />
-        <button type="button" className="team-settings__btn team-settings__btn--done" onClick={cloud.closeDialog}>
-          Done
-        </button>
-      </div>
-    </TeamDialog>
+    </>
   );
 }

@@ -5,7 +5,6 @@ import { JoinedDialog } from "./JoinedDialog";
 import { JoinSignedOutDialog } from "./JoinSignedOutDialog";
 import { JoinTeamDialog } from "./JoinTeamDialog";
 import { SignInDialog } from "./SignInDialog";
-import { TeamSettingsDialog } from "./TeamSettingsDialog";
 
 /** Whichever cloud dialog is open (useCloud().openDialog), over the whole window. */
 export function CloudDialogs() {
@@ -23,8 +22,6 @@ export function CloudDialogs() {
       return <JoinedDialog team={dialog.team} />;
     case "create-team":
       return <CreateTeamDialog />;
-    case "team-settings":
-      return <TeamSettingsDialog teamId={dialog.teamId} />;
     case "notes-sync-setup":
       return <NotesSyncSetupDialog />;
   }

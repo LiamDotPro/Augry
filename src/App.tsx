@@ -6,7 +6,7 @@ import { FirstRunSetup } from "./components/FirstRunSetup";
 import { NotesView } from "./components/notes/NotesView";
 import { ProcessView } from "./components/process/ProcessView";
 import { PaneGrid } from "./components/PaneGrid";
-import { SettingsDialog } from "./components/SettingsDialog";
+import { SettingsPage } from "./components/settings/SettingsPage";
 import { Splash } from "./components/Splash";
 import { useAppearance } from "./lib/appearance";
 import { cx } from "./lib/cx";
@@ -45,20 +45,18 @@ function Shell() {
   const actions = useAppActions();
   useGlobalHotkeys();
   useModifierHint();
-  // Settings previews its draft appearance while open; closing it (Save or
-  // Cancel) hands back to the saved config.
-  useAppearance(
-    state.config.theme,
-    state.config.compactLayout,
-    { focus: state.config.focusColor, finished: state.config.finishedColor },
-    !state.settingsOpen,
-  );
+  // Settings saves as it changes, so the saved config is always what shows.
+  useAppearance(state.config.theme, state.config.compactLayout, {
+    focus: state.config.focusColor,
+    finished: state.config.finishedColor,
+  });
   const frame = useWindowFrame();
   // The launch splash plays over the app, which stays hidden ("hold") until the
   // handoff lets the chrome in ("reveal").
   const [splash, setSplash] = useState<"hold" | "reveal" | null>("hold");
 
-  const tab = state.activeTab;
+  // Settings takes the place of the tab, which stays mounted underneath.
+  const tab = state.settingsOpen ? null : state.activeTab;
   // Setup runs once, after the splash has handed over to the app.
   const showSetup = state.ready && !state.setupDone && splash === null;
 
@@ -91,6 +89,11 @@ function Shell() {
         <div className={cx("view", tab === "notes" && "view--active")} aria-hidden={tab !== "notes"}>
           <NotesView />
         </div>
+        {state.settingsOpen && (
+          <div className="view view--active">
+            <SettingsPage />
+          </div>
+        )}
       </div>
 
       {splash && (
@@ -104,7 +107,6 @@ function Shell() {
 
       {showSetup && <FirstRunSetup />}
       {state.hotkeysOpen && <HotkeyPopover />}
-      {state.settingsOpen && <SettingsDialog />}
       <CloudDialogs />
 
       {state.error && (
@@ -134,12 +136,14 @@ function useGlobalHotkeys(): void {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      // The settings sheet and first-time setup own the keyboard while open.
-      if (state.settingsOpen || !state.setupDone) return;
+      // First-time setup owns the keyboard while open.
+      if (!state.setupDone) return;
 
       const scheme = hotkeyScheme(state.config.hotkeyModifier);
       const action = matchHotkey(event, scheme);
       if (!action) return;
+      // Over the Settings page only the tab keys work: they leave it for that tab.
+      if (state.settingsOpen && action.type !== "set-tab" && action.type !== "toggle-tab") return;
       // On macOS ⌘↩ also submits a comment or the review tray; inside one of
       // our text boxes it belongs to the box. The terminal's own hidden input
       // is not one of those.

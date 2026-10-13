@@ -108,11 +108,11 @@ function AccountMenu({ onClose }: { onClose: () => void }) {
         </>
       )}
       {selectedTeam && (
-        <MenuItem onClick={run(() => cloud.openDialog({ kind: "team-settings", teamId: selectedTeam.id }))}>
+        <MenuItem onClick={run(() => actions.setSettingsOpen(true, { page: "team", teamId: selectedTeam.id }))}>
           {selectedTeam.name} settings
         </MenuItem>
       )}
-      <MenuItem onClick={run(() => actions.setSettingsOpen(true))}>Account settings</MenuItem>
+      <MenuItem onClick={run(() => actions.setSettingsOpen(true, { page: "account" }))}>Account settings</MenuItem>
       <MenuItem onClick={run(() => void cloud.signOut())}>Sign out</MenuItem>
     </div>
   );

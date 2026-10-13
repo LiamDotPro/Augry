@@ -6,7 +6,7 @@ import { useAppActions, useAppState } from "../state/AppProvider";
 import { useDeviceSignIn } from "../cloud/useDeviceSignIn";
 import { GitHubMark, StrokeIcon } from "./Account";
 import { AgentIcon } from "./AgentIcon";
-import { FONTS, SHELLS } from "./SettingsDialog";
+import { FONTS, SHELLS } from "./settings/GeneralSettings";
 
 const STEPS = [
   { title: "Tools" },

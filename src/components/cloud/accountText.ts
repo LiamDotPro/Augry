@@ -46,32 +46,31 @@ export function listNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-/**
- * Settings' Notes sync row: "Personal and Northwind · synced 10:42", from
- * the sync choice, the teams and when each notes space last synced
- * ("notes:personal", "notes:<teamId>"). Null means sync is off.
- */
-export function notesSyncSummary(
+/** The notes spaces that sync, as stored in the "notesSync" choice, with their lastSyncedAt keys. */
+function syncedSpaces(choice: NotesSyncChoice | null, teams: Team[]): { key: string; name: string }[] {
+  if (!choice) return [];
+  return [
+    ...(choice.personal ? [{ key: "notes:personal", name: "Personal" }] : []),
+    ...teams.filter((team) => choice.teams.includes(team.id)).map((team) => ({ key: `notes:${team.id}`, name: team.name })),
+  ];
+}
+
+/** "Personal and Northwind": what syncs. Null means sync is off. */
+export function notesSyncNames(choice: NotesSyncChoice | null, teams: Team[]): string | null {
+  const spaces = syncedSpaces(choice, teams);
+  return spaces.length > 0 ? listNames(spaces.map((space) => space.name)) : null;
+}
+
+/** When any synced space last synced, epoch ms; null before the first sync. */
+export function notesSyncedAt(
   choice: NotesSyncChoice | null,
   teams: Team[],
   lastSyncedAt: Record<string, number>,
-): string | null {
-  if (!choice) return null;
-  const keys: string[] = [];
-  const names: string[] = [];
-  if (choice.personal) {
-    keys.push("notes:personal");
-    names.push("Personal");
-  }
-  for (const team of teams) {
-    if (!choice.teams.includes(team.id)) continue;
-    keys.push(`notes:${team.id}`);
-    names.push(team.name);
-  }
-  if (names.length === 0) return null;
-  const times = keys.map((key) => lastSyncedAt[key]).filter((at): at is number => typeof at === "number");
-  const synced = times.length > 0 ? ` · synced ${clockTime(Math.max(...times))}` : "";
-  return `${listNames(names)}${synced}`;
+): number | null {
+  const times = syncedSpaces(choice, teams)
+    .map((space) => lastSyncedAt[space.key])
+    .filter((at): at is number => typeof at === "number");
+  return times.length > 0 ? Math.max(...times) : null;
 }
 
 /** "1 process", "4 processes". */

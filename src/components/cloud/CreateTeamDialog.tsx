@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { isCloudError } from "../../cloud/api";
 import { useCloud } from "../../cloud/CloudProvider";
+import { useAppActions } from "../../state/AppProvider";
 import { createErrorMessage, isValidTeamName, TEAM_NAME_MAX, TEAM_NAME_RULE } from "../../cloud/teams";
 import { cx } from "../../lib/cx";
 import { PlusTile, TeamDialog, TeamDialogHead, TeamFieldError } from "./TeamDialog";
@@ -11,6 +12,7 @@ import { PlusTile, TeamDialog, TeamDialogHead, TeamFieldError } from "./TeamDial
  */
 export function CreateTeamDialog(_props: Record<string, never>) {
   const cloud = useCloud();
+  const appActions = useAppActions();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -24,7 +26,9 @@ export function CreateTeamDialog(_props: Record<string, never>) {
     try {
       const team = await cloud.createTeam(name);
       cloud.selectSpace(team.id);
-      cloud.openDialog({ kind: "team-settings", teamId: team.id });
+      cloud.closeDialog();
+      // Its settings page, so they can invite people.
+      appActions.setSettingsOpen(true, { page: "team", teamId: team.id });
     } catch (failure) {
       setError(createErrorMessage(isCloudError(failure) ? failure.status : -1));
       setBusy(false);

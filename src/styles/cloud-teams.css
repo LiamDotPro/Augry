@@ -1,48 +1,48 @@
-/* Team dialogs: team-join, team-join-error, team-joined, team-join-signed-out, team-create, team-settings. Shared pieces are in cloud.css. */
+/* Team dialogs: team-join, team-join-error, team-joined, team-join-signed-out, team-create, and the team section of Settings. Shared pieces are in cloud.css. */
 
 /* Fields as board 08 draws them ----------------------------------------- */
 
-.team-dialog .cloud-field {
+:is(.team-dialog, .settings-page) .cloud-field {
   gap: 8px;
 }
 
-.team-dialog .cloud-field__label {
+:is(.team-dialog, .settings-page) .cloud-field__label {
   font-size: 12px;
   color: var(--text-78);
 }
 
-.team-dialog .cloud-field__input {
+:is(.team-dialog, .settings-page) .cloud-field__input {
   border-radius: 10px;
 }
 
 /* The border and ring show focus; the app-wide outline would double it. */
-.team-dialog .cloud-field__input:focus-visible {
+:is(.team-dialog, .settings-page) .cloud-field__input:focus-visible {
   outline: none;
 }
 
 /* The focused field gets a 1.5px cyan line; padding keeps the text still. */
-.team-dialog .cloud-field__input:focus:not([readonly]) {
+:is(.team-dialog, .settings-page) .cloud-field__input:focus:not([readonly]) {
   padding: 0 13.5px;
   border: 1.5px solid var(--accent);
 }
 
-.team-dialog .cloud-field__input--error,
-.team-dialog .cloud-field__input--error:focus:not([readonly]) {
+:is(.team-dialog, .settings-page) .cloud-field__input--error,
+:is(.team-dialog, .settings-page) .cloud-field__input--error:focus:not([readonly]) {
   padding: 0 13.5px;
   border: 1.5px solid var(--cloud-error);
   box-shadow: none;
 }
 
-.team-dialog .cloud-field__input[readonly]:focus {
+:is(.team-dialog, .settings-page) .cloud-field__input[readonly]:focus {
   border-color: rgb(var(--ink-rgb) / 0.14);
   box-shadow: none;
 }
 
-.team-dialog .cloud-field__input--mono {
+:is(.team-dialog, .settings-page) .cloud-field__input--mono {
   letter-spacing: 0.06em;
 }
 
-.team-dialog .cloud-field__hint {
+:is(.team-dialog, .settings-page) .cloud-field__hint {
   font-size: 12.5px;
   line-height: 1.5;
   color: rgb(var(--text-rgb) / 0.6);
@@ -183,82 +183,7 @@
   text-wrap: pretty;
 }
 
-/* team-settings: the 800px panel ----------------------------------------- */
-
-.team-settings {
-  border-radius: var(--radius-sheet);
-  background: var(--cloud-panel-bg);
-  backdrop-filter: var(--glass-blur-strong);
-  border-color: var(--edge-strong);
-  box-shadow: var(--shadow-sheet);
-}
-
-.team-settings__head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 18px 22px 14px;
-  border-bottom: 1px solid var(--hair);
-}
-
-.team-settings__heading {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.team-settings__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.team-settings__sub {
-  font-size: 12px;
-  color: var(--text-55);
-}
-
-.team-settings__close {
-  width: 26px;
-  height: 26px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  font-size: 15px;
-  color: rgb(var(--text-rgb) / 0.6);
-}
-
-.team-settings__close:hover {
-  background: var(--fill-hover);
-  color: var(--text-strong);
-}
-
-.team-settings__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-/* Members see no invite column. */
-.team-settings__grid--single {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.team-settings__main {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 18px 22px;
-  min-width: 0;
-}
+/* team-settings, now the team section of the Settings page (settings.css) */
 
 .team-settings__note {
   margin: 0;
@@ -604,59 +529,4 @@ button.team-member__remove:disabled {
   font-size: 11.5px;
   line-height: 1.45;
   color: var(--text-55);
-}
-
-/* Footer: Leave team, Delete team, Done ------------------------------------ */
-
-.team-settings__foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 22px 18px;
-  border-top: 1px solid var(--hair);
-  background: rgb(var(--ink-rgb) / 0.03);
-}
-
-.team-settings__btn {
-  height: 32px;
-  padding: 0 14px;
-  display: flex;
-  align-items: center;
-  border-radius: 9px;
-  border: 1px solid var(--fill-4);
-  font-size: 12.5px;
-  white-space: nowrap;
-  color: var(--text-85);
-}
-
-.team-settings__btn:hover:not(:disabled) {
-  background: var(--fill-hover);
-  color: var(--text-strong);
-}
-
-.team-settings__btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.team-settings__btn--danger {
-  border-color: color-mix(in srgb, var(--cloud-error) 35%, transparent);
-  color: var(--cloud-error-text);
-}
-
-.team-settings__btn--danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--cloud-error) 12%, transparent);
-  color: var(--cloud-error-text);
-}
-
-.team-settings__btn--done {
-  padding: 0 16px;
-  background: var(--fill-5);
-  border-color: rgb(var(--ink-rgb) / 0.28);
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-.team-settings__btn--done:hover:not(:disabled) {
-  background: rgb(var(--ink-rgb) / 0.22);
 }

@@ -6,7 +6,8 @@ import {
   deviceCount,
   deviceUsage,
   listNames,
-  notesSyncSummary,
+  notesSyncedAt,
+  notesSyncNames,
   processCount,
   shortDate,
   spaceDetail,
@@ -69,23 +70,26 @@ describe("listNames", () => {
   });
 });
 
-describe("notesSyncSummary", () => {
+describe("notes sync", () => {
   const teams = [team("t1", "Northwind"), team("t2", "Acme")];
 
   it("is off until chosen, or when nothing is on", () => {
-    expect(notesSyncSummary(null, teams, {})).toBeNull();
-    expect(notesSyncSummary({ personal: false, teams: [] }, teams, {})).toBeNull();
+    expect(notesSyncNames(null, teams)).toBeNull();
+    expect(notesSyncNames({ personal: false, teams: [] }, teams)).toBeNull();
+    expect(notesSyncedAt(null, teams, { "notes:personal": 1 })).toBeNull();
   });
 
-  it("names what syncs and the latest sync time", () => {
+  it("names what syncs and takes the latest sync time", () => {
     const synced = { "notes:personal": at(2026, 10, 12, 10, 40).getTime(), "notes:t1": at(2026, 10, 12, 10, 42).getTime() };
-    expect(notesSyncSummary({ personal: true, teams: ["t1"] }, teams, synced)).toBe(
-      "Personal and Northwind · synced 10:42",
-    );
+    const choice = { personal: true, teams: ["t1"] };
+    expect(notesSyncNames(choice, teams)).toBe("Personal and Northwind");
+    expect(clockTime(notesSyncedAt(choice, teams, synced)!)).toBe("10:42");
   });
 
-  it("leaves the time out before the first sync and skips teams you left", () => {
-    expect(notesSyncSummary({ personal: true, teams: ["gone", "t2"] }, teams, {})).toBe("Personal and Acme");
+  it("has no time before the first sync and skips teams you left", () => {
+    const choice = { personal: true, teams: ["gone", "t2"] };
+    expect(notesSyncNames(choice, teams)).toBe("Personal and Acme");
+    expect(notesSyncedAt(choice, teams, {})).toBeNull();
   });
 });
 

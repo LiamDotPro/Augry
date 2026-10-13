@@ -102,6 +102,9 @@ export interface NoteToast {
   at: number;
 }
 
+/** A section of the Settings page: General, Account, or one of your teams. */
+export type SettingsPage = { page: "general" } | { page: "account" } | { page: "team"; teamId: string };
+
 export interface AppState {
   ready: boolean;
   /** Launch is over: config and notes are loaded and the saved panes restored. */
@@ -136,7 +139,12 @@ export interface AppState {
    * from; any other note in a folder was written by hand.
    */
   copiedNotes: Record<string, NoteLink>;
+  /**
+   * Settings is a page in place of the current tab (App Shell board 03);
+   * `activeTab` stays the tab it returns to.
+   */
   settingsOpen: boolean;
+  settingsPage: SettingsPage;
   hotkeysOpen: boolean;
   busy: boolean;
   error: string | null;
@@ -177,6 +185,7 @@ export const initialState: AppState = {
   noteToast: null,
   copiedNotes: {},
   settingsOpen: false,
+  settingsPage: { page: "general" },
   hotkeysOpen: false,
   busy: false,
   error: null,
@@ -197,7 +206,8 @@ export type Action =
   | { type: "page/step"; delta: -1 | 1 }
   | { type: "layout/set"; mode: LayoutMode }
   | { type: "layout/cycle" }
-  | { type: "ui/settings"; open: boolean }
+  /** Opens Settings at `page` (or where it was), or closes it. */
+  | { type: "ui/settings"; open: boolean; page?: SettingsPage }
   | { type: "ui/hotkeys"; open: boolean }
   | { type: "ui/busy"; busy: boolean }
   | { type: "ui/error"; message: string | null }
@@ -292,9 +302,11 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, installedAgents: action.agents };
 
     case "tab/set":
-      return { ...state, activeTab: action.tab, hotkeysOpen: false };
+      return { ...state, activeTab: action.tab, hotkeysOpen: false, settingsOpen: false };
 
     case "tab/toggle":
+      // From Settings, the toggle goes back to the tab it covers.
+      if (state.settingsOpen) return { ...state, settingsOpen: false, hotkeysOpen: false };
       return {
         ...state,
         activeTab: APP_TABS[(APP_TABS.indexOf(state.activeTab) + 1) % APP_TABS.length],
@@ -320,7 +332,12 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, layoutMode: nextLayoutMode(state.layoutMode) };
 
     case "ui/settings":
-      return { ...state, settingsOpen: action.open, hotkeysOpen: false };
+      return {
+        ...state,
+        settingsOpen: action.open,
+        settingsPage: action.page ?? state.settingsPage,
+        hotkeysOpen: false,
+      };
 
     case "ui/hotkeys":
       return { ...state, hotkeysOpen: action.open };
