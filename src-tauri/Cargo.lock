@@ -4691,6 +4691,7 @@ dependencies = [
  "trigger-docker",
  "trigger-fs",
  "trigger-git",
+ "trigger-github",
  "trigger-hub",
  "uuid",
  "window-vibrancy",
@@ -5135,6 +5136,16 @@ dependencies = [
  "serde_json",
  "trigger-core",
  "uuid",
+]
+
+[[package]]
+name = "trigger-github"
+version = "0.1.0"
+dependencies = [
+ "globset",
+ "serde",
+ "serde_json",
+ "trigger-core",
 ]
 
 [[package]]

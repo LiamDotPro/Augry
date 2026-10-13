@@ -151,6 +151,7 @@ mod tests {
             downloads: None,
             notes_root: PathBuf::from("/notes"),
             repo_roots: Vec::new(),
+            repo_remotes: Vec::new(),
             screenshots: || None,
         };
         service.refresh(&config, &ctx);

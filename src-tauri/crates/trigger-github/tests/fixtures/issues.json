@@ -1,0 +1,5 @@
+[
+  {"id":5741818300,"number":14660,"title":"Crash when the config file is empty","state":"open","updated_at":"2026-10-12T10:00:00Z","html_url":"https://github.com/cli/cli/issues/14660","user":{"login":"octocat"},"assignees":[{"login":"LiamDotPro"}],"repository_url":"https://api.github.com/repos/cli/cli"},
+  {"id":5741818299,"number":14655,"title":"Update the contributing guide","state":"open","updated_at":"2026-10-12T10:00:00Z","html_url":"https://github.com/cli/cli/pull/14655","user":{"login":"Copilot"},"assignees":[{"login":"LiamDotPro"},{"login":"Copilot"}],"repository_url":"https://api.github.com/repos/cli/cli","pull_request":{"url":"https://api.github.com/repos/cli/cli/pulls/14655"}},
+  {"id":5741818100,"number":14600,"title":"Support gh pr checks --watch for forks","state":"open","updated_at":"2026-10-12T10:00:00Z","html_url":"https://github.com/cli/cli/issues/14600","user":{"login":"babakks"},"assignees":[{"login":"LiamDotPro"}],"repository_url":"https://api.github.com/repos/cli/cli"}
+]

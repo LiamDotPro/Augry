@@ -45,6 +45,8 @@ fn sources(internal: &InternalSource) -> Vec<Box<dyn Source>> {
     list.push(Box::new(trigger_clock::ClockSource));
     #[cfg(feature = "trigger-docker")]
     list.push(Box::new(trigger_docker::DockerSource));
+    #[cfg(feature = "trigger-github")]
+    list.push(Box::new(trigger_github::GithubSource));
     list
 }
 
@@ -182,13 +184,29 @@ pub fn start(app: &AppHandle) {
     });
 }
 
-/// Repository roots of the open panes, from the git cache where it is fresh.
-fn repo_roots(state: &crate::AppState) -> Vec<String> {
+/// Repository roots and GitHub `owner/name` slugs of the open panes, from the
+/// git cache where it is fresh.
+fn repo_places(state: &crate::AppState) -> (Vec<String>, Vec<String>) {
     let open_dirs = state.pty.open_dirs();
-    open_dirs
+    let places: Vec<(Option<String>, Option<String>)> = open_dirs
         .iter()
-        .filter_map(|(_, cwd)| state.git.info(cwd, GIT_MAX_AGE, &open_dirs).repo_root)
-        .collect()
+        .map(|(_, cwd)| {
+            let info = state.git.info(cwd, GIT_MAX_AGE, &open_dirs);
+            (info.repo_root, info.remote_url)
+        })
+        .collect();
+    places_of(&places)
+}
+
+/// Splits (repository root, origin remote URL) pairs into the roots and the
+/// GitHub slugs. Remotes on other hosts add nothing.
+fn places_of(places: &[(Option<String>, Option<String>)]) -> (Vec<String>, Vec<String>) {
+    let roots = places.iter().filter_map(|(root, _)| root.clone()).collect();
+    let remotes = places
+        .iter()
+        .filter_map(|(_, url)| url.as_deref().and_then(variables::github_slug))
+        .collect();
+    (roots, remotes)
 }
 
 /// Collects the inputs from the app state and runs `TriggerService::refresh`.
@@ -196,12 +214,12 @@ fn repo_roots(state: &crate::AppState) -> Vec<String> {
 pub fn refresh_now(state: &crate::AppState) -> TriggersStatus {
     let config = state.state.config().triggers;
     // Nobody pays for git lookups while the feature is off.
-    let roots = if config.enabled {
-        repo_roots(state)
+    let (roots, remotes) = if config.enabled {
+        repo_places(state)
     } else {
-        Vec::new()
+        (Vec::new(), Vec::new())
     };
-    let ctx = Context::detect(state.notes.root(), roots);
+    let ctx = Context::detect(state.notes.root(), roots, remotes);
     state.triggers.refresh(&config, &ctx)
 }
 
@@ -292,6 +310,7 @@ mod tests {
             downloads: None,
             notes_root: PathBuf::from("/notes"),
             repo_roots: Vec::new(),
+            repo_remotes: Vec::new(),
             screenshots: || None,
         }
     }
@@ -315,6 +334,25 @@ mod tests {
 
     fn cleanup(dir: &Path) {
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn places_split_roots_and_github_slugs() {
+        let places = vec![
+            (
+                Some("/r/a".to_string()),
+                Some("git@github.com:o/a.git".to_string()),
+            ),
+            (
+                Some("/r/b".to_string()),
+                Some("https://gitlab.com/o/b.git".to_string()),
+            ),
+            (Some("/r/c".to_string()), None),
+            (None, None),
+        ];
+        let (roots, remotes) = places_of(&places);
+        assert_eq!(roots, ["/r/a", "/r/b", "/r/c"]);
+        assert_eq!(remotes, ["o/a"]);
     }
 
     #[test]
@@ -489,6 +527,22 @@ mod tests {
     #[test]
     fn the_catalogue_has_no_docker_source_without_the_feature() {
         assert!(!source_ids().contains(&"docker"));
+    }
+
+    #[cfg(feature = "trigger-github")]
+    #[test]
+    fn the_catalogue_lists_the_github_source() {
+        assert!(sources(&InternalSource::default())
+            .iter()
+            .any(|source| source.id() == "github"));
+    }
+
+    #[cfg(not(feature = "trigger-github"))]
+    #[test]
+    fn the_catalogue_has_no_github_source_without_the_feature() {
+        assert!(!sources(&InternalSource::default())
+            .iter()
+            .any(|source| source.id() == "github"));
     }
 
     #[test]

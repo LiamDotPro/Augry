@@ -77,5 +77,6 @@ process definition (local file, later synced)      ${variables} filled in
 | 003-trigger-git | `trigger-git`: commit, branch switch, pull, merge conflict, stopped rebase, tag, stash, detached HEAD, behind remote, old uncommitted work and new clones | done |
 | 007-trigger-clock | `trigger-clock`: schedule, interval, first use of the day, and calendar events, with catch up after sleep | done |
 | 010-trigger-docker | `trigger-docker`: container started, stopped, healthy, unhealthy and image built, from Docker and Podman | done |
-| 004 to 006, 008, 009, 011 to 015 | one crate per integration, all depending on 001 only | draft |
+| 011-trigger-github | `trigger-github`: issue assigned, review requested, CI failed or passed, PR comment, PR merged, release published, Dependabot or Renovate PR, polled with `gh` | done |
+| 004 to 006, 008, 009, 012 to 015 | one crate per integration, all depending on 001 only | draft |
 | later | process editor, run engine, trigger picker UI, team sync of definitions | not planned |
