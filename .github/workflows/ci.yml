@@ -54,7 +54,7 @@ jobs:
         working-directory: src-tauri
 
       - name: Clippy (trigger crates)
-        run: cargo clippy -p trigger-core -p trigger-hub -p trigger-fs -p trigger-git --all-targets -- -D warnings
+        run: cargo clippy -p trigger-core -p trigger-hub -p trigger-fs -p trigger-git -p trigger-clock --all-targets -- -D warnings
         working-directory: src-tauri
 
       - name: Core tests
@@ -75,5 +75,7 @@ jobs:
 
       - name: Live git tests
         run: cargo test -p trigger-git -- --ignored --test-threads=1
+      - name: Live clock tests
+        run: cargo test -p trigger-clock -- --ignored --test-threads=1
         working-directory: src-tauri
         timeout-minutes: 10

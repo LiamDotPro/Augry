@@ -41,6 +41,8 @@ fn sources(internal: &InternalSource) -> Vec<Box<dyn Source>> {
     list.push(Box::new(trigger_fs::FsSource));
     #[cfg(feature = "trigger-git")]
     list.push(Box::new(trigger_git::GitSource));
+    #[cfg(feature = "trigger-clock")]
+    list.push(Box::new(trigger_clock::ClockSource));
     list
 }
 
@@ -461,6 +463,18 @@ mod tests {
     #[test]
     fn the_catalogue_has_no_git_source_without_the_feature() {
         assert!(!source_ids().contains(&"git"));
+    }
+
+    #[cfg(feature = "trigger-clock")]
+    #[test]
+    fn the_catalogue_lists_the_clock_source() {
+        assert!(source_ids().contains(&"clock"));
+    }
+
+    #[cfg(not(feature = "trigger-clock"))]
+    #[test]
+    fn the_catalogue_has_no_clock_source_without_the_feature() {
+        assert!(!source_ids().contains(&"clock"));
     }
 
     #[test]
