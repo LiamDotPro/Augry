@@ -88,7 +88,7 @@ export function useAppearance(
   useEffect(() => {
     if (!active || !IS_MAC) return;
     call("set_window_glass", { enabled: glass }).catch((error) =>
-      console.error("terminal-grid: window glass unavailable", error),
+      console.error("augry: window glass unavailable", error),
     );
   }, [glass, active]);
 

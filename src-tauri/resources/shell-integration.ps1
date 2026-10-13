@@ -1,4 +1,4 @@
-# Terminal Grid shell integration for PowerShell (pwsh and Windows PowerShell).
+# Augry shell integration for PowerShell (pwsh and Windows PowerShell).
 # Emits OSC 7 (cwd), OSC 133 (prompt/command markers) and OSC 7777 (last command) so the app can
 # track the working directory, refresh git labels and detect finished agent runs.
 

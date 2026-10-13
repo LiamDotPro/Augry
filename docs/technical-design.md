@@ -1,6 +1,6 @@
-# Terminal Grid: technical design
+# Augry: technical design
 
-Working name: **Terminal Grid** (rename freely). Desktop app built on Tauri 2 with a Rust core. The frontend visual layer is out of scope here; it will come from Claude Design. This document defines everything the frontend needs to plug into: the process model, the Rust subsystems, the IPC contract, the state model, and the Windows specifics.
+Name: **Augry** (formerly Terminal Grid). Desktop app built on Tauri 2 with a Rust core. The frontend visual layer is out of scope here; it will come from Claude Design. This document defines everything the frontend needs to plug into: the process model, the Rust subsystems, the IPC contract, the state model, and the Windows specifics.
 
 Versions checked on crates.io and npm on 7 September 2026:
 
@@ -48,7 +48,7 @@ Versions checked on crates.io and npm on 7 September 2026:
 **Frontend runtime:** the WebView (WebView2 on Windows). Whatever Claude Design produces needs two non visual libraries: `@xterm/xterm` for the terminal surface and `@tauri-apps/api` for IPC. Everything else (framework, markdown editor, markdown renderer) is the frontend's choice.
 
 ```
-terminal-grid/
+augry/
   package.json
   src/                      # frontend, delivered separately
   src-tauri/
@@ -58,7 +58,7 @@ terminal-grid/
     capabilities/default.json
     icons/
     src/
-      main.rs               # calls terminal_grid_lib::run()
+      main.rs               # calls augry_lib::run()
       lib.rs                # builder, plugin registration, command handler list, managed state
       error.rs              # AppError (thiserror) with serde Serialize so commands can return it
       pty/
@@ -181,8 +181,8 @@ cmd.args(shell.args(&integration_script_path));
 cmd.cwd(&cwd);
 cmd.env("TERM", "xterm-256color");
 cmd.env("COLORTERM", "truecolor");
-cmd.env("TERMINAL_GRID_ID", &id);
-cmd.env("TERMINAL_GRID", "1");
+cmd.env("AUGRY_ID", &id);
+cmd.env("AUGRY", "1");
 let child = pair.slave.spawn_command(cmd)?;
 drop(pair.slave);
 let reader = pair.master.try_clone_reader()?;
@@ -293,7 +293,7 @@ Only when the session shell is `Cmd` and the process watcher found no agent proc
 
 ### 5.5 Task reports
 
-What the agent is working on comes from the agent itself, not from detection. `PtyManager::spawn` gives every shell `TERMINAL_GRID_TASK_FILE=<config dir>/tasks/<id>.txt` and creates the file empty. Agents write one line there. The AgentWatcher tick stats each live session's file, and when the mtime or length changes it reads the first 4 KiB and emits `terminal://task { id, task, updatedAtMs }`. The line is decoded as UTF-8 or as UTF-16 with a BOM, since Windows PowerShell 5.1's `>` writes UTF-16LE. Whitespace collapses to single spaces, the line is capped at 280 characters, and an empty file sends `task: null`. Closing a pane deletes its file, and the tasks folder is emptied at launch.
+What the agent is working on comes from the agent itself, not from detection. `PtyManager::spawn` gives every shell `AUGRY_TASK_FILE=<config dir>/tasks/<id>.txt` and creates the file empty. Agents write one line there. The AgentWatcher tick stats each live session's file, and when the mtime or length changes it reads the first 4 KiB and emits `terminal://task { id, task, updatedAtMs }`. The line is decoded as UTF-8 or as UTF-16 with a BOM, since Windows PowerShell 5.1's `>` writes UTF-16LE. Whitespace collapses to single spaces, the line is capped at 280 characters, and an empty file sends `task: null`. Closing a pane deletes its file, and the tasks folder is emptied at launch.
 
 A file was chosen over an OSC sequence because agents capture their tools' output, so an escape sequence printed by a tool call never reaches the terminal. A file also needs no port or token. The frontend drops the task when a new agent run starts or the shell exits. A reported task shows as one ellipsized line under the pane header's first row (it takes the place of the last command line); clicking it drops down a popover with the full text. Before the first report the header has a small `task` button that opens the same popover. From there, "Ask agent" types a one line request into the pty (the Enter is sent 150 ms after the text, so agent TUIs don't treat it as part of a paste), and "Copy instructions" copies a CLAUDE.md / AGENTS.md section.
 
@@ -454,7 +454,7 @@ The panel polls `review_status` every 2.5 s while it is open and on every `termi
 
 ### 8.1 Storage
 
-Plain `.md` files in a notes root, default `%USERPROFILE%\Documents\TerminalGrid\Notes`, changeable through a folder picker. Subfolders allowed. Nothing else is stored; the folder is safe to sync or put in a repo.
+Plain `.md` files in a notes root, default `%USERPROFILE%\Documents\Augry\Notes`, changeable through a folder picker. Subfolders allowed. Nothing else is stored; the folder is safe to sync or put in a repo.
 
 ### 8.2 Commands
 
@@ -500,7 +500,7 @@ Editor behaviour (frontend contract): autosave 600 ms after the last keystroke a
 
 ## 9. Persistence (`state`)
 
-Two files in `app.path().app_config_dir()` (`%APPDATA%\com.liamread.terminalgrid\` on Windows, adjust identifier):
+Two files in `app.path().app_config_dir()` (`%APPDATA%\dev.augry.app\` on Windows, adjust identifier):
 
 `config.json` (user settings):
 
@@ -554,7 +554,7 @@ Events (Rust → frontend), all emitted to the `main` window:
 | `terminal://git` | `{ id, info: GitInfo }` |
 | `terminal://agent` | `{ id, event: "started" \| "finished", name, durationMs? , source: "process" \| "shell" \| "bell" \| "idle" }` |
 | `terminal://stats` | `{ id, cpuPercent, memBytes }` sampled on the AgentWatcher tick for the session process tree; the pane header renders it next to the agent badge |
-| `terminal://task` | `{ id, task: string \| null, updatedAtMs }` when a session's `TERMINAL_GRID_TASK_FILE` changes (section 5.5) |
+| `terminal://task` | `{ id, task: string \| null, updatedAtMs }` when a session's `AUGRY_TASK_FILE` changes (section 5.5) |
 | `notes://changed` | `{ relPath, kind }` |
 
 Frontend → Rust commands are listed in sections 4.4, 7 (review commands in 7.5), 8, 9. All commands return `Result<T, AppError>` where `AppError` serializes to `{ code: string, message: string, ...extra }`. Codes: `NotFound`, `SpawnFailed`, `Io`, `OutsideRoot`, `Conflict`, `InvalidName`, `GitTimeout`, `GitNotInstalled`.
@@ -571,12 +571,12 @@ TypeScript types for the contract live in `src/ipc/types.ts` and are the single 
 
 ```json
 {
-  "productName": "Terminal Grid",
-  "identifier": "com.liamread.terminalgrid",
+  "productName": "Augry",
+  "identifier": "dev.augry.app",
   "app": {
     "windows": [{
       "label": "main",
-      "title": "Terminal Grid",
+      "title": "Augry",
       "fullscreen": true,
       "resizable": true,
       "decorations": true,

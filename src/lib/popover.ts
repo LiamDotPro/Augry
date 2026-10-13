@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-const OPENED = "terminal-grid:popover-opened";
+const OPENED = "augry:popover-opened";
 
 /**
  * Keeps popovers one at a time: when this one opens it tells the others,

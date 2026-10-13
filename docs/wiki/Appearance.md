@@ -1,6 +1,6 @@
 # Appearance
 
-Three settings change how Terminal Grid looks: **Theme**, **Compact layout**
+Three settings change how Augry looks: **Theme**, **Compact layout**
 and **Colours**. They are in **Settings** (`<mod>+,`, `⌘,` on a Mac), preview
 as you change them, and stick when you press Save; Cancel puts them back.
 

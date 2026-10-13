@@ -34,7 +34,7 @@ define_class!(
     // SAFETY: NSView has no subclassing requirements and this has no Drop.
     #[unsafe(super(NSView, NSResponder, NSObject))]
     #[thread_kind = MainThreadOnly]
-    #[name = "TerminalGridTrafficLights"]
+    #[name = "AugryTrafficLights"]
     #[ivars = Cell<bool>]
     struct TrafficLights;
 
@@ -90,7 +90,7 @@ define_class!(
     // SAFETY: NSObject has no subclassing requirements and this has no Drop.
     #[unsafe(super(NSObject))]
     #[thread_kind = MainThreadOnly]
-    #[name = "TerminalGridFullScreenObserver"]
+    #[name = "AugryFullScreenObserver"]
     struct FullScreenObserver;
 
     impl FullScreenObserver {

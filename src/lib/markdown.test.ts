@@ -7,7 +7,7 @@ describe("parseMarkdown", () => {
       [
         "# Claude Code — working notes",
         "",
-        "Runs in pane 1 and 6 on `terminal-grid`. Keep one agent per",
+        "Runs in pane 1 and 6 on `augry`. Keep one agent per",
         "worktree so diffs stay isolated.",
         "",
         "## Prompts that worked",

@@ -1,11 +1,11 @@
 [package]
-name = "terminal-grid"
+name = "augry"
 version = "0.5.0"
-description = "Terminal grid with git labels, worktree view and markdown notes"
+description = "Augry: coding agents side by side, with git, review, notes and processes"
 edition = "2021"
 
 [lib]
-name = "terminal_grid_lib"
+name = "augry_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

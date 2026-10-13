@@ -101,7 +101,7 @@ mod tests {
     use super::*;
 
     fn root() -> PathBuf {
-        std::env::temp_dir().join("terminal-grid-tests-notes")
+        std::env::temp_dir().join("augry-tests-notes")
     }
 
     #[test]

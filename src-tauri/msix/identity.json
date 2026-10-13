@@ -1,7 +1,7 @@
 {
   "$comment": "Package identity for the Microsoft Store MSIX. After reserving the app name in Partner Center, copy Package/Identity/Name and Package/Identity/Publisher from Product management > Product identity into identityName and publisher. publisherDisplayName is the name shown in the Store listing.",
-  "identityName": "LiamRead.TerminalGrid",
+  "identityName": "LiamRead.Augry",
   "publisher": "CN=Liam Read",
   "publisherDisplayName": "Liam Read",
-  "description": "Terminal grid with git labels, worktree view and markdown notes"
+  "description": "Augry: coding agents side by side, with git, review, notes and processes"
 }

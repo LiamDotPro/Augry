@@ -1,8 +1,8 @@
 # Augry
 
-[![Latest release](https://img.shields.io/github/v/release/LiamDotPro/Terminal-Grid?label=release)](https://github.com/LiamDotPro/Terminal-Grid/releases/latest)
-[![CI](https://github.com/LiamDotPro/Terminal-Grid/actions/workflows/ci.yml/badge.svg)](https://github.com/LiamDotPro/Terminal-Grid/actions/workflows/ci.yml)
-[![Downloads](https://img.shields.io/github/downloads/LiamDotPro/Terminal-Grid/total)](https://github.com/LiamDotPro/Terminal-Grid/releases)
+[![Latest release](https://img.shields.io/github/v/release/LiamDotPro/Augry?label=release)](https://github.com/LiamDotPro/Augry/releases/latest)
+[![CI](https://github.com/LiamDotPro/Augry/actions/workflows/ci.yml/badge.svg)](https://github.com/LiamDotPro/Augry/actions/workflows/ci.yml)
+[![Downloads](https://img.shields.io/github/downloads/LiamDotPro/Augry/total)](https://github.com/LiamDotPro/Augry/releases)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-informational)
 [![Built with Tauri 2](https://img.shields.io/badge/built%20with-Tauri%202-24C8DB?logo=tauri&logoColor=white)](https://tauri.app)
 
@@ -37,7 +37,7 @@ and comment on its changes, and keeps your notes next to the work.
 ## Install
 
 Download the latest build from the
-[Releases page](https://github.com/LiamDotPro/Terminal-Grid/releases/latest).
+[Releases page](https://github.com/LiamDotPro/Augry/releases/latest).
 
 - **Windows** (10 1809 or later): `…_x64-setup.exe` installs for you without
   an admin prompt; `…_x64_en-US.msi` is for scripted or per machine installs.
@@ -95,11 +95,11 @@ matches one of the name patterns in Settings. When the agent exits, the pane
 turns green until you look at it. For Claude Code's bell to count too, run
 `claude config set --global preferredNotifChannel terminal_bell`.
 
-**Current task.** Every shell gets a `TERMINAL_GRID_TASK_FILE` variable;
+**Current task.** Every shell gets a `AUGRY_TASK_FILE` variable;
 whatever is written to that file shows under the pane header within a second:
 
 ```
-echo "Adding retries to the upload client" > "$TERMINAL_GRID_TASK_FILE"
+echo "Adding retries to the upload client" > "$AUGRY_TASK_FILE"
 ```
 
 The `task` button can **Ask agent** to write it now, or **Copy instructions**
@@ -137,7 +137,7 @@ marked, and `Alt+↑` / `Alt+↓` step through changed files.
 
 ![A line selected in Claude Code with the Save to note and Copy menu next to it](docs/screenshots/save-to-note.png)
 
-Plain `.md` files in a folder you choose (default `Documents/TerminalGrid/Notes`),
+Plain `.md` files in a folder you choose (default `Documents/Augry/Notes`),
 saved as you type, with a prompt if a file changes outside the app. Deleted
 notes go to the trash.
 

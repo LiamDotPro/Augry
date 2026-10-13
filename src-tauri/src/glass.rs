@@ -26,7 +26,7 @@ pub fn set_window_glass(window: WebviewWindow, enabled: bool) -> Result<()> {
                         Some(window_vibrancy::NSVisualEffectState::Active),
                         None,
                     ) {
-                        eprintln!("terminal-grid: could not apply window glass: {error}");
+                        eprintln!("augry: could not apply window glass: {error}");
                     }
                 }
             })

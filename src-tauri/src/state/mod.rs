@@ -234,7 +234,7 @@ fn load_json<T: serde::de::DeserializeOwned>(path: &Path) -> Option<T> {
         Ok(value) => Some(value),
         Err(error) => {
             // A hand-edited or truncated file must not stop the app from starting.
-            eprintln!("terminal-grid: ignoring {}: {error}", path.display());
+            eprintln!("augry: ignoring {}: {error}", path.display());
             None
         }
     }
@@ -254,13 +254,59 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     Ok(())
 }
 
-/// `%APPDATA%\com.liamread.terminalgrid` on Windows.
+/// The app's identifier before it was renamed from Terminal Grid to Augry.
+/// Its folder sits next to the new one, under the same parent.
+const OLD_IDENTIFIER: &str = "com.liamread.terminalgrid";
+
+/// `%APPDATA%\dev.augry.app` on Windows, `~/Library/Application
+/// Support/dev.augry.app` on macOS. The first time Augry starts under its
+/// new identifier it copies the old Terminal Grid folder in, so settings,
+/// the session and saved processes carry over.
 pub fn config_dir(app: &AppHandle) -> Result<PathBuf> {
     let dir = app.path().app_config_dir().map_err(|e| AppError::Io {
         message: e.to_string(),
     })?;
+    match adopt_old_folder(&dir) {
+        Ok(true) => eprintln!("augry: copied settings from the {OLD_IDENTIFIER} folder"),
+        Ok(false) => {}
+        Err(error) => eprintln!("augry: could not copy the {OLD_IDENTIFIER} folder: {error}"),
+    }
     fs::create_dir_all(&dir)?;
     Ok(dir)
+}
+
+/// Copies the pre-rename folder into `new_dir` when this is the first run
+/// under the new identifier: the old folder exists and the new one has no
+/// config or session yet. The old folder is left as it was. Files already in
+/// `new_dir` are never overwritten.
+pub fn adopt_old_folder(new_dir: &Path) -> std::io::Result<bool> {
+    let Some(parent) = new_dir.parent() else {
+        return Ok(false);
+    };
+    let old = parent.join(OLD_IDENTIFIER);
+    if old == new_dir || !old.is_dir() {
+        return Ok(false);
+    }
+    if new_dir.join(CONFIG_FILE).exists() || new_dir.join(SESSION_FILE).exists() {
+        return Ok(false);
+    }
+    copy_missing(&old, new_dir)?;
+    Ok(true)
+}
+
+fn copy_missing(from: &Path, to: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(to)?;
+    for entry in fs::read_dir(from)? {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        let kind = entry.file_type()?;
+        if kind.is_dir() {
+            copy_missing(&entry.path(), &target)?;
+        } else if kind.is_file() && !target.exists() {
+            fs::copy(entry.path(), &target)?;
+        }
+    }
+    Ok(())
 }
 
 // Commands ----------------------------------------------------------------
@@ -356,7 +402,7 @@ mod tests {
 
     #[test]
     fn a_file_with_a_utf8_bom_still_loads() {
-        let dir = std::env::temp_dir().join(format!("terminal-grid-bom-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("augry-bom-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&dir).expect("temp dir");
         let path = dir.join(CONFIG_FILE);
         fs::write(&path, "﻿{\"version\":1,\"fontSize\":21}").expect("write");
@@ -421,5 +467,34 @@ mod tests {
         };
         config.apply(patch);
         assert_eq!(config.shell.as_deref(), Some("zsh"));
+    }
+
+    #[test]
+    fn copies_the_old_folder_once_and_keeps_new_files() {
+        let parent = std::env::temp_dir().join(format!("augry-rename-{}", uuid::Uuid::new_v4()));
+        let old = parent.join(OLD_IDENTIFIER);
+        let new = parent.join("dev.augry.app");
+        fs::create_dir_all(old.join("processes")).unwrap();
+        fs::write(old.join(CONFIG_FILE), "{\"fontSize\":18}").unwrap();
+        fs::write(old.join(SESSION_FILE), "{}").unwrap();
+        fs::write(old.join("processes").join("bug-fix.json"), "{}").unwrap();
+
+        assert!(adopt_old_folder(&new).unwrap());
+        assert_eq!(fs::read_to_string(new.join(CONFIG_FILE)).unwrap(), "{\"fontSize\":18}");
+        assert!(new.join("processes").join("bug-fix.json").exists());
+        assert!(old.join(CONFIG_FILE).exists(), "the old folder is left alone");
+
+        // Once the new folder has a config it is never copied over again.
+        fs::write(new.join(CONFIG_FILE), "{\"fontSize\":20}").unwrap();
+        fs::write(old.join(CONFIG_FILE), "{\"fontSize\":30}").unwrap();
+        assert!(!adopt_old_folder(&new).unwrap());
+        assert_eq!(fs::read_to_string(new.join(CONFIG_FILE)).unwrap(), "{\"fontSize\":20}");
+        let _ = fs::remove_dir_all(parent);
+    }
+
+    #[test]
+    fn does_nothing_without_an_old_folder() {
+        let parent = std::env::temp_dir().join(format!("augry-rename-{}", uuid::Uuid::new_v4()));
+        assert!(!adopt_old_folder(&parent.join("dev.augry.app")).unwrap());
     }
 }

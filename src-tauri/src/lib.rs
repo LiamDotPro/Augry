@@ -1,4 +1,4 @@
-//! Terminal Grid core. Module layout follows docs/technical-design.md section 2.
+//! Augry core. Module layout follows docs/technical-design.md section 2.
 
 pub mod agent;
 pub mod cloud;
@@ -76,7 +76,7 @@ pub fn run() {
             // launch so an app update also updates them (design section 4.5).
             if let Ok(resource_dir) = handle.path().resource_dir() {
                 if let Err(error) = pty::shell::install_scripts(&resource_dir, &config_dir) {
-                    eprintln!("terminal-grid: could not install shell integration: {error}");
+                    eprintln!("augry: could not install shell integration: {error}");
                 }
             }
 
@@ -101,7 +101,7 @@ pub fn run() {
 
             // A missing or unwritable notes folder must not stop the app.
             if let Err(error) = app_state.notes.set_root(app_state.notes.root()) {
-                eprintln!("terminal-grid: notes folder unavailable: {error}");
+                eprintln!("augry: notes folder unavailable: {error}");
             }
 
             app.manage(app_state);
@@ -109,7 +109,7 @@ pub fn run() {
             let state = handle.state::<AppState>();
             state.agent.start(handle.clone());
             if let Err(error) = state.notes.watch(handle.clone()) {
-                eprintln!("terminal-grid: notes watcher unavailable: {error}");
+                eprintln!("augry: notes watcher unavailable: {error}");
             }
             start_git_sweep(handle.clone());
             watch_deep_links(&handle);
@@ -187,7 +187,7 @@ pub fn run() {
             processes::process_open_file,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Terminal Grid");
+        .expect("error while running Augry");
 }
 
 /// augry://join/<code> links: the one the app was started with, and any that
@@ -198,7 +198,7 @@ fn watch_deep_links(app: &AppHandle) {
     // Dev builds and Linux aren't registered by an installer.
     #[cfg(any(windows, target_os = "linux"))]
     if let Err(error) = app.deep_link().register_all() {
-        eprintln!("terminal-grid: could not register augry:// links: {error}");
+        eprintln!("augry: could not register augry:// links: {error}");
     }
     if let Ok(Some(urls)) = app.deep_link().get_current() {
         cloud::deliver_deep_links(app, urls.iter().map(|u| u.to_string()).collect());

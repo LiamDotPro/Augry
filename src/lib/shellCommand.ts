@@ -1,4 +1,4 @@
-/** Command lines Terminal Grid types into a shell on the user's behalf. */
+/** Command lines Augry types into a shell on the user's behalf. */
 import type { ShellKind } from "../ipc/types";
 
 /**

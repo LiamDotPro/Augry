@@ -1,6 +1,6 @@
 //! Agent task reports. See docs/technical-design.md section 5.5.
 //!
-//! Every shell is started with `TERMINAL_GRID_TASK_FILE` pointing at a file of
+//! Every shell is started with `AUGRY_TASK_FILE` pointing at a file of
 //! its own. An agent (or anything else in the pane) writes one short line
 //! there describing what it is working on; the agent watcher stats the files
 //! on its tick and emits `terminal://task` when one changes. A file is the
@@ -20,7 +20,7 @@ use tauri::{AppHandle, Emitter};
 use crate::pty::TerminalId;
 
 pub const EVENT_TASK: &str = "terminal://task";
-pub const ENV_TASK_FILE: &str = "TERMINAL_GRID_TASK_FILE";
+pub const ENV_TASK_FILE: &str = "AUGRY_TASK_FILE";
 
 /// Anything past this is not a one line status and is not read at all.
 const MAX_READ_BYTES: u64 = 4096;

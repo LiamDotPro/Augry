@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/terminal-grid.iml" filepath="$PROJECT_DIR$/.idea/terminal-grid.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/augry.iml" filepath="$PROJECT_DIR$/.idea/augry.iml" />
     </modules>
   </component>
 </project>

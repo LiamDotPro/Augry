@@ -3,7 +3,7 @@
   Package the release build as an MSIX for the Microsoft Store.
 
 .DESCRIPTION
-  Stages terminal-grid.exe, the shell integration resources and the Store
+  Stages augry.exe, the shell integration resources and the Store
   icons into src-tauri/target/msix/layout, fills src-tauri/msix/AppxManifest.xml
   from src-tauri/msix/identity.json and tauri.conf.json, and runs makeappx from
   the Windows SDK. The unsigned .msix is what gets uploaded to Partner Center;
@@ -16,7 +16,7 @@
 .EXAMPLE
   .\scripts\pack-msix.ps1 -Build
   .\scripts\pack-msix.ps1 -SelfSign
-  .\scripts\pack-msix.ps1 -Version 1.0.0.0 -IdentityName 12345LiamRead.TerminalGrid -Publisher "CN=0123ABCD-..."
+  .\scripts\pack-msix.ps1 -Version 1.0.0.0 -IdentityName 12345LiamRead.Augry -Publisher "CN=0123ABCD-..."
 #>
 [CmdletBinding()]
 param(
@@ -81,7 +81,7 @@ if ($Build) {
   } finally { Pop-Location }
 }
 
-$exe = Join-Path $tauriDir 'target\release\terminal-grid.exe'
+$exe = Join-Path $tauriDir 'target\release\augry.exe'
 if (-not (Test-Path $exe)) {
   throw "Release exe not found at $exe. Run with -Build or run 'npm run tauri build' first."
 }
@@ -115,7 +115,7 @@ if ($LASTEXITCODE -ne 0) { throw "makeappx failed ($LASTEXITCODE)" }
 
 if ($SelfSign) {
   $signtool = Find-SdkTool 'signtool.exe'
-  $friendly = 'Terminal Grid MSIX dev'
+  $friendly = 'Augry MSIX dev'
   $cert = Get-ChildItem Cert:\CurrentUser\My |
     Where-Object { $_.Subject -eq $Publisher -and $_.FriendlyName -eq $friendly } |
     Select-Object -First 1
@@ -126,7 +126,7 @@ if ($SelfSign) {
   }
   & $signtool sign /fd SHA256 /sha1 $cert.Thumbprint $package
   if ($LASTEXITCODE -ne 0) { throw "signtool failed ($LASTEXITCODE)" }
-  $cer = Join-Path $OutDir 'terminal-grid-dev.cer'
+  $cer = Join-Path $OutDir 'augry-dev.cer'
   Export-Certificate -Cert $cert -FilePath $cer | Out-Null
   Write-Host ''
   Write-Host 'Signed with a self-signed dev certificate. To install locally, trust it once from an elevated shell:'

@@ -46,7 +46,7 @@
   </Resources>
 
   <Applications>
-    <Application Id="TerminalGrid" Executable="terminal-grid.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="Augry" Executable="augry.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="__DISPLAY_NAME__"
         Description="__DESCRIPTION__"

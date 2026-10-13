@@ -1,4 +1,4 @@
-# Terminal Grid shell integration for bash and zsh. Sourced at startup.
+# Augry shell integration for bash and zsh. Sourced at startup.
 __tg_osc() { printf '\033]%s\007' "$1"; }
 __tg_precmd() {
   local exit=$?

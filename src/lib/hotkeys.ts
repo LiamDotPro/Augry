@@ -1,6 +1,6 @@
 /**
  * Keyboard shortcuts. The bindings are the ones the design's hotkey popover
- * advertises (Terminal Grid.dc.html, screen 1d), plus the aliases from
+ * advertises (the original design canvas, screen 1d), plus the aliases from
  * docs/technical-design.md section 6 that do not collide with them.
  *
  * There are two layouts. Windows and Linux chord everything on a modifier

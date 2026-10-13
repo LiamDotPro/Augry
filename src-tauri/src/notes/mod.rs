@@ -74,12 +74,16 @@ impl NotesService {
         }
     }
 
-    /// `%USERPROFILE%\Documents\TerminalGrid\Notes` unless configured otherwise.
+    /// `Documents/Augry/Notes` unless configured otherwise. Someone who used
+    /// the app as Terminal Grid keeps `Documents/TerminalGrid/Notes`, so their
+    /// notes stay where they are.
     pub fn default_root() -> PathBuf {
-        dirs::document_dir()
-            .unwrap_or_else(crate::pty::home_dir)
-            .join("TerminalGrid")
-            .join("Notes")
+        let documents = dirs::document_dir().unwrap_or_else(crate::pty::home_dir);
+        let old = documents.join("TerminalGrid").join("Notes");
+        if old.is_dir() {
+            return old;
+        }
+        documents.join("Augry").join("Notes")
     }
 
     pub fn root(&self) -> PathBuf {
@@ -519,7 +523,7 @@ mod tests {
     impl TempRoot {
         fn new(name: &str) -> Self {
             let path =
-                std::env::temp_dir().join(format!("terminal-grid-{name}-{}", uuid::Uuid::new_v4()));
+                std::env::temp_dir().join(format!("augry-{name}-{}", uuid::Uuid::new_v4()));
             fs::create_dir_all(&path).expect("temp root");
             Self(path)
         }

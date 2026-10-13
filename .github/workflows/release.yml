@@ -1,4 +1,4 @@
-# Builds Terminal Grid for Windows, macOS and Linux and publishes a GitHub
+# Builds Augry for Windows, macOS and Linux and publishes a GitHub
 # Release with the installers attached.
 #
 # Trigger by pushing an annotated tag that matches the version in package.json,
@@ -68,7 +68,7 @@ jobs:
             cat >> notes.md <<'EOF'
 
           The macOS build is not notarized. If macOS says the app is damaged,
-          run `xattr -cr "/Applications/Terminal Grid.app"` once after installing.
+          run `xattr -cr "/Applications/Augry.app"` once after installing.
           EOF
           fi
           cat notes.md
@@ -83,7 +83,7 @@ jobs:
           if [ -z "$id" ]; then
             id=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
               -f tag_name="$GITHUB_REF_NAME" \
-              -f name="Terminal Grid ${GITHUB_REF_NAME}" \
+              -f name="Augry ${GITHUB_REF_NAME}" \
               -F body=@notes.md \
               -F draft=true \
               --jq .id)
@@ -218,7 +218,7 @@ jobs:
       - name: Verify the macOS signature and notarization
         if: matrix.name == 'macos' && env.MAC_SIGNED == 'true'
         run: |
-          app="src-tauri/target/universal-apple-darwin/release/bundle/macos/Terminal Grid.app"
+          app="src-tauri/target/universal-apple-darwin/release/bundle/macos/Augry.app"
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign --display --verbose=2 "$app" 2>&1 | grep -E '^(Authority|TeamIdentifier|Runtime)'
           xcrun stapler validate "$app"

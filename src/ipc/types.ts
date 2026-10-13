@@ -247,7 +247,7 @@ export interface StatsEvent {
 }
 
 // What the pane's agent says it is working on (design section 5.5). Every shell
-// gets TERMINAL_GRID_TASK_FILE; whatever is written there arrives here as one
+// gets AUGRY_TASK_FILE; whatever is written there arrives here as one
 // line. `task` is null when the file was emptied.
 export interface TaskEvent {
   id: TerminalId;

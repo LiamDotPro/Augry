@@ -1,6 +1,6 @@
 # Store publishing
 
-How Terminal Grid gets into the Microsoft Store, and why the Mac App Store is
+How Augry gets into the Microsoft Store, and why the Mac App Store is
 not a target. Checked against the Microsoft and Tauri docs on 24 September
 2026; links at the end.
 
@@ -39,9 +39,9 @@ which declares the same capability."
    individual developer account is a one-time fee (USD 19 at the time of
    writing; company accounts are USD 99 and need business verification).
 2. Apps and games > New product > **MSIX or PWA app**. Reserve the name
-   "Terminal Grid".
+   "Augry".
 3. Open Product management > **Product identity** and copy
-   `Package/Identity/Name` (looks like `12345LiamRead.TerminalGrid`) and
+   `Package/Identity/Name` (looks like `12345LiamRead.Augry`) and
    `Package/Identity/Publisher` (looks like `CN=<GUID>`) into
    `src-tauri/msix/identity.json`. Those two values must match the manifest
    exactly or the upload is rejected.
@@ -56,7 +56,7 @@ npm run tauri build
 .\scripts\pack-msix.ps1
 ```
 
-Upload `src-tauri\target\msix\Terminal Grid_<version>_x64.msix` on the
+Upload `src-tauri\target\msix\Augry_<version>_x64.msix` on the
 submission's Packages page. The release workflow builds the same file on every
 tag and keeps it as a workflow artifact named `msix-unsigned`, so it can be
 downloaded from the Actions run instead of built locally.
@@ -82,7 +82,7 @@ layout without signing:
 Add-AppxPackage -Register src-tauri\target\msix\layout\AppxManifest.xml
 ```
 
-Remove it afterwards with `Get-AppxPackage *TerminalGrid* | Remove-AppxPackage`.
+Remove it afterwards with `Get-AppxPackage *Augry* | Remove-AppxPackage`.
 The Store build is uploaded unsigned; never upload the self-signed one.
 
 Things to check in the installed package: a pane opens a `pwsh` shell, git
@@ -131,7 +131,7 @@ Not viable for this app as it stands, for two reasons.
    open panel, cannot exec another sandboxed binary, and cannot see the
    user's home, `.gitconfig`, SSH keys or Homebrew. That is why iTerm2, Warp,
    Alacritty, kitty and Ghostty are all distributed outside the App Store.
-   Terminal Grid's whole job is running shells and git in arbitrary folders,
+   Augry's whole job is running shells and git in arbitrary folders,
    so a sandboxed build would be a different, mostly broken product.
 
 If macOS becomes a target, the route is: port the shell layer, then ship a

@@ -505,12 +505,12 @@ mod tests {
     #[test]
     fn repo_name_is_the_last_path_segment() {
         assert_eq!(
-            last_segment("C:/dev/terminal-grid").as_deref(),
-            Some("terminal-grid")
+            last_segment("C:/dev/augry").as_deref(),
+            Some("augry")
         );
         assert_eq!(
-            last_segment("C:/dev/terminal-grid/").as_deref(),
-            Some("terminal-grid")
+            last_segment("C:/dev/augry/").as_deref(),
+            Some("augry")
         );
     }
 

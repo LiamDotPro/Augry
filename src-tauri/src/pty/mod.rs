@@ -215,15 +215,15 @@ impl PtyManager {
         command.cwd(&cwd);
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
-        command.env("TERMINAL_GRID", "1");
-        command.env("TERMINAL_GRID_ID", &id);
+        command.env("AUGRY", "1");
+        command.env("AUGRY_ID", &id);
 
         // A task file the pane's agent can report into (agent::task). A pane
         // without one still works, it just never shows a task.
         let task_path = task::task_file(&self.tasks_dir(), &id);
         match task::reset_task_file(&task_path) {
             Ok(()) => command.env(task::ENV_TASK_FILE, path_string(&task_path)),
-            Err(error) => eprintln!("terminal-grid: no task file for {id}: {error}"),
+            Err(error) => eprintln!("augry: no task file for {id}: {error}"),
         }
 
         let child = pair

@@ -1,8 +1,8 @@
 /*
- * Design tokens for Augry (formerly Terminal Grid).
+ * Design tokens for Augry.
  *
  * Every value here is lifted verbatim from the Claude Design canvas
- * ("Terminal Grid.dc.html", "Chrome.dc.html", "TerminalPane.dc.html").
+ * (the original canvas, "Chrome.dc.html", "TerminalPane.dc.html").
  * Components reference these variables instead of hard coding colours so the
  * design stays adjustable from one place.
  */
