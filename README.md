@@ -29,7 +29,7 @@ show the task the agent is working on. Notes sit next to the terminals.
 - **Keyboard first**: everything has a hotkey; hold the modifier to see them.
 - **Themes**: System, Light, Dark, Black and, on macOS, Glass, a compact
   layout, and your own focus ring colour. See
-  [Appearance](docs/wiki/Appearance.md).
+  [Appearance](docs/wiki/Appearance.md)
 
 ![The Notes tab with a release checklist open next to its preview](docs/screenshots/notes.png)
 
