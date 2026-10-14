@@ -1,0 +1,2246 @@
+openapi: 3.0.3
+info:
+  title: Terminal Grid API
+  version: 0.1.0
+  description: |
+    HTTP API for the Terminal Grid backend. This file is the contract: the Go
+    server types in apps/api are generated from it, and the fixtures in
+    libs/api-spec/fixtures are validated against it.
+
+    Business routes live under /v1 and are never changed incompatibly. New
+    versions go beside them.
+
+    Every error response uses the Error schema.
+
+    Unknown paths return 404 with code not_found. A wrong method on a known
+    path also returns 404 with code not_found, not 405. This is accepted so
+    that every response body is JSON.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+paths:
+  /healthz:
+    get:
+      operationId: getHealthz
+      summary: Liveness probe
+      description: Always answers 200 while the process is running. It never touches the database.
+      responses:
+        "200":
+          description: The process is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /readyz:
+    get:
+      operationId: getReadyz
+      summary: Readiness probe
+      description: Answers 200 when the database answers a ping within 2 seconds, otherwise 503.
+      responses:
+        "200":
+          description: Dependencies are reachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: A dependency is unavailable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /v1/features:
+    get:
+      operationId: getFeatures
+      summary: Optional features of this server
+      description: |
+        The desktop app asks once at startup and hides every feature that is not
+        listed. A session token is optional. Anonymous callers get accounts and
+        templates. Signed in callers get accounts, teams, sync, processes,
+        connections and templates. connections is left out when the server has
+        no key for connection secrets. A bad token is 401, as on every route.
+      responses:
+        "200":
+          description: The API version and the names of the optional features this server has.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Features"
+  /v1/auth/github/device:
+    post:
+      operationId: postAuthGithubDevice
+      summary: Start a GitHub sign in
+      description: |
+        Starts the GitHub device flow for one device. Show userCode to the user
+        and send them to verificationUri. Then call POST /v1/auth/github/token
+        with the handle every interval seconds. The handle is ours: GitHub's
+        device code never leaves the server.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceStartRequest"
+      responses:
+        "200":
+          description: The code to show and the handle to poll with.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceStart"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "502":
+          $ref: "#/components/responses/ErrBadGateway"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/auth/github/token:
+    post:
+      operationId: postAuthGithubToken
+      summary: Finish a GitHub sign in
+      description: |
+        Makes at most one request to GitHub per call, and none when called
+        before the current interval has passed. 202 means keep polling. 200
+        returns the session token, which is shown once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceTokenRequest"
+      responses:
+        "200":
+          description: Signed in. The handle is used up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionCreated"
+        "202":
+          description: Not approved yet, or called too early. Wait interval seconds.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevicePending"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "403":
+          $ref: "#/components/responses/ErrForbidden"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "410":
+          $ref: "#/components/responses/ErrGone"
+        "422":
+          $ref: "#/components/responses/ErrUnprocessable"
+        "502":
+          $ref: "#/components/responses/ErrBadGateway"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/auth/logout:
+    post:
+      operationId: postAuthLogout
+      summary: Sign out this device
+      description: Revokes the session that made the request.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: The session is revoked.
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/me:
+    get:
+      operationId: getMe
+      summary: The signed in user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The user the session belongs to.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/sessions:
+    get:
+      operationId: listSessions
+      summary: The caller's active sessions
+      description: One session per signed in device. The one making the request has current true.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Active sessions, most recently used first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionList"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/sessions/{sessionId}:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: deleteSession
+      summary: Sign out a device
+      description: Revokes one of the caller's sessions. Another user's session id answers 404.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: The session is revoked.
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams:
+    get:
+      operationId: listTeams
+      summary: The teams the caller belongs to
+      description: Sorted by name. The role in each Team is the caller's own.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's teams. The list is empty when they have none.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamList"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    post:
+      operationId: createTeam
+      summary: Create a team
+      description: The caller becomes the team's owner. The new team is on the free plan.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTeamRequest"
+      responses:
+        "201":
+          description: The new team, with role owner.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getTeam
+      summary: One team with its members
+      description: A caller who is not a member gets 404, the same as for a team that does not exist.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The team, the caller's role and every member.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamDetail"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    patch:
+      operationId: updateTeam
+      summary: Rename a team
+      description: Needs the admin or owner role. The slug does not change.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTeamRequest"
+      responses:
+        "200":
+          description: The renamed team.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "403":
+          $ref: "#/components/responses/ErrForbidden"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    delete:
+      operationId: deleteTeam
+      summary: Delete a team
+      description: Needs the owner role. Removes the team, its members and its invites.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: The team is deleted.
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "403":
+          $ref: "#/components/responses/ErrForbidden"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/members/{userId}:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      operationId: updateMember
+      summary: Change a member's role
+      description: |
+        Needs the admin or owner role. Only an owner may make someone an owner
+        or change an owner's role. A team always keeps at least one owner, so
+        demoting the last owner answers 409.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberRequest"
+      responses:
+        "200":
+          description: The member with the new role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "403":
+          $ref: "#/components/responses/ErrForbidden"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          $ref: "#/components/responses/ErrConflict"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    delete:
+      operationId: removeMember
+      summary: Remove a member, or leave the team
+      description: |
+        Anyone may remove themselves. Removing someone else needs the admin or
+        owner role, and removing an owner needs the owner role. A team always
+        keeps at least one owner, so removing the last owner answers 409.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: The member is removed.
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "403":
+          $ref: "#/components/responses/ErrForbidden"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          $ref: "#/components/responses/ErrConflict"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/invites:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: createInvite
+      summary: Create an invite link and code
+      description: |
+        Needs the admin or owner role. The invite can be used once, by one
+        signed in person, before it expires. The role is admin or member,
+        never owner. The code in the answer is the only time it is shown.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInviteRequest"
+      responses:
+        "201":
+          description: The new invite.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "403":
+          $ref: "#/components/responses/ErrForbidden"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/invites/{code}/accept:
+    parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The invite code, with or without the hyphen and in any case.
+    post:
+      operationId: acceptInvite
+      summary: Join a team with an invite code
+      description: |
+        The signed in caller joins the team with the role the invite carries.
+        A code that does not exist, or is not shaped like a code, answers 404.
+        An expired or already used invite answers 410. A caller who is already
+        a member answers 409 and the invite stays usable for someone else.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The team, with the caller's new role.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          $ref: "#/components/responses/ErrConflict"
+        "410":
+          $ref: "#/components/responses/ErrGone"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/me/space:
+    get:
+      operationId: getMySpace
+      summary: The caller's personal space
+      description: |
+        The private space of the signed in user, for settings. It is created on
+        the first call, and every later call returns the same space.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The caller's personal space.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Space"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/space:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getTeamSpace
+      summary: A team's shared space
+      description: |
+        Any member of the team may call this. The space is created on the first
+        call, and every later call returns the same space. A caller who is not
+        a member gets 404.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The team's space.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Space"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/spaces/{spaceId}/documents:
+    parameters:
+      - name: spaceId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: listDocuments
+      summary: Read several documents at once
+      description: |
+        Returns the documents with the given ids, tombstones included, ordered
+        by id. Ids that do not exist in this space are left out. At most 100
+        ids. A space that does not exist, or that the caller may not use,
+        answers 404.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Document ids separated by commas.
+      responses:
+        "200":
+          description: The documents that were found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentList"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/spaces/{spaceId}/documents/{docId}:
+    parameters:
+      - name: spaceId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: docId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getDocument
+      summary: Read one document
+      description: A deleted document is returned too, with deleted true.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The document.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    put:
+      operationId: putDocument
+      summary: Create or update a document
+      description: |
+        baseRevision 0 creates the document. Sending the same create again
+        (same id, path and content) is a retry and answers 200 with the stored
+        document. A higher baseRevision updates the document, and a different
+        path renames it. It only works when the stored revision equals
+        baseRevision, otherwise the answer is 409 with the current document.
+        A path used by another live document is 409 with that document.
+        Updating a deleted document revives it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutDocumentRequest"
+      responses:
+        "200":
+          description: The stored document, with its new revision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          description: The stored revision is not baseRevision, or the path is used by another document. current is the document that is stored now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentConflict"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    delete:
+      operationId: deleteDocument
+      summary: Delete a document
+      description: |
+        Writes a tombstone: the content is dropped and the path is free to use
+        again. It only works when the stored revision equals baseRevision,
+        otherwise the answer is 409 with the current document. Deleting a
+        document that is already deleted is also 409.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: baseRevision
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: The tombstone, with its new revision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          description: The stored revision is not baseRevision, or the document is already deleted. current is the document that is stored now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentConflict"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/spaces/{spaceId}/changes:
+    parameters:
+      - name: spaceId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: listChanges
+      summary: The change feed of a space
+      description: |
+        Changes in the order they were committed, one entry per write. Call it
+        with the cursor of the previous page until hasMore is false, and keep
+        the last cursor. An empty cursor starts from the beginning. A cursor
+        that is malformed or belongs to another space answers 400. A cursor
+        from the future (the database was restored) answers 410, and the
+        client must start over.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+          description: Entries per page. Defaults to 500.
+      responses:
+        "200":
+          description: One page of changes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChangePage"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "410":
+          $ref: "#/components/responses/ErrGone"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/processes:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: listProcesses
+      summary: The processes of a team that changed after a point
+      description: |
+        Returns the processes whose seq is greater than since, tombstones
+        included, ordered by seq, with their current definition. At most 200 per
+        call. When hasMore is true, call again with the seq of the last process
+        as since. When hasMore is false, keep lastSeq and send it as since next
+        time. Any member of the team may call this. A caller who is not a member
+        gets 404.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            default: 0
+          description: Only processes with a greater seq are returned. 0 returns everything.
+      responses:
+        "200":
+          description: One page of processes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessPage"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    post:
+      operationId: createProcess
+      summary: Create a process
+      description: |
+        Stores the definition as version 1. The definition must pass the checks
+        in ProcessDefinition: a JSON object of at most 256 KiB with an integer
+        schemaVersion the server knows and a name of 1 to 120 characters, and no
+        well known access token. A definition that fails is 422, and the
+        message never contains the text that matched. A team has at most 500
+        processes that are not deleted. Any member of the team may call this.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProcessRequest"
+      responses:
+        "201":
+          description: The new process, at version 1.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "422":
+          $ref: "#/components/responses/ErrUnprocessable"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/processes/{processId}:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: processId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getProcess
+      summary: Read one process
+      description: A deleted process is returned too, with deleted true.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The process with its current definition.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    put:
+      operationId: saveProcess
+      summary: Save a new version of a process
+      description: |
+        Stores the definition as the next version. It only works when the
+        process is still at exactly baseVersion and is not deleted, otherwise
+        the answer is 409 with the current process. The definition is checked
+        like in createProcess. The process name becomes the name in the
+        definition.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveProcessRequest"
+      responses:
+        "200":
+          description: The process at its new version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          description: The process is not at baseVersion, or it is deleted. current is the process as it is stored now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessConflict"
+        "422":
+          $ref: "#/components/responses/ErrUnprocessable"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    delete:
+      operationId: deleteProcess
+      summary: Delete a process
+      description: |
+        Marks the process as deleted. Its versions stay readable. It only works
+        when the process is still at exactly baseVersion, otherwise the answer
+        is 409 with the current process. Deleting a process that is already
+        deleted is also 409.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: baseVersion
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "204":
+          description: The process is deleted.
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          description: The process is not at baseVersion, or it is already deleted. current is the process as it is stored now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessConflict"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/processes/{processId}/versions:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: processId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: listProcessVersions
+      summary: The version history of a process
+      description: Newest first, without the definitions. The versions of a deleted process are listed too.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Every version of the process.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessVersionList"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/processes/{processId}/versions/{version}:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: processId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getProcessVersion
+      summary: Read one old version of a process
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The version with its definition.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessVersion"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/processes/{processId}/restore:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: processId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: restoreProcess
+      summary: Make an old version current again
+      description: |
+        Copies the definition of an old version into a new version, so the
+        history only grows. It only works when the process is still at exactly
+        baseVersion and is not deleted, otherwise the answer is 409 with the
+        current process. The copied definition is not checked again. An unknown
+        version is 404.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestoreProcessRequest"
+      responses:
+        "200":
+          description: The process at its new version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          description: The process is not at baseVersion, or it is deleted. current is the process as it is stored now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessConflict"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/connections:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: listTeamConnections
+      summary: The connections of a team that changed after a point
+      description: |
+        Returns the team's shared connections whose seq is greater than since,
+        tombstones included, ordered by seq. At most 200 per call. When hasMore
+        is true, call again with the seq of the last connection as since. When
+        hasMore is false, keep lastSeq and send it as since next time. The
+        secret is never part of the answer, only hasSecret. Any member of the
+        team may call this. A caller who is not a member gets 404. Answers 503
+        when the server has no key for connection secrets.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+            default: 0
+          description: Only connections with a greater seq are returned. 0 returns everything.
+      responses:
+        "200":
+          description: One page of connections.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamConnectionPage"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    post:
+      operationId: createTeamConnection
+      summary: Create a shared connection
+      description: |
+        Only an admin or owner may call this. The name is 1 to 64 characters
+        (lowercase letters, digits and hyphens), unique among the team's
+        connections that are not deleted, and never changes. The settings are
+        plain text for every member, so a value that looks like an access token
+        is 422 and the token belongs in secret. The secret is encrypted before
+        it is stored and is never returned. A team has at most 100 connections
+        that are not deleted. Answers 503 when the server has no key for
+        connection secrets.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTeamConnectionRequest"
+      responses:
+        "201":
+          description: The new connection, at version 1.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamConnection"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "403":
+          $ref: "#/components/responses/ErrForbidden"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          $ref: "#/components/responses/ErrConflict"
+        "422":
+          $ref: "#/components/responses/ErrUnprocessable"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/connections/{connectionId}:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: connectionId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getTeamConnection
+      summary: Read one connection
+      description: |
+        A deleted connection is returned too, with deleted true. The secret is
+        never part of the answer, only hasSecret.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The connection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamConnection"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    put:
+      operationId: saveTeamConnection
+      summary: Change a connection
+      description: |
+        Replaces the settings and, when sent, the editors and the secret. It
+        only works when the connection is still at exactly baseVersion and is
+        not deleted, otherwise the answer is 409 with the current connection.
+        An admin or owner may always call this. A member may only when the
+        stored editors is members, and may not change editors. A secret that
+        is missing keeps the stored secret, an empty secret removes it, and any
+        other value replaces it. Every accepted save raises version and seq.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveTeamConnectionRequest"
+      responses:
+        "200":
+          description: The connection at its new version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamConnection"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "403":
+          $ref: "#/components/responses/ErrForbidden"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          description: The connection is not at baseVersion, or it is deleted. current is the connection as it is stored now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamConnectionConflict"
+        "422":
+          $ref: "#/components/responses/ErrUnprocessable"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+    delete:
+      operationId: deleteTeamConnection
+      summary: Delete a connection
+      description: |
+        Marks the connection as deleted and removes its secret. Who may call
+        this is the same as for saveTeamConnection. It only works when the
+        connection is still at exactly baseVersion, otherwise the answer is 409
+        with the current connection. Deleting a connection that is already
+        deleted is also 409. The name can be used again afterwards.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: baseVersion
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "204":
+          description: The connection is deleted.
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "403":
+          $ref: "#/components/responses/ErrForbidden"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "409":
+          description: The connection is not at baseVersion, or it is already deleted. current is the connection as it is stored now.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamConnectionConflict"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/teams/{teamId}/connections/{connectionId}/secret:
+    parameters:
+      - name: teamId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: connectionId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getTeamConnectionSecret
+      summary: Read the secret of a connection
+      description: |
+        Returns the decrypted secret to any member of the team, so that a
+        process can run on that member's machine. The answer must not be
+        cached. 404 when the connection does not exist, is deleted, or has no
+        secret. Every successful read is logged with the user and connection
+        ids, never the secret.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The secret and the version of the connection it belongs to.
+          headers:
+            Cache-Control:
+              required: true
+              description: Always `no-store`.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamConnectionSecret"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/templates:
+    get:
+      operationId: listTemplates
+      summary: The template catalogue
+      description: |
+        Lists the published templates, ordered by category and then name, without
+        their definitions. No session is needed. A template an operator has
+        unpublished is not listed.
+      responses:
+        "200":
+          description: The published templates. The list is empty when there are none.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateList"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/templates/{slug}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getTemplate
+      summary: One template with its current definition
+      description: |
+        No session is needed. A slug that does not exist and a template that is
+        unpublished both answer 404.
+      responses:
+        "200":
+          description: The template at its current version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+  /v1/templates/{slug}/install:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: installTemplate
+      summary: Install a template into a team
+      description: |
+        Copies the current version of the template into a new process of the
+        team, at version 1, and records the template and its version on the
+        process. The copied definition is not checked again. Needs a session and
+        membership of the team in the body. A template that does not exist or is
+        unpublished, and a team the caller is not in, both answer 404. A team has
+        at most 500 processes that are not deleted.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstallTemplateRequest"
+      responses:
+        "201":
+          description: The new process.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Process"
+        "400":
+          $ref: "#/components/responses/ErrBadRequest"
+        "401":
+          $ref: "#/components/responses/ErrUnauthorized"
+        "404":
+          $ref: "#/components/responses/ErrNotFound"
+        "503":
+          $ref: "#/components/responses/ErrUnavailable"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "Session token from POST /v1/auth/github/token: tg_ followed by 43 base64url characters."
+  responses:
+    ErrBadRequest:
+      description: The request is malformed or a field is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ErrUnauthorized:
+      description: The session token is missing, malformed, revoked or expired.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ErrForbidden:
+      description: The caller is not allowed to do this.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ErrNotFound:
+      description: The thing does not exist, or the caller may not know that it does.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ErrConflict:
+      description: The request conflicts with the current state.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ErrGone:
+      description: The thing existed but has expired or was used up.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ErrUnprocessable:
+      description: The request is well formed but cannot be done.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ErrBadGateway:
+      description: GitHub did not answer, or answered something we do not understand.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ErrUnavailable:
+      description: The server cannot do this right now, for example no database or no GitHub sign in is configured.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          description: "ok on 200, unavailable on 503."
+    Features:
+      type: object
+      additionalProperties: false
+      required: [apiVersion, features]
+      properties:
+        apiVersion:
+          type: integer
+          description: The version of the /v1 API. It is 1.
+        features:
+          type: array
+          description: Names of the optional features available to the caller. Later epics add names.
+          items:
+            type: string
+    User:
+      type: object
+      additionalProperties: false
+      required: [id, login, name, avatarUrl, email, createdAt]
+      properties:
+        id:
+          type: string
+        login:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: string
+        email:
+          type: string
+        createdAt:
+          type: string
+          description: Timestamp text such as 2026-10-11T09:30:00.123Z.
+    DeviceStartRequest:
+      type: object
+      additionalProperties: false
+      required: [deviceName]
+      properties:
+        deviceName:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Shown in the session list, for example the computer name.
+    DeviceStart:
+      type: object
+      additionalProperties: false
+      required: [userCode, verificationUri, handle, interval, expiresIn]
+      properties:
+        userCode:
+          type: string
+          description: The code the user types on GitHub.
+        verificationUri:
+          type: string
+        handle:
+          type: string
+          description: Send this to POST /v1/auth/github/token.
+        interval:
+          type: integer
+          description: Seconds to wait between calls to the token route.
+        expiresIn:
+          type: integer
+          description: Seconds until the code expires.
+    DeviceTokenRequest:
+      type: object
+      additionalProperties: false
+      required: [handle]
+      properties:
+        handle:
+          type: string
+    DevicePending:
+      type: object
+      additionalProperties: false
+      required: [status, interval]
+      properties:
+        status:
+          type: string
+          enum: [pending]
+        interval:
+          type: integer
+          description: Seconds to wait before the next call.
+    SessionCreated:
+      type: object
+      additionalProperties: false
+      required: [sessionToken, sessionId, user]
+      properties:
+        sessionToken:
+          type: string
+          description: Shown once. Send it as Authorization Bearer.
+        sessionId:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+    Session:
+      type: object
+      additionalProperties: false
+      required: [id, deviceName, createdAt, lastUsedAt, expiresAt, current]
+      properties:
+        id:
+          type: string
+        deviceName:
+          type: string
+        createdAt:
+          type: string
+        lastUsedAt:
+          type: string
+        expiresAt:
+          type: string
+        current:
+          type: boolean
+          description: True for the session that made this request.
+    SessionList:
+      type: object
+      additionalProperties: false
+      required: [sessions]
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Session"
+    PublicUser:
+      type: object
+      additionalProperties: false
+      required: [id, login, name, avatarUrl]
+      properties:
+        id:
+          type: string
+        login:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: string
+    Team:
+      type: object
+      additionalProperties: false
+      required: [id, name, slug, plan, role, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+          description: Made once from the name when the team is created. It never changes.
+        plan:
+          type: string
+          description: free or pro.
+        role:
+          type: string
+          enum: [owner, admin, member]
+          description: The caller's role in this team.
+        createdAt:
+          type: string
+    TeamList:
+      type: object
+      additionalProperties: false
+      required: [teams]
+      properties:
+        teams:
+          type: array
+          items:
+            $ref: "#/components/schemas/Team"
+    Member:
+      type: object
+      additionalProperties: false
+      required: [user, role, joinedAt]
+      properties:
+        user:
+          $ref: "#/components/schemas/PublicUser"
+        role:
+          type: string
+          enum: [owner, admin, member]
+        joinedAt:
+          type: string
+    TeamDetail:
+      type: object
+      additionalProperties: false
+      required: [id, name, slug, plan, role, createdAt, members]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        plan:
+          type: string
+        role:
+          type: string
+          enum: [owner, admin, member]
+          description: The caller's role in this team.
+        createdAt:
+          type: string
+        members:
+          type: array
+          description: Every member of the team, in the order they joined.
+          items:
+            $ref: "#/components/schemas/Member"
+    CreateTeamRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Spaces at both ends are removed. No control characters.
+    UpdateTeamRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Spaces at both ends are removed. No control characters.
+    UpdateMemberRequest:
+      type: object
+      additionalProperties: false
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [owner, admin, member]
+    CreateInviteRequest:
+      type: object
+      additionalProperties: false
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [admin, member]
+          description: The role the new member gets. An invite never makes an owner.
+        expiresInHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+          description: How long the invite can be accepted. Defaults to 168 (seven days).
+    Invite:
+      type: object
+      additionalProperties: false
+      required: [id, code, url, role, expiresAt]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+          description: Ten characters shown as XXXXX-XXXXX. It is shown once and only its hash is stored.
+        url:
+          type: string
+          description: The website address that carries the code, PUBLIC_WEB_URL followed by /join/ and the code.
+        role:
+          type: string
+          enum: [admin, member]
+          description: The role the person who accepts gets.
+        expiresAt:
+          type: string
+    Space:
+      type: object
+      additionalProperties: false
+      required: [id, kind, lastSeq]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [team, personal]
+        teamId:
+          type: string
+          description: The team a team space belongs to. Absent for a personal space.
+        lastSeq:
+          type: integer
+          format: int64
+          description: The number of changes the space has had. The change feed cursor never passes it.
+    Document:
+      type: object
+      additionalProperties: false
+      required: [id, spaceId, path, content, sha256, revision, deleted, updatedBy, updatedAt]
+      properties:
+        id:
+          type: string
+          description: Chosen by the client. Any UUID, stored in lower case.
+        spaceId:
+          type: string
+        path:
+          type: string
+          description: Relative to the space root, with forward slashes, for example notes/ideas.md.
+        content:
+          type: string
+          description: UTF-8 text, up to 1 MiB. Empty for a deleted document.
+        sha256:
+          type: string
+          description: Lower case hex SHA-256 of content.
+        revision:
+          type: integer
+          description: Starts at 1 and goes up by 1 with every write, deletes included.
+        deleted:
+          type: boolean
+          description: True for a tombstone. A tombstone keeps its path and has empty content.
+        updatedBy:
+          type: string
+          description: The id of the user who made the last write.
+        updatedAt:
+          type: string
+    DocumentList:
+      type: object
+      additionalProperties: false
+      required: [documents]
+      properties:
+        documents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Document"
+    PutDocumentRequest:
+      type: object
+      additionalProperties: false
+      required: [path, content, baseRevision]
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+        baseRevision:
+          type: integer
+          minimum: 0
+          description: 0 creates the document. A higher number updates it, and only works when the stored revision is exactly that number.
+    DocumentConflict:
+      type: object
+      additionalProperties: false
+      required: [error, current]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Always conflict.
+            message:
+              type: string
+        current:
+          $ref: "#/components/schemas/Document"
+    Change:
+      type: object
+      additionalProperties: false
+      required: [docId, path, revision, deleted, sha256]
+      properties:
+        docId:
+          type: string
+        path:
+          type: string
+        revision:
+          type: integer
+        deleted:
+          type: boolean
+        sha256:
+          type: string
+    ChangePage:
+      type: object
+      additionalProperties: false
+      required: [changes, cursor, hasMore]
+      properties:
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Change"
+        cursor:
+          type: string
+          description: Opaque. Send it back as the cursor query parameter to get the changes after this page.
+        hasMore:
+          type: boolean
+    ProcessDefinition:
+      type: object
+      required: [schemaVersion, name]
+      additionalProperties: true
+      description: |
+        A process definition. The server only reads schemaVersion and name; every
+        other field is kept as sent. Where it is used it is a free form object
+        (Go type json.RawMessage), so the server stores and returns the exact
+        bytes it received.
+      properties:
+        schemaVersion:
+          type: integer
+          minimum: 1
+          description: The definition format. The server accepts 1.
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+    ProcessDefinitionV1:
+      type: object
+      required: [schemaVersion, name, lanes]
+      additionalProperties: true
+      description: |
+        The format of a definition with schemaVersion 1, as the desktop app reads
+        and runs it. No route uses this schema and the server does not enforce
+        it: it checks only ProcessDefinition. It is here so the app, the
+        templates and their tests share one description.
+
+        A run opens one pane per lane, in the repository the run starts from.
+        Inside a lane the stages run in order, and inside a stage the steps run
+        in order. Apps ignore fields they do not know, so new optional fields do
+        not need a new schemaVersion; a change an older app would run wrongly
+        does. Never put secrets or paths that exist on one machine only in a
+        definition: refer to them by name, for example ${env:GITHUB_TOKEN} or
+        ${repo.root}, and let the app fill them in.
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          description: One or two sentences on what the process is for.
+        requires:
+          type: array
+          description: Tools the lanes need, checked before a run, for example claude, codex or gh.
+          items:
+            type: string
+        lanes:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ProcessLane"
+    ProcessLane:
+      type: object
+      required: [id, title, stages]
+      additionalProperties: true
+      description: A track of work that runs in its own pane.
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: Unique within the definition.
+        title:
+          type: string
+          minLength: 1
+        stages:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ProcessStage"
+    ProcessStage:
+      type: object
+      required: [id, title, steps]
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: Unique within the lane.
+        title:
+          type: string
+          minLength: 1
+        steps:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ProcessStep"
+    ProcessStep:
+      type: object
+      required: [id, kind]
+      additionalProperties: true
+      description: |
+        One thing to do in the lane's pane. An agent step starts the agent (when
+        it is not already running) and sends it the prompt. A shell step types
+        the command at the shell prompt.
+      properties:
+        id:
+          type: string
+          minLength: 1
+          description: Unique within the stage.
+        title:
+          type: string
+        kind:
+          type: string
+          enum: [agent, shell]
+        agent:
+          type: string
+          description: For agent steps, the agent CLI to use, for example claude or codex. When it is missing the app uses the user's default agent.
+        prompt:
+          type: string
+          description: For agent steps, the text sent to the agent.
+        command:
+          type: string
+          description: For shell steps, the command line to run.
+    Process:
+      type: object
+      additionalProperties: false
+      required: [id, teamId, name, version, seq, deleted, updatedBy, updatedAt, definition]
+      properties:
+        id:
+          type: string
+        teamId:
+          type: string
+        name:
+          type: string
+          description: Copied from the definition on every save.
+        version:
+          type: integer
+          description: The current version. Starts at 1 and goes up by 1 with every save and restore. Deleting a process does not change it.
+        seq:
+          type: integer
+          format: int64
+          description: The team's change counter value of the last write to this process. Use it with the since query parameter of listProcesses.
+        deleted:
+          type: boolean
+          description: True for a tombstone. The versions of a deleted process stay readable.
+        templateId:
+          type: string
+          description: Set when the process was installed from a template.
+        templateVersion:
+          type: integer
+          description: The template version that was installed. Set together with templateId.
+        updatedBy:
+          type: string
+          description: The id of the user who made the last write.
+        updatedAt:
+          type: string
+        definition:
+          type: object
+          x-go-type: json.RawMessage
+          description: The current version of the definition, exactly as it was saved. See ProcessDefinition.
+    ProcessPage:
+      type: object
+      additionalProperties: false
+      required: [processes, lastSeq, hasMore]
+      properties:
+        processes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Process"
+        lastSeq:
+          type: integer
+          format: int64
+          description: The team's change counter now. When hasMore is false, send it as since next time.
+        hasMore:
+          type: boolean
+          description: True when more than 200 processes changed after since. Send the seq of the last process as since to get the next page.
+    SaveProcessRequest:
+      type: object
+      additionalProperties: false
+      required: [definition, baseVersion]
+      properties:
+        definition:
+          type: object
+          x-go-type: json.RawMessage
+          description: The whole new definition. See ProcessDefinition.
+        baseVersion:
+          type: integer
+          minimum: 1
+          description: The version this edit started from. It only works when the process is still at exactly this version.
+    CreateProcessRequest:
+      type: object
+      additionalProperties: false
+      required: [definition]
+      properties:
+        definition:
+          type: object
+          x-go-type: json.RawMessage
+          description: The first version of the definition. See ProcessDefinition.
+    RestoreProcessRequest:
+      type: object
+      additionalProperties: false
+      required: [version, baseVersion]
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          description: The old version to copy.
+        baseVersion:
+          type: integer
+          minimum: 1
+          description: The version the caller last saw. It only works when the process is still at exactly this version.
+    ProcessConflict:
+      type: object
+      additionalProperties: false
+      required: [error, current]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Always conflict.
+            message:
+              type: string
+        current:
+          $ref: "#/components/schemas/Process"
+    ProcessVersionSummary:
+      type: object
+      additionalProperties: false
+      required: [version, name, createdBy, createdAt]
+      properties:
+        version:
+          type: integer
+        name:
+          type: string
+        createdBy:
+          type: string
+          description: The id of the user who saved this version.
+        createdAt:
+          type: string
+    ProcessVersionList:
+      type: object
+      additionalProperties: false
+      required: [versions]
+      properties:
+        versions:
+          type: array
+          description: Newest first.
+          items:
+            $ref: "#/components/schemas/ProcessVersionSummary"
+    ProcessVersion:
+      type: object
+      additionalProperties: false
+      required: [version, name, createdBy, createdAt, definition]
+      properties:
+        version:
+          type: integer
+        name:
+          type: string
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+        definition:
+          type: object
+          x-go-type: json.RawMessage
+          description: This version of the definition, exactly as it was saved. See ProcessDefinition.
+    TemplateSummary:
+      type: object
+      additionalProperties: false
+      required: [slug, name, description, category, version, installs]
+      properties:
+        slug:
+          type: string
+          description: The stable name of the template in URLs. Lower case letters, digits and hyphens.
+        name:
+          type: string
+          description: The name in the current version of the definition.
+        description:
+          type: string
+        category:
+          type: string
+        version:
+          type: integer
+          description: The current version. Starts at 1 and goes up by 1 each time an operator publishes the slug again.
+        installs:
+          type: integer
+          description: How many times the template has been installed into a team.
+    TemplateList:
+      type: object
+      additionalProperties: false
+      required: [templates]
+      properties:
+        templates:
+          type: array
+          description: The published templates, ordered by category and then name. Empty when there are none.
+          items:
+            $ref: "#/components/schemas/TemplateSummary"
+    Template:
+      type: object
+      additionalProperties: false
+      required: [slug, name, description, category, version, installs, definition]
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        version:
+          type: integer
+        installs:
+          type: integer
+        definition:
+          type: object
+          x-go-type: json.RawMessage
+          description: The current version of the definition, exactly as the operator published it. See ProcessDefinition.
+    InstallTemplateRequest:
+      type: object
+      additionalProperties: false
+      required: [teamId]
+      properties:
+        teamId:
+          type: string
+          description: The team that gets the new process. The caller must be a member of it.
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: One of bad_request (400), unauthorized (401), forbidden (403), not_found (404), conflict (409), gone (410), unprocessable (422), rate_limited (429), internal (500), bad_gateway (502), unavailable (503).
+            message:
+              type: string
+              description: A short human readable text. Never contains internal details.
+    TeamConnectionEditors:
+      type: string
+      enum: [admins, members]
+      description: Who may change or delete the connection besides admins and owners. admins means nobody else, members means every member.
+    TeamConnection:
+      type: object
+      additionalProperties: false
+      required: [id, teamId, name, kind, settings, hasSecret, editors, version, seq, deleted, createdBy, createdAt, updatedBy, updatedAt]
+      properties:
+        id:
+          type: string
+        teamId:
+          type: string
+        name:
+          type: string
+          description: 1 to 64 characters, lowercase letters, digits and hyphens. Set on create and never changes. Processes use it as ${conn:name}.
+        kind:
+          type: string
+          description: The app's catalogue id for the kind of connection, for example github or postgresql. 1 to 40 characters, lowercase letters, digits and hyphens.
+        settings:
+          type: object
+          additionalProperties:
+            type: string
+          description: Plain settings every member can read. At most 50 keys. Never put a token here.
+        hasSecret:
+          type: boolean
+          description: True when a secret is stored. The secret itself is only returned by getTeamConnectionSecret.
+        editors:
+          $ref: "#/components/schemas/TeamConnectionEditors"
+        version:
+          type: integer
+          description: Starts at 1 and goes up by 1 with every accepted save. Deleting does not change it.
+        seq:
+          type: integer
+          format: int64
+          description: The team's connection change counter value of the last write. Use it with the since query parameter of listTeamConnections.
+        deleted:
+          type: boolean
+          description: True for a tombstone. A deleted connection has no secret.
+        createdBy:
+          $ref: "#/components/schemas/PublicUser"
+        createdAt:
+          type: string
+        updatedBy:
+          $ref: "#/components/schemas/PublicUser"
+        updatedAt:
+          type: string
+    TeamConnectionPage:
+      type: object
+      additionalProperties: false
+      required: [connections, lastSeq, hasMore]
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamConnection"
+        lastSeq:
+          type: integer
+          format: int64
+          description: The team's connection change counter now. When hasMore is false, send it as since next time.
+        hasMore:
+          type: boolean
+          description: True when more than 200 connections changed after since. Send the seq of the last connection as since to get the next page.
+    CreateTeamConnectionRequest:
+      type: object
+      additionalProperties: false
+      required: [name, kind, settings]
+      properties:
+        name:
+          type: string
+        kind:
+          type: string
+        settings:
+          type: object
+          additionalProperties:
+            type: string
+        secret:
+          type: string
+          description: A token or password, 1 to 8192 bytes. Missing or empty means no secret.
+        editors:
+          $ref: "#/components/schemas/TeamConnectionEditors"
+    SaveTeamConnectionRequest:
+      type: object
+      additionalProperties: false
+      required: [settings, baseVersion]
+      properties:
+        settings:
+          type: object
+          additionalProperties:
+            type: string
+          description: All the settings. They replace the stored ones.
+        secret:
+          type: string
+          description: Missing keeps the stored secret, an empty string removes it, any other value (1 to 8192 bytes) replaces it.
+        editors:
+          $ref: "#/components/schemas/TeamConnectionEditors"
+        baseVersion:
+          type: integer
+          minimum: 1
+          description: The version this edit started from. It only works when the connection is still at exactly this version.
+    TeamConnectionConflict:
+      type: object
+      additionalProperties: false
+      required: [error, current]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Always conflict.
+            message:
+              type: string
+        current:
+          $ref: "#/components/schemas/TeamConnection"
+    TeamConnectionSecret:
+      type: object
+      additionalProperties: false
+      required: [secret, version]
+      properties:
+        secret:
+          type: string
+        version:
+          type: integer
+          description: The version of the connection this secret was read from.

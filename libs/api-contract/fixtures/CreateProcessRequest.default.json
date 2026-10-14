@@ -1,0 +1,1 @@
+{"definition":{"schemaVersion":1,"name":"Fix a GitHub issue","lanes":[{"id":"dev","title":"Developer","stages":[{"id":"build","title":"Implement","steps":[{"id":"plan","kind":"agent","prompt":"Read the issue and write a plan."}]}]}]}}
