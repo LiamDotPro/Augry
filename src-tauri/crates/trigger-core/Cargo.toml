@@ -1,0 +1,11 @@
+[package]
+name = "trigger-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "The contract between trigger sources and whatever runs them, plus a test kit"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true

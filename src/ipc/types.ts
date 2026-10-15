@@ -109,6 +109,13 @@ export type HotkeyModifier = "ctrl+alt" | "ctrl+shift";
  */
 export type ThemePreference = "system" | "light" | "dark" | "black" | "glass";
 
+/** Process triggers; local to this machine (config.json), never synced. */
+export interface TriggersConfig {
+  enabled: boolean;
+  /** Ids of the local process definitions the user armed. */
+  armed: string[];
+}
+
 export interface Config {
   version: 1;
   shell: string | null;
@@ -127,7 +134,11 @@ export interface Config {
   focusColor: string | null;
   /** `#rrggbb` for a pane whose agent finished; null follows the theme. */
   finishedColor: string | null;
+  triggers: TriggersConfig;
 }
+
+/** What `config_set` takes: any field of Config, and `triggers` may carry just some of its fields. */
+export type ConfigPatch = Partial<Omit<Config, "triggers">> & { triggers?: Partial<TriggersConfig> };
 
 /**
  * A note copied out of a pane's output, linked to that terminal session
@@ -204,6 +215,7 @@ export const EVENTS = {
   stats: "terminal://stats",
   task: "terminal://task",
   notesChanged: "notes://changed",
+  triggerFired: "trigger://fired",
 } as const;
 
 export interface OutputEvent { id: TerminalId; dataB64: string }
@@ -241,6 +253,92 @@ export interface TaskEvent {
 export interface NotesChangedEvent {
   relPath: string;
   kind: "create" | "modify" | "remove" | "rename";
+}
+
+// Triggers ----------------------------------------------------------------
+
+export type TriggerPlatform = "macos" | "windows" | "linux";
+
+export type TriggerPermission =
+  | "accessibility"
+  | "screenRecording"
+  | "location"
+  | "calendar"
+  | "reminders"
+  | "microphone"
+  | "camera"
+  | "notifications"
+  | { folder: string };
+
+export interface TriggerFieldInfo {
+  name: string;
+  doc: string;
+  required: boolean;
+}
+
+export interface TriggerKindInfo {
+  id: string;
+  title: string;
+  summary: string;
+  platforms: TriggerPlatform[];
+  permission: TriggerPermission | null;
+  when: TriggerFieldInfo[];
+  payload: TriggerFieldInfo[];
+}
+
+export type TriggerAvailability =
+  | { state: "available" }
+  | { state: "unsupported"; reason: string }
+  | { state: "needsPermission"; permission: TriggerPermission; how: string };
+
+export interface TriggerSourceInfo {
+  id: string;
+  kinds: TriggerKindInfo[];
+  availability: TriggerAvailability;
+}
+
+export interface TriggerRule {
+  id: string;
+  kind: string;
+  when: Record<string, unknown>;
+}
+
+export type TriggerCheck = { ok: true } | { ok: false; reason: string };
+
+/** "skipped" is a rule whose variable has no value on this machine. */
+export type TriggerRuleState = "active" | "rejected" | "sourceFailed" | "skipped";
+
+export interface TriggerRuleStatus {
+  id: string;
+  kind: string;
+  state: TriggerRuleState;
+  /** Present for every state except "active". */
+  reason?: string;
+}
+
+export interface TriggerProcessStatus {
+  id: string;
+  name: string;
+  armed: boolean;
+  /** Why the definition file cannot be used; such a process has no rules. */
+  problem?: string;
+  rules: TriggerRuleStatus[];
+}
+
+export interface TriggersStatus {
+  enabled: boolean;
+  processes: TriggerProcessStatus[];
+}
+
+/** `trigger://fired`. `at` is epoch ms; `payload` holds the source's fields (paths and so on). */
+export interface TriggerFiredEvent {
+  processId: string;
+  processName: string;
+  ruleId: string;
+  kind: string;
+  at: number;
+  payload: Record<string, unknown>;
+  coalesced: number;
 }
 
 // Commands (frontend to Rust) ---------------------------------------------
@@ -300,9 +398,15 @@ export interface Commands {
 
   // config and session
   config_get: { in: Record<string, never>; out: Config };
-  config_set: { in: { patch: Partial<Config> }; out: Config };
+  config_set: { in: { patch: ConfigPatch }; out: Config };
   session_get: { in: Record<string, never>; out: Session | null };
   session_set: { in: { session: Session }; out: void };
+
+  // triggers
+  triggers_catalogue: { in: Record<string, never>; out: TriggerSourceInfo[] };
+  triggers_check: { in: { rule: TriggerRule }; out: TriggerCheck };
+  triggers_status: { in: Record<string, never>; out: TriggersStatus };
+  triggers_arm: { in: { processId: string; armed: boolean }; out: void };
 
   // window
   set_window_glass: { in: { enabled: boolean }; out: void };

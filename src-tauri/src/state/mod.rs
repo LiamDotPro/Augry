@@ -39,6 +39,26 @@ pub struct Config {
     pub focus_color: Option<String>,
     /// `#rrggbb` for a pane whose agent finished; None follows the theme.
     pub finished_color: Option<String>,
+    /// Process triggers: the master switch and which definitions are armed.
+    pub triggers: TriggersConfig,
+}
+
+/// Process triggers, kept in `config.json` and never in the session or the
+/// cloud (plans/001-trigger-core/epic.md Decision 11).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct TriggersConfig {
+    pub enabled: bool,
+    /// Ids of the local process definitions the user has armed.
+    pub armed: Vec<String>,
+}
+
+/// A partial update of `TriggersConfig`; a missing field is left alone.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TriggersPatch {
+    pub enabled: Option<bool>,
+    pub armed: Option<Vec<String>>,
 }
 
 const THEMES: [&str; 5] = ["system", "light", "dark", "black", "glass"];
@@ -64,6 +84,7 @@ impl Default for Config {
             compact_layout: false,
             focus_color: None,
             finished_color: None,
+            triggers: TriggersConfig::default(),
         }
     }
 }
@@ -93,6 +114,7 @@ pub struct ConfigPatch {
     pub focus_color: Option<Option<String>>,
     #[serde(default, deserialize_with = "nullable")]
     pub finished_color: Option<Option<String>>,
+    pub triggers: Option<TriggersPatch>,
 }
 
 /// A field that is present: `null` becomes `Some(None)`.
@@ -170,6 +192,20 @@ impl Config {
                 self.finished_color = hex_color(&value).or(self.finished_color.take())
             }
             None => {}
+        }
+        if let Some(triggers) = patch.triggers {
+            if let Some(enabled) = triggers.enabled {
+                self.triggers.enabled = enabled;
+            }
+            if let Some(armed) = triggers.armed {
+                let mut seen = Vec::new();
+                for id in armed {
+                    if !id.is_empty() && !seen.contains(&id) {
+                        seen.push(id);
+                    }
+                }
+                self.triggers.armed = seen;
+            }
         }
     }
 }
@@ -271,13 +307,18 @@ pub fn config_get(state: State<'_, crate::AppState>) -> Config {
 }
 
 #[tauri::command]
-pub fn config_set(state: State<'_, crate::AppState>, patch: ConfigPatch) -> Result<Config> {
+pub fn config_set(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+    patch: ConfigPatch,
+) -> Result<Config> {
     let notes_root = patch.notes_root.clone().flatten();
     let config = state.state.set_config(patch)?;
     if let Some(root) = notes_root {
         // Keep the notes service in step with the setting it was saved from.
         state.notes.set_root(root)?;
     }
+    crate::triggers::refresh_app(&app);
     Ok(config)
 }
 
@@ -421,5 +462,57 @@ mod tests {
         };
         config.apply(patch);
         assert_eq!(config.shell.as_deref(), Some("zsh"));
+    }
+
+    #[test]
+    fn triggers_are_off_and_empty_by_default() {
+        let config = Config::default();
+        assert!(!config.triggers.enabled);
+        assert!(config.triggers.armed.is_empty());
+        let json = serde_json::to_value(&config).expect("config serialises");
+        assert_eq!(json["triggers"]["enabled"], false);
+        assert_eq!(json["triggers"]["armed"], serde_json::json!([]));
+    }
+
+    #[test]
+    fn a_config_written_before_triggers_loads_with_them_off() {
+        let config: Config =
+            serde_json::from_str(r#"{"version":1,"fontSize":18}"#).expect("older config parses");
+        assert_eq!(config.triggers, TriggersConfig::default());
+    }
+
+    #[test]
+    fn a_triggers_patch_changes_only_the_fields_it_carries() {
+        let mut config = Config::default();
+        let patch: ConfigPatch =
+            serde_json::from_str(r#"{"triggers":{"armed":["a","b"]}}"#).expect("patch parses");
+        config.apply(patch);
+        assert!(!config.triggers.enabled);
+        assert_eq!(
+            config.triggers.armed,
+            vec!["a".to_string(), "b".to_string()]
+        );
+
+        let patch: ConfigPatch =
+            serde_json::from_str(r#"{"triggers":{"enabled":true}}"#).expect("patch parses");
+        config.apply(patch);
+        assert!(config.triggers.enabled);
+        assert_eq!(config.triggers.armed.len(), 2);
+    }
+
+    #[test]
+    fn armed_ids_are_deduplicated_and_empty_ones_dropped() {
+        let mut config = Config::default();
+        config.apply(ConfigPatch {
+            triggers: Some(TriggersPatch {
+                enabled: None,
+                armed: Some(vec!["a".into(), "".into(), "a".into(), "b".into()]),
+            }),
+            ..Default::default()
+        });
+        assert_eq!(
+            config.triggers.armed,
+            vec!["a".to_string(), "b".to_string()]
+        );
     }
 }

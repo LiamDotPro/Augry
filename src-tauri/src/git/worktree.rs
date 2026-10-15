@@ -10,6 +10,8 @@ use tauri::{AppHandle, Manager};
 use super::cli;
 use crate::error::{AppError, Result};
 use crate::pty::TerminalId;
+use crate::triggers::feeds;
+use crate::triggers::internal::InternalSignal;
 
 /// Checking out a large repository into a new folder takes a while.
 const TIMEOUT: Duration = Duration::from_secs(120);
@@ -274,11 +276,34 @@ fn refresh(app: &AppHandle, id: &TerminalId) {
     super::refresh_repo_of(app, &state, id, Duration::ZERO);
 }
 
+/// `branch` is what the user typed; `create` trims it the same way. An empty
+/// name cannot get this far, but it would be left out rather than sent.
+fn created_signal(repo: String, path: &str, branch: &str) -> InternalSignal {
+    let branch = branch.trim();
+    InternalSignal::WorktreeCreated {
+        repo,
+        path: normalise(path),
+        branch: (!branch.is_empty()).then(|| branch.to_string()),
+    }
+}
+
+fn removed_signal(repo: String, path: &str) -> InternalSignal {
+    InternalSignal::WorktreeRemoved {
+        repo,
+        path: normalise(path),
+    }
+}
+
 #[tauri::command]
 pub async fn worktree_create(app: AppHandle, id: TerminalId, branch: String) -> Result<String> {
     crate::blocking(move || {
-        let path = create(&cwd_of(&app, &id)?, &branch)?;
+        let cwd = cwd_of(&app, &id)?;
+        let path = create(&cwd, &branch)?;
         refresh(&app, &id);
+        let state = app.state::<crate::AppState>();
+        if let Some(repo) = feeds::repo_root_of(&state, &cwd) {
+            feeds::publish(&app, created_signal(repo, &path, &branch));
+        }
         Ok(path)
     })
     .await?
@@ -287,8 +312,13 @@ pub async fn worktree_create(app: AppHandle, id: TerminalId, branch: String) -> 
 #[tauri::command]
 pub async fn worktree_remove(app: AppHandle, id: TerminalId, path: String) -> Result<()> {
     crate::blocking(move || {
-        remove(&cwd_of(&app, &id)?, &path)?;
+        let cwd = cwd_of(&app, &id)?;
+        remove(&cwd, &path)?;
         refresh(&app, &id);
+        let state = app.state::<crate::AppState>();
+        if let Some(repo) = feeds::repo_root_of(&state, &cwd) {
+            feeds::publish(&app, removed_signal(repo, &path));
+        }
         Ok(())
     })
     .await?
@@ -311,6 +341,40 @@ mod tests {
                           HEAD 77ab000000000000000000000000000000000cc\n\
                           detached\n\
                           prunable gitdir file points to non-existent location\n";
+
+    #[test]
+    fn a_created_worktree_names_the_trimmed_branch_and_a_forward_slash_path() {
+        let signal = created_signal("C:/dev/app".into(), "C:\\dev\\app-x", " x ");
+        assert_eq!(
+            signal,
+            InternalSignal::WorktreeCreated {
+                repo: "C:/dev/app".into(),
+                path: "C:/dev/app-x".into(),
+                branch: Some("x".into()),
+            }
+        );
+    }
+
+    #[test]
+    fn a_blank_branch_is_left_out_of_the_signal() {
+        let InternalSignal::WorktreeCreated { branch, .. } =
+            created_signal("/a".into(), "/b", "  ")
+        else {
+            panic!("expected WorktreeCreated");
+        };
+        assert_eq!(branch, None);
+    }
+
+    #[test]
+    fn a_removed_worktree_names_its_forward_slash_path() {
+        assert_eq!(
+            removed_signal("/a".into(), "C:\\dev\\app-x"),
+            InternalSignal::WorktreeRemoved {
+                repo: "/a".into(),
+                path: "C:/dev/app-x".into(),
+            }
+        );
+    }
 
     #[test]
     fn reads_every_block() {

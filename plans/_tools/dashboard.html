@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan progress</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect x=%221%22 y=%221%22 width=%226%22 height=%226%22 rx=%221%22 fill=%22%2323935f%22/%3E%3Crect x=%229%22 y=%221%22 width=%226%22 height=%226%22 rx=%221%22 fill=%22%232f6bff%22/%3E%3Crect x=%221%22 y=%229%22 width=%226%22 height=%226%22 rx=%221%22 fill=%22%239aa3ad%22/%3E%3Crect x=%229%22 y=%229%22 width=%226%22 height=%226%22 rx=%221%22 fill=%22%239aa3ad%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #e7eaee;
+    --pane: #ffffff;
+    --pane-2: #f4f6f8;
+    --ink: #1a1e23;
+    --muted: #5d6672;
+    --line: #d3d8de;
+    --focus: #2f6bff;
+    --done: #23935f;
+    --done-soft: #d9f2e5;
+    --work: #c98a00;
+    --work-soft: #fbefcf;
+    --blocked: #c0362c;
+    --blocked-soft: #f8dcd9;
+    --todo: #9aa3ad;
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15181c;
+      --pane: #1d2126;
+      --pane-2: #23282e;
+      --ink: #e6e9ed;
+      --muted: #98a1ac;
+      --line: #313840;
+      --focus: #5b8cff;
+      --done: #3cc283;
+      --done-soft: #183428;
+      --work: #e3a92a;
+      --work-soft: #3a2f14;
+      --blocked: #ef6b60;
+      --blocked-soft: #3d1e1c;
+      --todo: #66707b;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 14px/1.45 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-rows: auto auto 1fr;
+    gap: 12px;
+    padding: 12px;
+    min-height: 100vh;
+  }
+  .pane {
+    background: var(--pane);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    min-width: 0;
+  }
+  .pane > header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .pane > header h2 { font-size: 13px; font-weight: 600; margin: 0; }
+  .pane > header .meta { color: var(--muted); font-size: 12px; margin-left: auto; }
+
+  /* Top bar */
+  .top {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 2px 4px;
+  }
+  .top h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  .live { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; margin-left: auto; }
+  .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--todo); }
+  .live.on i { background: var(--done); }
+
+  /* Epic strip */
+  .epics {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(200px, 1fr);
+    gap: 8px;
+    overflow-x: auto;
+  }
+  .epic {
+    text-align: left;
+    background: var(--pane);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px 12px;
+    cursor: pointer;
+  }
+  .epic[aria-pressed="true"] { border-color: var(--focus); box-shadow: inset 0 0 0 1px var(--focus); }
+  .epic .row { display: flex; gap: 8px; align-items: baseline; }
+  .epic .id { font: 600 12px var(--mono); }
+  .epic .repo { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .epic .name { margin: 2px 0 8px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--pane-2); }
+  .bar span { display: block; }
+  .bar .done { background: var(--done); }
+  .bar .work { background: var(--work); }
+  .bar .blocked { background: var(--blocked); }
+  .epic .counts { margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+  /* Now */
+  .main { display: grid; gap: 12px; align-content: start; min-width: 0; }
+  .now-list { display: grid; gap: 10px; padding: 12px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .now {
+    border: 2px solid var(--focus);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: var(--pane);
+  }
+  .now .what { font-size: 12px; color: var(--muted); }
+  .now .title { font-size: 16px; font-weight: 600; margin: 2px 0 8px; }
+  .now .row { display: flex; gap: 12px; align-items: baseline; font-size: 13px; }
+  .now .clock { font: 600 20px var(--mono); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .idle { padding: 14px; color: var(--muted); }
+
+  /* Graph */
+  .graph-wrap { position: relative; overflow: auto; padding: 14px; }
+  .graph { position: relative; }
+  .graph svg { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+  .lane { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 14px; margin-bottom: 18px; padding-left: 36px; position: relative; }
+  .lane .label { position: absolute; left: 0; top: 8px; font: 600 12px var(--mono); color: var(--muted); }
+  .node {
+    flex: 0 0 170px;
+    min-height: 66px;
+    text-align: left;
+    background: var(--pane);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--todo);
+    border-radius: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+  }
+  .node .nid { font: 600 12px var(--mono); }
+  .node .model { font: 11px var(--mono); color: var(--muted); float: right; }
+  .node .t { font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .node.done { border-left-color: var(--done); }
+  .node.in-progress { border-left-color: var(--work); background: var(--work-soft); }
+  .node.blocked { border-left-color: var(--blocked); background: var(--blocked-soft); }
+  .node.running { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .node.just-done { animation: finished 2.4s ease-out 1; }
+  @keyframes finished {
+    0% { background: var(--done-soft); box-shadow: 0 0 0 3px var(--done); }
+    100% { background: var(--pane); box-shadow: 0 0 0 0 transparent; }
+  }
+  .empty { padding: 18px 14px; color: var(--muted); }
+
+  /* Side */
+  .side { display: grid; gap: 12px; align-content: start; min-width: 0; }
+  .feed { list-style: none; margin: 0; padding: 6px 0; max-height: 52vh; overflow: auto; }
+  .feed li { display: grid; grid-template-columns: 54px 1fr; gap: 8px; padding: 5px 14px; font-size: 13px; }
+  .feed time { font: 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .feed .pass { color: var(--done); }
+  .feed .fail, .feed .blocked { color: var(--blocked); }
+  .repo-block { padding: 10px 14px; border-top: 1px solid var(--line); }
+  .repo-block:first-of-type { border-top: 0; }
+  .repo-block h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+  .repo-block .branch { font: 12px var(--mono); color: var(--muted); }
+  .repo-block ol { list-style: none; margin: 6px 0 0; padding: 0; }
+  .repo-block li { font-size: 12px; padding: 2px 0; display: grid; grid-template-columns: 60px 1fr; gap: 6px; }
+  .repo-block code { font: 12px var(--mono); color: var(--muted); }
+  .repo-block li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Drawer */
+  dialog {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--pane);
+    color: var(--ink);
+    width: min(640px, 92vw);
+    max-height: 86vh;
+    padding: 0;
+  }
+  dialog::backdrop { background: rgb(0 0 0 / 0.35); }
+  dialog header { display: flex; gap: 10px; align-items: baseline; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  dialog h2 { margin: 0; font-size: 16px; }
+  dialog .body { padding: 12px 16px 16px; overflow: auto; max-height: calc(86vh - 60px); }
+  dialog dl { display: grid; grid-template-columns: 110px 1fr; gap: 4px 12px; margin: 0 0 12px; font-size: 13px; }
+  dialog dt { color: var(--muted); }
+  dialog dd { margin: 0; }
+  dialog code, dialog .mono { font: 12px var(--mono); }
+  dialog h4 { margin: 14px 0 4px; font-size: 13px; }
+  dialog p { margin: 0; max-width: 72ch; }
+  dialog ul { margin: 0; padding-left: 18px; font-size: 13px; }
+  .close { margin-left: auto; background: none; border: 1px solid var(--line); border-radius: 6px; padding: 2px 10px; cursor: pointer; }
+  .pill { font: 600 11px var(--mono); padding: 1px 6px; border-radius: 4px; background: var(--pane-2); }
+  .pill.done { background: var(--done-soft); color: var(--done); }
+  .pill.in-progress { background: var(--work-soft); color: var(--work); }
+  .pill.blocked { background: var(--blocked-soft); color: var(--blocked); }
+
+  @media (max-width: 960px) {
+    .app { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .node.just-done { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <h1>Plan progress</h1>
+    <span id="summary" class="meta"></span>
+    <span class="live" id="live"><i></i><span>Connecting</span></span>
+  </div>
+  <nav class="epics" id="epics" aria-label="Epics"></nav>
+  <main class="main">
+    <section class="pane" aria-labelledby="now-h">
+      <header><h2 id="now-h">Running now</h2><span class="meta" id="now-meta"></span></header>
+      <div id="now"></div>
+    </section>
+    <section class="pane" aria-labelledby="graph-h">
+      <header><h2 id="graph-h">Cards</h2><span class="meta" id="graph-meta"></span></header>
+      <div class="graph-wrap"><div class="graph" id="graph"></div></div>
+    </section>
+  </main>
+  <aside class="side">
+    <section class="pane" aria-labelledby="feed-h">
+      <header><h2 id="feed-h">Activity</h2><span class="meta" id="feed-meta"></span></header>
+      <ol class="feed" id="feed"></ol>
+    </section>
+    <section class="pane" aria-labelledby="repos-h">
+      <header><h2 id="repos-h">Checkouts</h2></header>
+      <div id="repos"></div>
+    </section>
+  </aside>
+</div>
+<dialog id="card"></dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let data = null;
+let selected = null;
+let lastStatus = new Map();
+let pinned = false;
+
+const PHRASE = {
+  'epic-start': (e) => `Started building ${e.epic}`,
+  'epic-end': (e) => `Finished ${e.epic}`,
+  'plan-start': (e) => `Architect started planning ${e.epic}`,
+  'plan-end': (e) => `Architect finished planning ${e.epic}`,
+  'research-start': (e) => `Researching ${e.card ?? ''}`,
+  'research-end': (e) => `Answered ${e.card ?? ''}`,
+  'carding-start': (e) => `Writing cards for slice ${e.card ?? ''}`,
+  'carding-end': (e) => `Cards written for slice ${e.card ?? ''}`,
+  'review-start': (e) => `Reviewing cards`,
+  'review-end': (e) => `Review done`,
+  'build-start': (e) => `${e.card} building`,
+  'build-end': (e) => `${e.card} built`,
+  'check-start': (e) => `${e.card} checking`,
+  'check-end': (e) => `${e.card} check: ${e.result ?? 'done'}`,
+  'retry': (e) => `${e.card} retrying`,
+  'escalate': (e) => `${e.card} escalated`,
+  'blocked': (e) => `${e.card} blocked`,
+  'commit': (e) => `${e.card} committed`,
+};
+const WHAT = {
+  build: (m) => `${cap(m || 'haiku')} is building`,
+  check: (m) => `${cap(m || 'sonnet')} is checking`,
+  research: (m) => `${cap(m || 'sonnet')} is researching`,
+  carding: (m) => `${cap(m || 'sonnet')} is writing cards`,
+  plan: (m) => `${cap(m || 'opus')} is planning`,
+  review: (m) => `${cap(m || 'opus')} is reviewing`,
+  epic: () => 'Epic build running',
+};
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+function running(activity) {
+  const open = new Map();
+  for (const e of activity) {
+    const m = e.event.match(/^(.*)-(start|end)$/);
+    if (!m) {
+      if (['blocked', 'commit'].includes(e.event)) {
+        for (const k of [...open.keys()]) if (k.startsWith(`${e.epic}/${e.card}/`)) open.delete(k);
+      }
+      continue;
+    }
+    const key = `${e.epic}/${e.card ?? ''}/${m[1]}`;
+    if (m[2] === 'start') open.set(key, { kind: m[1], ...e });
+    else open.delete(key);
+  }
+  return [...open.values()].filter((r) => r.kind !== 'epic');
+}
+
+function fmtClock(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
+}
+function ago(iso) {
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + ' min ago';
+  if (s < 86400) return Math.floor(s / 3600) + ' h ago';
+  return Math.floor(s / 86400) + ' d ago';
+}
+function hhmm(iso) {
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function counts(cards) {
+  const c = { done: 0, 'in-progress': 0, blocked: 0, todo: 0 };
+  for (const k of cards) c[k.status] = (c[k.status] ?? 0) + 1;
+  return c;
+}
+
+function pickDefault() {
+  const run = running(data.activity)[0];
+  if (run && data.epics.some((e) => e.id === run.epic)) return run.epic;
+  const active = data.epics.find((e) => e.cards.some((c) => c.status === 'in-progress'));
+  if (active) return active.id;
+  const next = data.epics.find((e) => e.cards.length && e.cards.some((c) => c.status !== 'done'));
+  return (next ?? data.epics[0])?.id;
+}
+
+function renderEpics() {
+  $('epics').innerHTML = data.epics.map((e) => {
+    const c = counts(e.cards);
+    const n = e.cards.length || 1;
+    const pct = (k) => (100 * (c[k] || 0)) / n;
+    const label = e.cards.length
+      ? `${c.done} of ${e.cards.length} done` + (c.blocked ? `, ${c.blocked} blocked` : '')
+      : `No cards yet, ${e.status}`;
+    return `<button class="epic" aria-pressed="${e.id === selected}" data-epic="${esc(e.id)}">
+      <div class="row"><span class="id">${esc(e.id.slice(0, 3))}</span><span class="repo" title="${e.worktree ? 'built in the worktree on branch ' + esc(e.worktree) : ''}">${esc(e.status)}${e.worktree ? ' · ' + esc(e.worktree) : ''}</span></div>
+      <div class="name" title="${esc(e.title)}">${esc(e.title)}</div>
+      <div class="bar" role="img" aria-label="${esc(label)}">
+        <span class="done" style="width:${pct('done')}%"></span><span class="work" style="width:${pct('in-progress')}%"></span><span class="blocked" style="width:${pct('blocked')}%"></span>
+      </div>
+      <div class="counts">${esc(label)}</div>
+    </button>`;
+  }).join('');
+}
+
+function renderNow() {
+  const runs = running(data.activity);
+  const inProg = data.epics.flatMap((e) => e.cards.filter((c) => c.status === 'in-progress').map((c) => ({ e, c })))
+    .filter(({ e, c }) => !runs.some((r) => r.epic === e.id && r.card === c.id));
+  if (!runs.length && !inProg.length) {
+    const last = data.activity.at(-1);
+    $('now').innerHTML = `<p class="idle">Nothing is running. ${last ? 'Last activity ' + ago(last.ts) + '.' : 'No activity recorded yet.'}</p>`;
+    $('now-meta').textContent = '';
+    return;
+  }
+  $('now-meta').textContent = runs.length + inProg.length + ' active';
+  const titleOf = (epic, card) => data.epics.find((e) => e.id === epic)?.cards.find((c) => c.id === card)?.title;
+  $('now').innerHTML = '<div class="now-list">' + runs.map((r) => {
+    const t = titleOf(r.epic, r.card) ?? (r.note || r.card || r.epic);
+    return `<div class="now" data-start="${esc(r.ts)}">
+      <div class="what">${esc((WHAT[r.kind] ?? (() => r.kind))(r.model))}${r.attempt ? ', attempt ' + esc(r.attempt) : ''}</div>
+      <div class="title">${esc(t)}</div>
+      <div class="row"><span class="mono">${esc(r.epic.slice(0, 3))} ${esc(r.card ?? '')}</span><span class="clock">${fmtClock(Date.now() - new Date(r.ts))}</span></div>
+    </div>`;
+  }).join('') + inProg.map(({ e, c }) => `<div class="now">
+      <div class="what">Marked in progress</div>
+      <div class="title">${esc(c.title)}</div>
+      <div class="row"><span class="mono">${esc(e.id.slice(0, 3))} ${esc(c.id)}</span></div>
+    </div>`).join('') + '</div>';
+}
+
+function renderGraph() {
+  const epic = data.epics.find((e) => e.id === selected);
+  if (!epic) { $('graph').innerHTML = ''; return; }
+  $('graph-h').textContent = `Cards in ${epic.id}`;
+  $('graph-meta').textContent = `${epic.cards.length} cards`;
+  if (!epic.cards.length) {
+    $('graph').innerHTML = `<p class="empty">No cards yet. This epic is at the ${esc(epic.status)} stage${epic.research ? `, with ${epic.research} research questions` : ''}.</p>`;
+    return;
+  }
+  const runs = running(data.activity).filter((r) => r.epic === epic.id).map((r) => r.card);
+  const lanes = new Map();
+  for (const c of epic.cards) {
+    const n = Number(String(c.id).slice(1));
+    const lane = String.fromCharCode(65 + Math.floor(n / 10));
+    if (!lanes.has(lane)) lanes.set(lane, []);
+    lanes.get(lane).push(c);
+  }
+  const html = [...lanes].map(([lane, cards]) => `<div class="lane"><span class="label">${lane}</span>${cards.map((c) => {
+    const key = `${epic.id}/${c.id}`;
+    const was = lastStatus.get(key);
+    const just = was && was !== 'done' && c.status === 'done' ? ' just-done' : '';
+    return `<button class="node ${esc(c.status)}${runs.includes(c.id) ? ' running' : ''}${just}" data-card="${esc(c.id)}" id="n-${esc(c.id)}" title="${esc(c.title)}">
+      <span class="model">${c.model === 'sonnet' ? 'sonnet' : ''}</span><span class="nid">${esc(c.id)}</span>
+      <span class="t">${esc(c.title)}</span></button>`;
+  }).join('')}</div>`).join('');
+  $('graph').innerHTML = html + '<svg id="edges"></svg>';
+  drawEdges(epic);
+}
+
+function drawEdges(epic) {
+  const svg = $('edges');
+  const box = $('graph').getBoundingClientRect();
+  const lines = [];
+  for (const c of epic.cards) {
+    const to = document.getElementById('n-' + c.id);
+    for (const d of c.dependsOn) {
+      if (d.includes('/')) continue;
+      const from = document.getElementById('n-' + d);
+      if (!from || !to) continue;
+      const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+      const sameLane = from.parentElement === to.parentElement;
+      // A card that waits on the card just before it in its lane: implied by order.
+      if (sameLane && to.previousElementSibling === from) continue;
+      const sameRow = Math.abs(a.top - b.top) < 4;
+      const x1 = a.left + a.width / 2 - box.left, y1 = a.bottom - box.top;
+      const x2 = b.left + b.width / 2 - box.left, y2 = b.top - box.top;
+      const done = epic.cards.find((k) => k.id === d)?.status === 'done';
+      const path = sameRow
+        ? `M${a.right - box.left},${a.top + a.height / 2 - box.top} C${a.right - box.left + 30},${a.bottom - box.top + 24} ${b.left - box.left - 30},${b.bottom - box.top + 24} ${b.left - box.left},${b.top + b.height / 2 - box.top}`
+        : `M${x1},${y1} C${x1},${(y1 + y2) / 2} ${x2},${(y1 + y2) / 2} ${x2},${y2}`;
+      lines.push(`<path d="${path}" fill="none" stroke="${done ? 'var(--done)' : 'var(--todo)'}" stroke-width="1.5" opacity="0.7"/>`);
+    }
+  }
+  svg.setAttribute('width', $('graph').scrollWidth);
+  svg.setAttribute('height', $('graph').scrollHeight);
+  svg.innerHTML = lines.join('');
+}
+
+function renderFeed() {
+  const items = data.activity.slice(-150).reverse();
+  $('feed-meta').textContent = items.length ? `${data.activity.length} events` : '';
+  $('feed').innerHTML = items.length
+    ? items.map((e) => {
+        const text = (PHRASE[e.event] ?? ((x) => `${x.event} ${x.card ?? ''}`))(e);
+        const cls = e.result === 'pass' ? 'pass' : e.result === 'fail' ? 'fail' : e.event === 'blocked' ? 'blocked' : '';
+        const who = e.model ? ` (${cap(e.model)})` : '';
+        return `<li><time datetime="${esc(e.ts)}">${hhmm(e.ts)}</time><span class="${cls}">${esc(text)}${esc(who)}${e.note ? `<br><small>${esc(e.note)}</small>` : ''}</span></li>`;
+      }).join('')
+    : '<li><span></span><span class="idle">Events appear here while /plan-epic and /build-epic run.</span></li>';
+}
+
+function renderRepos() {
+  $('repos').innerHTML = Object.entries(data.git).map(([name, g]) => {
+    if (!g) return `<div class="repo-block"><h3>${esc(name)}</h3><div class="branch">Git is not available.</div></div>`;
+    return `<div class="repo-block"><h3>${esc(name)}</h3>
+      <div class="branch">${esc(g.branch || 'detached')}${g.dirty ? `, ${g.dirty} uncommitted` : ', clean'}</div>
+      <ol>${g.commits.slice(0, 6).map((c) => `<li><code>${esc(c.hash)}</code><span title="${esc(c.subject)}">${esc(c.subject)}</span></li>`).join('')}</ol></div>`;
+  }).join('');
+}
+
+function openCard(id) {
+  const epic = data.epics.find((e) => e.id === selected);
+  const c = epic?.cards.find((k) => k.id === id);
+  if (!c) return;
+  const dlg = $('card');
+  dlg.innerHTML = `<header><h2>${esc(c.id)} ${esc(c.title)}</h2><button class="close" autofocus>Close</button></header>
+    <div class="body">
+      <dl>
+        <dt>Status</dt><dd><span class="pill ${esc(c.status)}">${esc(c.status)}</span></dd>
+        <dt>Size, model</dt><dd>${esc(c.size)}, ${esc(c.model)}</dd>
+        <dt>Waits on</dt><dd class="mono">${c.dependsOn.length ? esc(c.dependsOn.join(', ')) : 'nothing'}</dd>
+        <dt>Card file</dt><dd class="mono">plans/${esc(epic.id)}/tasks/${esc(c.file)}</dd>
+      </dl>
+      <h4>Goal</h4><p>${esc(c.goal)}</p>
+      <h4>Files it may touch</h4><ul>${c.files.map((f) => `<li class="mono">${esc(f)}</li>`).join('')}</ul>
+      <h4>Log</h4>${c.log.length ? `<ul>${c.log.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : '<p class="idle">No attempts yet.</p>'}
+    </div>`;
+  dlg.querySelector('.close').onclick = () => dlg.close();
+  dlg.showModal();
+}
+
+function render() {
+  if (!pinned || !data.epics.some((e) => e.id === selected)) selected = pickDefault();
+  const all = data.epics.flatMap((e) => e.cards);
+  const c = counts(all);
+  $('summary').textContent = `${c.done} of ${all.length} cards done across ${data.epics.length} epics` + (c.blocked ? `, ${c.blocked} blocked` : '');
+  renderEpics();
+  renderNow();
+  renderGraph();
+  renderFeed();
+  renderRepos();
+  lastStatus = new Map(data.epics.flatMap((e) => e.cards.map((k) => [`${e.id}/${k.id}`, k.status])));
+}
+
+async function refresh() {
+  try {
+    const res = await fetch('/api/state', { cache: 'no-store' });
+    data = await res.json();
+    render();
+  } catch {
+    setLive(false);
+  }
+}
+function setLive(on) {
+  $('live').classList.toggle('on', on);
+  $('live').querySelector('span').textContent = on ? 'Live' : 'Reconnecting';
+}
+
+$('epics').addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-epic]');
+  if (!b) return;
+  selected = b.dataset.epic;
+  pinned = true;
+  render();
+});
+$('graph').addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-card]');
+  if (b) openCard(b.dataset.card);
+});
+window.addEventListener('resize', () => data && renderGraph());
+
+setInterval(() => {
+  for (const el of document.querySelectorAll('.now[data-start]')) {
+    el.querySelector('.clock').textContent = fmtClock(Date.now() - new Date(el.dataset.start));
+  }
+}, 1000);
+
+const es = new EventSource('/events');
+es.onopen = () => setLive(true);
+es.onerror = () => setLive(false);
+es.onmessage = () => refresh();
+setInterval(refresh, 15000);
+refresh();
+</script>
+</body>
+</html>

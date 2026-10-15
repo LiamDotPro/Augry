@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GitInfo, NoteLink, TerminalInfo, Worktree } from "../ipc/types";
 import { paneStatus, toPaneView } from "./model";
-import { initialState, reducer, toSession, totalPages, visibleIds, type AppState } from "./reducer";
+import { DEFAULT_CONFIG, initialState, reducer, toSession, totalPages, visibleIds, type AppState } from "./reducer";
 
 const info = (id: string, cwd = `C:/dev/${id}`): TerminalInfo => ({
   id,
@@ -489,5 +489,29 @@ describe("session notes", () => {
     expect(state.terminals.t0!.notes).toEqual([]);
     expect(state.copiedNotes).toEqual({});
     expect(state.noteToast).toBeNull();
+  });
+});
+
+describe("triggers and notices", () => {
+  it("starts with triggers off, no status and no notice", () => {
+    expect(DEFAULT_CONFIG.triggers).toEqual({ enabled: false, armed: [] });
+    expect(initialState.triggers.status).toBeNull();
+    expect(initialState.notice).toBeNull();
+  });
+
+  it("keeps the last status", () => {
+    const status = { enabled: true, processes: [] };
+    const state = reducer(initialState, { type: "triggers/status", status });
+    expect(state.triggers.status).toBe(status);
+  });
+
+  it("raises and clears a notice without touching the error toast", () => {
+    let state = reducer(initialState, { type: "ui/error", message: "boom" });
+    state = reducer(state, { type: "ui/notice", notice: { message: "Trigger fired", at: 5 } });
+    expect(state.notice).toEqual({ message: "Trigger fired", at: 5 });
+    expect(state.error).toBe("boom");
+    state = reducer(state, { type: "ui/notice", notice: null });
+    expect(state.notice).toBeNull();
+    expect(state.error).toBe("boom");
   });
 });

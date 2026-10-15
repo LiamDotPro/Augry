@@ -3,6 +3,7 @@ import type { Config, HotkeyModifier, ThemePreference } from "../ipc/types";
 import { cx } from "../lib/cx";
 import { useAppearance } from "../lib/appearance";
 import { IS_MAC } from "../lib/hotkeys";
+import { processStatusLine } from "../lib/triggers";
 import { useAppActions, useAppState } from "../state/AppProvider";
 
 /** The backend's fallback order differs by platform (src-tauri/src/pty/shell.rs). */
@@ -66,6 +67,8 @@ export function SettingsDialog() {
   const [initialNotesRoot] = useState(draft.notesRoot);
   const [pattern, setPattern] = useState("");
   const sheet = useRef<HTMLFormElement>(null);
+  const triggersOn = state.config.triggers.enabled;
+  const triggers = state.triggers.status;
   useAppearance(draft.theme, draft.compactLayout, {
     focus: draft.focusColor,
     finished: draft.finishedColor,
@@ -85,6 +88,12 @@ export function SettingsDialog() {
   useEffect(() => {
     sheet.current?.querySelector<HTMLElement>("select, input, button")?.focus();
   }, []);
+
+  // The list of definitions is read each time the sheet opens, so a file
+  // added since shows up.
+  useEffect(() => {
+    void actions.loadTriggersStatus();
+  }, [actions]);
 
   const patch = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
@@ -385,6 +394,58 @@ export function SettingsDialog() {
               </button>
             </div>
           </div>
+
+          <div className="row">
+            <div className="row__label" id="settings-triggers">
+              Process triggers (experimental)
+              <div className="row__hint">
+                Applies as soon as you change it. Definitions are JSON files in the processes folder
+                of the app's config folder.
+                {IS_MAC &&
+                  " macOS may ask for access to Desktop, Documents or Downloads the first time a trigger watches them."}
+              </div>
+            </div>
+            <div className="segmented" role="radiogroup" aria-labelledby="settings-triggers">
+              {[false, true].map((value) => (
+                <button
+                  key={String(value)}
+                  type="button"
+                  role="radio"
+                  aria-checked={triggersOn === value}
+                  className={cx("segmented__item", triggersOn === value && "segmented__item--active")}
+                  onClick={() => void actions.setTriggersEnabled(value)}
+                >
+                  {value ? "On" : "Off"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {triggersOn &&
+            triggers?.processes.map((process) => (
+              <div className="row row--top" key={process.id}>
+                <div className="row__label">{process.name}</div>
+                <div className="process">
+                  <label className="process__armed">
+                    <input
+                      type="checkbox"
+                      checked={process.armed}
+                      disabled={Boolean(process.problem) && !process.armed}
+                      onChange={(event) => void actions.armProcess(process.id, event.target.checked)}
+                    />
+                    Armed
+                  </label>
+                  <div className="row__hint">{processStatusLine(process)}</div>
+                </div>
+              </div>
+            ))}
+
+          {triggersOn && triggers && triggers.processes.length === 0 && (
+            <div className="row">
+              <div className="row__label">Definitions</div>
+              <div className="row__note">No process definitions found.</div>
+            </div>
+          )}
         </div>
 
         <div className="sheet__foot">

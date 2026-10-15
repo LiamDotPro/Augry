@@ -1,0 +1,6 @@
+[
+  {"id":399674750,"tag_name":"v2.103.0-rc.1","name":"GitHub CLI 2.103.0 RC1","draft":false,"prerelease":true,"published_at":"2026-10-10T02:40:02Z","created_at":"2026-10-10T02:40:02Z","html_url":"https://github.com/cli/cli/releases/tag/v2.103.0-rc.1","author":{"login":"github-actions[bot]"}},
+  {"id":399674745,"tag_name":"v2.102.1","name":null,"draft":true,"prerelease":false,"published_at":null,"created_at":"2026-10-10T00:00:00Z","html_url":"https://github.com/cli/cli/releases/tag/v2.102.1","author":{"login":"github-actions[bot]"}},
+  {"id":399674740,"tag_name":"v2.102.0","name":"GitHub CLI 2.102.0","draft":false,"prerelease":false,"published_at":"2026-09-30T02:40:02Z","created_at":"2026-09-30T02:40:02Z","html_url":"https://github.com/cli/cli/releases/tag/v2.102.0","author":{"login":"github-actions[bot]"}},
+  {"id":399674700,"tag_name":"v2.101.0","name":"GitHub CLI 2.101.0","draft":false,"prerelease":false,"published_at":"2026-09-15T02:40:02Z","created_at":"2026-09-15T02:40:02Z","html_url":"https://github.com/cli/cli/releases/tag/v2.101.0","author":{"login":"github-actions[bot]"}}
+]

@@ -1,7 +1,9 @@
 //! Terminal sessions. See docs/technical-design.md section 4.
 
+pub mod marks;
 pub mod reader;
 pub mod shell;
+pub mod tap;
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -71,6 +73,9 @@ struct Session {
     spawned_at: Instant,
     /// Bumped on restart so the previous reader and waiter threads fall silent.
     generation: u64,
+    /// Times commands for the internal triggers. `write` starts it, the reader
+    /// thread stops it.
+    clock: Arc<Mutex<tap::CommandClock>>,
 }
 
 impl Session {
@@ -212,6 +217,9 @@ impl PtyManager {
         for arg in &shell.args {
             command.arg(arg);
         }
+        for (key, value) in &shell.env {
+            command.env(key, value);
+        }
         command.cwd(&cwd);
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
@@ -252,6 +260,7 @@ impl PtyManager {
             })?;
 
         let generation = self.generations.fetch_add(1, Ordering::SeqCst) + 1;
+        let clock = Arc::new(Mutex::new(tap::CommandClock::default()));
 
         let session = Session {
             master: pair.master,
@@ -264,6 +273,7 @@ impl PtyManager {
             exit_code: None,
             spawned_at: Instant::now(),
             generation,
+            clock: Arc::clone(&clock),
         };
         let info = session.info(&id);
         self.sessions
@@ -271,7 +281,7 @@ impl PtyManager {
             .expect("pty sessions")
             .insert(id.clone(), session);
 
-        self.start_reader(app.clone(), id.clone(), generation, output);
+        self.start_reader(app.clone(), id.clone(), generation, output, clock);
         self.start_waiter(app.clone(), id, generation, child);
 
         Ok(info)
@@ -286,20 +296,34 @@ impl PtyManager {
         id: TerminalId,
         generation: u64,
         mut output: Box<dyn Read + Send>,
+        clock: Arc<Mutex<tap::CommandClock>>,
     ) {
         let pump = Arc::new(OutputPump::new());
         let sessions = Arc::clone(&self.sessions);
+        // The reader thread publishes trigger signals, so it needs the app.
+        let tap_app = app.clone();
+        let mut tap = tap::Tap::new(id.clone(), clock);
 
         {
             let pump = Arc::clone(&pump);
             let id = id.clone();
             std::thread::spawn(move || {
                 let mut buffer = [0u8; reader::READ_BUFFER];
+                // Cleared if the tap ever panics, so output keeps flowing.
+                let mut tapping = true;
                 loop {
                     match output.read(&mut buffer) {
                         Ok(0) => break,
                         Ok(count) => {
                             pump.push(&buffer[..count]);
+                            if tapping {
+                                // A bug in the tap must never stop the pane's output.
+                                let published =
+                                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                        publish_signals(&tap_app, &mut tap, &buffer[..count])
+                                    }));
+                                tapping = published.is_ok();
+                            }
                             // Pace a runaway writer rather than dropping its bytes.
                             if pump.should_throttle() {
                                 std::thread::sleep(reader::THROTTLE_SLEEP);
@@ -358,6 +382,13 @@ impl PtyManager {
         let session = guard.get_mut(id).ok_or_else(|| not_found(id))?;
         if session.exited {
             return Ok(());
+        }
+        if bytes.contains(&b'\r') {
+            session
+                .clock
+                .lock()
+                .expect("pty clock")
+                .on_enter(Instant::now());
         }
         session.writer.write_all(bytes)?;
         session.writer.flush()?;
@@ -465,6 +496,28 @@ fn is_current(
         .is_some_and(|session| session.generation == generation)
 }
 
+/// Gives a chunk of output to the session's tap and publishes what it finds
+/// (command ended, bell, output lines) to the internal triggers. Runs after the
+/// chunk is queued for the window, so it never delays the screen.
+fn publish_signals(app: &AppHandle, tap: &mut tap::Tap, chunk: &[u8]) {
+    let state = app.state::<crate::AppState>();
+    let signals = tap.process(
+        chunk,
+        state.triggers.wants_output(),
+        Instant::now(),
+        |pane| {
+            state
+                .pty
+                .cwd_of(&pane.to_string())
+                .map(|cwd| path_string(&cwd))
+                .unwrap_or_default()
+        },
+    );
+    for signal in signals {
+        state.triggers.publish_internal(signal);
+    }
+}
+
 fn emit_output(app: &AppHandle, id: &TerminalId, bytes: Vec<u8>) -> bool {
     let data_b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
     app.emit_to(
@@ -517,6 +570,27 @@ pub async fn create_terminal(
         let config = state.state.config();
         let info = state.pty.spawn(&app, id, cwd, cols, rows, &config)?;
         state.agent.wake();
+        // The rules that name this pane's repository (`${repo.root}`) must be
+        // armed before the signal goes out, so refresh first and publish after,
+        // on one spawned thread. Starting a source can take seconds, and the
+        // new pane must not wait for it.
+        let (pane, pane_cwd) = (info.id.clone(), info.cwd.clone());
+        let pane_app = app.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let state = pane_app.state::<crate::AppState>();
+            crate::triggers::refresh_now(&state);
+            if crate::triggers::feeds::enabled(&state) {
+                let repo_root = crate::triggers::feeds::repo_root_of(&state, Path::new(&pane_cwd));
+                crate::triggers::feeds::publish(
+                    &pane_app,
+                    crate::triggers::internal::InternalSignal::PaneOpened {
+                        pane,
+                        cwd: pane_cwd,
+                        repo_root,
+                    },
+                );
+            }
+        });
         Ok(info)
     })
     .await?
@@ -556,8 +630,14 @@ pub fn resize_terminal(
 }
 
 #[tauri::command]
-pub fn close_terminal(state: State<'_, crate::AppState>, id: TerminalId) -> Result<()> {
-    state.pty.close(&id)
+pub fn close_terminal(
+    app: AppHandle,
+    state: State<'_, crate::AppState>,
+    id: TerminalId,
+) -> Result<()> {
+    state.pty.close(&id)?;
+    crate::triggers::refresh_app(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -609,6 +689,7 @@ pub fn report_cwd(
             cwd: cwd.clone(),
         },
     );
+    crate::triggers::refresh_app(&app);
 
     let app_handle = app.clone();
     let inner_id = id;
@@ -625,10 +706,19 @@ pub fn set_focused_terminal(
     state: State<'_, crate::AppState>,
     id: Option<TerminalId>,
 ) -> Result<()> {
+    let previous = state.pty.focused();
     state.pty.set_focused(id.clone());
     let Some(id) = id else {
         return Ok(());
     };
+
+    if let Some(cwd) = state.pty.cwd_of(&id) {
+        if let Some(signal) =
+            crate::triggers::feeds::focus_entered(previous.as_deref(), &id, &path_string(&cwd))
+        {
+            crate::triggers::feeds::publish(&app, signal);
+        }
+    }
 
     let app_handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {

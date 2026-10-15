@@ -15,9 +15,10 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
-use crate::pty::TerminalId;
+use crate::pty::{path_string, TerminalId};
+use crate::triggers::feeds;
 
 pub const EVENT_TASK: &str = "terminal://task";
 pub const ENV_TASK_FILE: &str = "TERMINAL_GRID_TASK_FILE";
@@ -132,6 +133,7 @@ impl TaskTracker {
                 .duration_since(UNIX_EPOCH)
                 .map(|elapsed| elapsed.as_millis() as u64)
                 .unwrap_or(0);
+            let reported = task.clone();
             let _ = app.emit_to(
                 "main",
                 EVENT_TASK,
@@ -141,6 +143,17 @@ impl TaskTracker {
                     updated_at_ms,
                 },
             );
+
+            // Only a map read, because this is the agent watcher thread.
+            let cwd = app
+                .state::<crate::AppState>()
+                .pty
+                .cwd_of(id)
+                .map(|cwd| path_string(&cwd))
+                .unwrap_or_default();
+            if let Some(signal) = feeds::task_reported(id, &cwd, reported.as_deref()) {
+                feeds::publish(app, signal);
+            }
         }
     }
 }
